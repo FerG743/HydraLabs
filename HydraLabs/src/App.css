@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Pastel Professional Light Mode (for fallback) */
+    --background: 220 13% 18%; /* #1F2937 */
+    --foreground: 210 20% 98%; /* #F8FAFC */
+    --card: 220 13% 23%; /* #374151 */
+    --card-foreground: 210 20% 98%;
+    --popover: 220 13% 23%;
+    --popover-foreground: 210 20% 98%;
+    
+    /* Primary - Teal */
+    --primary: 172 82% 40%; /* #14B8A6 */
+    --primary-foreground: 210 20% 98%;
+    
+    /* Secondary - Using card color for consistency */
+    --secondary: 220 13% 23%;
+    --secondary-foreground: 210 20% 98%;
+    
+    /* Muted colors */
+    --muted: 220 13% 23%;
+    --muted-foreground: 215 13% 65%;
+    
+    /* Accent - Using primary teal */
+    --accent: 172 82% 40%;
+    --accent-foreground: 210 20% 98%;
+    
+    /* Status colors */
+    --destructive: 347 77% 50%; /* #E11D48 - Rose red */
+    --destructive-foreground: 210 20% 98%;
+    
+    /* Border and input */
+    --border: 220 13% 28%; /* Slightly lighter than panels */
+    --input: 220 13% 28%;
+    --ring: 172 82% 40%; /* Teal ring */
+    
+    /* Chart colors using your palette */
+    --chart-1: 172 82% 40%; /* Teal */
+    --chart-2: 84 81% 44%; /* Lime */
+    --chart-3: 32 95% 44%; /* Amber */
+    --chart-4: 347 77% 50%; /* Rose */
+    --chart-5: 220 13% 60%; /* Gray variant */
+    
+    --radius: 0.5rem;
+  }
+
+  /* Dark mode (using the same colors since this is already a dark theme) */
+  .dark {
+    --background: 220 13% 18%;
+    --foreground: 210 20% 98%;
+    --card: 220 13% 23%;
+    --card-foreground: 210 20% 98%;
+    --popover: 220 13% 23%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 172 82% 40%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 220 13% 23%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 220 13% 23%;
+    --muted-foreground: 215 13% 65%;
+    --accent: 172 82% 40%;
+    --accent-foreground: 210 20% 98%;
+    --destructive: 347 77% 50%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 220 13% 28%;
+    --input: 220 13% 28%;
+    --ring: 172 82% 40%;
+    --chart-1: 172 82% 40%;
+    --chart-2: 84 81% 44%;
+    --chart-3: 32 95% 44%;
+    --chart-4: 347 77% 50%;
+    --chart-5: 220 13% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Custom utility classes for your specific colors */
+@layer utilities {
+  .bg-panel {
+    background-color: #374151;
+  }
+  
+  .text-success {
+    color: #65A30D;
+  }
+  
+  .bg-success {
+    background-color: #65A30D;
+  }
+  
+  .text-warning {
+    color: #D97706;
+  }
+  
+  .bg-warning {
+    background-color: #D97706;
+  }
+  
+  .text-error {
+    color: #E11D48;
+  }
+  
+  .bg-error {
+    background-color: #E11D48;
+  }
+}

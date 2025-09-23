@@ -1,7 +1,7 @@
 import React from "react";
 import { Eye, Trash2, Download } from "lucide-react";
 import { DEFAULT_ICONS } from "./constants";
-import { formatTime, copyToClipboard } from "./utils";
+import { formatTime, copyToClipboard } from "./ActivityPanleUtils";
 import { ActivityItem } from "./ActivityItem";
 import { ResultCard } from "./ResultCard";
 import { MetricCard } from "./MetricCard";

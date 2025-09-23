@@ -4,75 +4,87 @@
 
 @layer base {
   :root {
-    /* Pastel Professional Light Mode (for fallback) */
-    --background: 220 13% 18%; /* #1F2937 */
-    --foreground: 210 20% 98%; /* #F8FAFC */
-    --card: 220 13% 23%; /* #374151 */
-    --card-foreground: 210 20% 98%;
-    --popover: 220 13% 23%;
-    --popover-foreground: 210 20% 98%;
+    /* Striking Dark Theme - No Blue Colors */
+    --background: 300 15% 6%; /* Deep Purple Black #0F0A0F */
+    --foreground: 60 9% 98%; /* Warm White #FBFBF6 */
+    --card: 315 20% 9%; /* Dark Charcoal Purple #1A0F1A */
+    --card-foreground: 60 9% 98%;
+    --popover: 315 20% 9%;
+    --popover-foreground: 60 9% 98%;
     
-    /* Primary - Teal */
-    --primary: 172 82% 40%; /* #14B8A6 */
-    --primary-foreground: 210 20% 98%;
+    /* Primary - Electric Lime Green */
+    --primary: 75 100% 50%; /* #80FF00 - Bright Electric Lime */
+    --primary-foreground: 300 15% 6%;
     
-    /* Secondary - Using card color for consistency */
-    --secondary: 220 13% 23%;
-    --secondary-foreground: 210 20% 98%;
+    /* Secondary - Deep Magenta */
+    --secondary: 320 60% 15%; /* #3D0B26 */
+    --secondary-foreground: 60 9% 98%;
     
     /* Muted colors */
-    --muted: 220 13% 23%;
-    --muted-foreground: 215 13% 65%;
+    --muted: 315 20% 12%; /* #241A24 */
+    --muted-foreground: 300 15% 65%;
     
-    /* Accent - Using primary teal */
-    --accent: 172 82% 40%;
-    --accent-foreground: 210 20% 98%;
+    /* Accent - Hot Coral/Salmon */
+    --accent: 15 100% 60%; /* #FF4D00 - Vibrant Orange-Red */
+    --accent-foreground: 60 9% 98%;
     
-    /* Status colors */
-    --destructive: 347 77% 50%; /* #E11D48 - Rose red */
-    --destructive-foreground: 210 20% 98%;
+    /* Status colors - Bold and unique */
+    --destructive: 355 85% 60%; /* #E6194D - Hot Pink Red */
+    --destructive-foreground: 60 9% 98%;
+    
+    /* Success - Neon Lime */
+    --success: 75 100% 50%; /* #80FF00 - Electric Lime Green */
+    --success-foreground: 300 15% 6%;
+    
+    /* Warning - Vibrant Orange */
+    --warning: 35 100% 55%; /* #FF9900 - Bright Orange */
+    --warning-foreground: 300 15% 6%;
+    
+    /* Error - Magenta Red */
+    --error: 340 90% 58%; /* #F0336B - Bright Magenta */
+    --error-foreground: 60 9% 98%;
     
     /* Border and input */
-    --border: 220 13% 28%; /* Slightly lighter than panels */
-    --input: 220 13% 28%;
-    --ring: 172 82% 40%; /* Teal ring */
+    --border: 315 20% 18%; /* #3A2B3A */
+    --input: 315 20% 18%;
+    --ring: 75 100% 50%; /* Electric Lime ring */
     
-    /* Chart colors using your palette */
-    --chart-1: 172 82% 40%; /* Teal */
-    --chart-2: 84 81% 44%; /* Lime */
-    --chart-3: 32 95% 44%; /* Amber */
-    --chart-4: 347 77% 50%; /* Rose */
-    --chart-5: 220 13% 60%; /* Gray variant */
+    /* Chart colors - Vibrant spectrum (no blue) */
+    --chart-1: 75 100% 50%; /* Electric Lime */
+    --chart-2: 35 100% 55%; /* Vibrant Orange */
+    --chart-3: 340 90% 58%; /* Magenta */
+    --chart-4: 285 100% 70%; /* Electric Purple */
+    --chart-5: 15 100% 60%; /* Hot Coral */
     
-    --radius: 0.5rem;
+    --radius: 0.75rem;
   }
 
-  /* Dark mode (using the same colors since this is already a dark theme) */
+  /* Dark mode (same colors since we're going full dark) */
   .dark {
-    --background: 220 13% 18%;
-    --foreground: 210 20% 98%;
-    --card: 220 13% 23%;
-    --card-foreground: 210 20% 98%;
-    --popover: 220 13% 23%;
-    --popover-foreground: 210 20% 98%;
-    --primary: 172 82% 40%;
-    --primary-foreground: 210 20% 98%;
-    --secondary: 220 13% 23%;
-    --secondary-foreground: 210 20% 98%;
-    --muted: 220 13% 23%;
-    --muted-foreground: 215 13% 65%;
-    --accent: 172 82% 40%;
-    --accent-foreground: 210 20% 98%;
-    --destructive: 347 77% 50%;
-    --destructive-foreground: 210 20% 98%;
-    --border: 220 13% 28%;
-    --input: 220 13% 28%;
-    --ring: 172 82% 40%;
-    --chart-1: 172 82% 40%;
-    --chart-2: 84 81% 44%;
-    --chart-3: 32 95% 44%;
-    --chart-4: 347 77% 50%;
-    --chart-5: 220 13% 60%;
+    --background: 300 15% 6%;
+    --foreground: 60 9% 98%;
+    --card: 315 20% 9%;
+    --card-foreground: 60 9% 98%;
+    --popover: 315 20% 9%;
+    --popover-foreground: 60 9% 98%;
+    --primary: 75 100% 50%;
+    --primary-foreground: 300 15% 6%;
+    --secondary: 320 60% 15%;
+    --secondary-foreground: 60 9% 98%;
+    --muted: 315 20% 12%;
+    --muted-foreground: 300 15% 65%;
+    --accent: 15 100% 60%;
+    --accent-foreground: 60 9% 98%;
+    --destructive: 355 85% 60%;
+    --destructive-foreground: 60 9% 98%;
+    --border: 315 20% 18%;
+    --input: 315 20% 18%;
+    --ring: 75 100% 50%;
+    --chart-1: 75 100% 50%;
+    --chart-2: 35 100% 55%;
+    --chart-3: 340 90% 58%;
+    --chart-4: 285 100% 70%;
+    --chart-5: 15 100% 60%;
   }
 }
 
@@ -86,33 +98,382 @@
   }
 }
 
-/* Custom utility classes for your specific colors */
+/* Enhanced utility classes with striking non-blue colors */
 @layer utilities {
   .bg-panel {
-    background-color: #374151;
+    background-color: hsl(var(--card));
   }
   
+  /* Success - Electric Lime */
   .text-success {
-    color: #65A30D;
+    color: hsl(var(--success));
   }
   
   .bg-success {
-    background-color: #65A30D;
+    background-color: hsl(var(--success));
   }
   
+  /* Warning - Vibrant Orange */
   .text-warning {
-    color: #D97706;
+    color: hsl(var(--warning));
   }
   
   .bg-warning {
-    background-color: #D97706;
+    background-color: hsl(var(--warning));
   }
   
+  /* Error - Magenta Red */
   .text-error {
-    color: #E11D48;
+    color: hsl(var(--error));
   }
   
   .bg-error {
-    background-color: #E11D48;
+    background-color: hsl(var(--error));
+  }
+
+  /* Additional striking utilities - NO BLUE */
+  .text-electric-lime {
+    color: #80FF00;
+  }
+  
+  .bg-electric-lime {
+    background-color: #80FF00;
+  }
+  
+  .text-hot-coral {
+    color: #FF4D00;
+  }
+  
+  .bg-hot-coral {
+    background-color: #FF4D00;
+  }
+  
+  .text-magenta {
+    color: #F0336B;
+  }
+  
+  .bg-magenta {
+    background-color: #F0336B;
+  }
+  
+  .text-electric-purple {
+    color: #CC66FF;
+  }
+  
+  .bg-electric-purple {
+    background-color: #CC66FF;
+  }
+
+  .text-golden-yellow {
+    color: #FFD700;
+  }
+  
+  .bg-golden-yellow {
+    background-color: #FFD700;
+  }
+
+  /* Gradient utilities with warm colors */
+  .bg-gradient-fire {
+    background: linear-gradient(135deg, #80FF00 0%, #FF4D00 100%);
+  }
+  
+  .bg-gradient-sunset {
+    background: linear-gradient(135deg, #FF9900 0%, #F0336B 100%);
+  }
+  
+  .bg-gradient-neon {
+    background: linear-gradient(135deg, #80FF00 0%, #CC66FF 100%);
+  }
+
+  .bg-gradient-volcanic {
+    background: linear-gradient(135deg, #FF4D00 0%, #E6194D 100%);
+  }
+
+  /* Glowing effects - warm colors */
+  .glow-lime {
+    box-shadow: 0 0 20px rgba(128, 255, 0, 0.4);
+  }
+  
+  .glow-coral {
+    box-shadow: 0 0 20px rgba(255, 77, 0, 0.4);
+  }
+  
+  .glow-magenta {
+    box-shadow: 0 0 20px rgba(240, 51, 107, 0.4);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 20px rgba(204, 102, 255, 0.4);
+  }
+
+  /* Hover glow effects */
+  .hover-glow-lime:hover {
+    box-shadow: 0 0 25px rgba(128, 255, 0, 0.6);
+    transition: box-shadow 0.3s ease;
+  }
+  
+  .hover-glow-coral:hover {
+    box-shadow: 0 0 25px rgba(255, 77, 0, 0.6);
+    transition: box-shadow 0.3s ease;
+  }
+
+  .hover-glow-magenta:hover {
+    box-shadow: 0 0 25px rgba(240, 51, 107, 0.6);
+    transition: box-shadow 0.3s ease;
+  }
+
+  /* Status indicator improvements */
+  .status-dot-success {
+    background-color: hsl(var(--success));
+    box-shadow: 0 0 8px rgba(128, 255, 0, 0.7);
+  }
+  
+  .status-dot-error {
+    background-color: hsl(var(--error));
+    box-shadow: 0 0 8px rgba(240, 51, 107, 0.7);
+  }
+  
+  .status-dot-warning {
+    background-color: hsl(var(--warning));
+    box-shadow: 0 0 8px rgba(255, 153, 0, 0.7);
+  }
+
+  /* Enhanced method colors for HTTP requests - NO BLUE */
+  .method-get {
+    @apply bg-success/20 text-success border-success/30;
+  }
+  
+  .method-post {
+    @apply bg-warning/20 text-warning border-warning/30;
+  }
+  
+  .method-put {
+    @apply bg-accent/20 text-accent border-accent/30;
+  }
+  
+  .method-patch {
+    @apply bg-electric-purple/20 text-electric-purple border-electric-purple/30;
+  }
+  
+  .method-delete {
+    @apply bg-destructive/20 text-destructive border-destructive/30;
+  }
+
+  /* Animated pulse for loading states */
+  .pulse-lime {
+    animation: pulse-lime 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes pulse-lime {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 rgba(128, 255, 0, 0.7);
+    }
+    50% {
+      opacity: .8;
+      box-shadow: 0 0 0 10px rgba(128, 255, 0, 0);
+    }
+  }
+
+  .pulse-coral {
+    animation: pulse-coral 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes pulse-coral {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 rgba(255, 77, 0, 0.7);
+    }
+    50% {
+      opacity: .8;
+      box-shadow: 0 0 0 10px rgba(255, 77, 0, 0);
+    }
+  }
+
+  /* Border gradients */
+  .border-gradient-fire {
+    border: 2px solid transparent;
+    background: linear-gradient(var(--background), var(--background)) padding-box,
+                linear-gradient(135deg, #80FF00, #FF4D00) border-box;
+  }
+
+  .border-gradient-sunset {
+    border: 2px solid transparent;
+    background: linear-gradient(var(--background), var(--background)) padding-box,
+                linear-gradient(135deg, #FF9900, #F0336B) border-box;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Enhanced utility classes with striking colors */
+@layer utilities {
+  .bg-panel {
+    background-color: hsl(var(--card));
+  }
+  
+  /* Success - Neon Green */
+  .text-success {
+    color: hsl(var(--success));
+  }
+  
+  .bg-success {
+    background-color: hsl(var(--success));
+  }
+  
+  /* Warning - Electric Orange */
+  .text-warning {
+    color: hsl(var(--warning));
+  }
+  
+  .bg-warning {
+    background-color: hsl(var(--warning));
+  }
+  
+  /* Error - Hot Red */
+  .text-error {
+    color: hsl(var(--error));
+  }
+  
+  .bg-error {
+    background-color: hsl(var(--error));
+  }
+
+  /* Additional striking utilities */
+  .text-electric-cyan {
+    color: #00D9FF;
+  }
+  
+  .bg-electric-cyan {
+    background-color: #00D9FF;
+  }
+  
+  .text-hot-pink {
+    color: #FF0080;
+  }
+  
+  .bg-hot-pink {
+    background-color: #FF0080;
+  }
+  
+  .text-neon-green {
+    color: #00FF00;
+  }
+  
+  .bg-neon-green {
+    background-color: #00FF00;
+  }
+  
+  .text-electric-purple {
+    color: #8B5CF6;
+  }
+  
+  .bg-electric-purple {
+    background-color: #8B5CF6;
+  }
+
+  /* Gradient utilities for extra flair */
+  .bg-gradient-cyber {
+    background: linear-gradient(135deg, #00D9FF 0%, #FF0080 100%);
+  }
+  
+  .bg-gradient-neon {
+    background: linear-gradient(135deg, #00FF00 0%, #00D9FF 100%);
+  }
+  
+  .bg-gradient-fire {
+    background: linear-gradient(135deg, #FF8C00 0%, #F23030 100%);
+  }
+
+  /* Glowing effects */
+  .glow-cyan {
+    box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+  }
+  
+  .glow-pink {
+    box-shadow: 0 0 20px rgba(255, 0, 128, 0.3);
+  }
+  
+  .glow-green {
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+  }
+
+  /* Hover glow effects */
+  .hover-glow-cyan:hover {
+    box-shadow: 0 0 25px rgba(0, 217, 255, 0.5);
+    transition: box-shadow 0.3s ease;
+  }
+  
+  .hover-glow-pink:hover {
+    box-shadow: 0 0 25px rgba(255, 0, 128, 0.5);
+    transition: box-shadow 0.3s ease;
+  }
+
+  /* Status indicator improvements */
+  .status-dot-success {
+    background-color: hsl(var(--success));
+    box-shadow: 0 0 8px rgba(0, 255, 0, 0.6);
+  }
+  
+  .status-dot-error {
+    background-color: hsl(var(--error));
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+  }
+  
+  .status-dot-warning {
+    background-color: hsl(var(--warning));
+    box-shadow: 0 0 8px rgba(255, 140, 0, 0.6);
+  }
+
+  /* Enhanced method colors for HTTP requests */
+  .method-get {
+    @apply bg-success/20 text-success border-success/30;
+  }
+  
+  .method-post {
+    @apply bg-primary/20 text-primary border-primary/30;
+  }
+  
+  .method-put {
+    @apply bg-warning/20 text-warning border-warning/30;
+  }
+  
+  .method-patch {
+    @apply bg-accent/20 text-accent border-accent/30;
+  }
+  
+  .method-delete {
+    @apply bg-destructive/20 text-destructive border-destructive/30;
+  }
+
+  /* Animated pulse for loading states */
+  .pulse-cyan {
+    animation: pulse-cyan 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes pulse-cyan {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 rgba(0, 217, 255, 0.7);
+    }
+    50% {
+      opacity: .8;
+      box-shadow: 0 0 0 10px rgba(0, 217, 255, 0);
+    }
+  }
+
+  /* Border gradients */
+  .border-gradient-cyber {
+    border: 2px solid transparent;
+    background: linear-gradient(var(--background), var(--background)) padding-box,
+                linear-gradient(135deg, #00D9FF, #FF0080) border-box;
   }
 }

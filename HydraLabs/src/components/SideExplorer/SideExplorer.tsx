@@ -1,14 +1,15 @@
 import React from 'react';
-import { useResizer } from './hooks/useResizer';
-import { useExplorerState } from './hooks/useExplorerState';
-import { defaultTestSuites, defaultFileTree } from './utils/testSuiteUtils';
-import ResizeHandle from './components/ResizeHandle';
-import Header from './components/Header';
-import FileTreeSection from './components/FileTreeSection';
-import TestSuitesSection from './components/TestSuitesSection';
-import FooterStats from './components/FooterStats';
-
-const SideExplorer = ({ 
+import { useResizer } from '@/hooks'; // Still fix this typo if needed
+import { useExplorerState } from './hooks'; 
+import { defaultTestSuites, defaultFileTree } from './Utils';
+import { 
+  ResizeHandle,    // This will import from resizeHandle.tsx
+  Header,          // This will import from header.tsx
+  FileTreeSection,
+  TestSuiteSection,
+  FooterStats 
+} from './components';
+export const SideExplorer = ({ 
   width: initialWidth = 300,
   minWidth = 200,
   maxWidth = 500,
@@ -18,7 +19,7 @@ const SideExplorer = ({
   activeTestSuite,
   testSuites = [],
   fileTree = []
-}) => {
+} = {} ) => {
   // Get data with defaults
   const currentTestSuites = testSuites.length > 0 ? testSuites : defaultTestSuites;
   const currentFileTree = fileTree.length > 0 ? fileTree : defaultFileTree;

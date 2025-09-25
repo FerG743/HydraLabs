@@ -1,5 +1,5 @@
 import React from 'react';
-import { useMetricCard } from './hooks/useMetricCard';
+import { useMetricCard } from '../hooks'; 
 
 // MetricCard Component (35 lines)
 const MetricCard = ({

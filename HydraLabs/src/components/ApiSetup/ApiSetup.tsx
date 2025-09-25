@@ -1,10 +1,10 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { useApiRequest } from './hooks/useApiRequest';
-import { useKeyValuePairs } from './hooks/useKeyValuePairs';
-import { useExpandableItems } from './hooks/useExpandableItems';
-import { hasRequestBody } from './utils/apiHelpers';
-import RequestHeader from './RequestHeader';
+import { useKeyValuePairs } from './hooks';
+import { useExpandableItems } from '@/hooks/useExpandibleItems';
+import { hasRequestBody } from '@/utils/apiConstants';
+import { RequestHeader } from './components';
 import BodyEditor from './components/BodyEditor';
 import AdvancedSection from './components/AdvancedSection';
 
@@ -13,7 +13,7 @@ const ApiSetup = ({
   onSaveRequest,
   className = '',
   initialData = {}
-}) => {
+} = {} ) => {
   const {
     requestData,
     updateRequestData,

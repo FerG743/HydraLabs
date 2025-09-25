@@ -1,10 +1,13 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App'
-import './App.css' // Make sure this line is here
+import React from "react";
+import ReactDOM from "react-dom/client";
+import APITesting from "./pages/APITesting";
+import "./App.css";
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+// Apply dark theme class to enable your CSS variables
+document.documentElement.classList.add('dark');
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <APITesting />
   </React.StrictMode>
-)
+);

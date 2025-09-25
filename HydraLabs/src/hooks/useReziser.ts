@@ -1,26 +1,41 @@
-/ hooks/useResizer.js - HIGHLY REUSABLE ✨
-// Can be used for any resizable panel, sidebar, modal, etc.
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
-export const useResizer = ({ 
-  initialWidth = 300, 
-  minWidth = 200, 
-  maxWidth = 500, 
+interface UseResizerProps {
+  initialWidth?: number;
+  minWidth?: number;
+  maxWidth?: number;
+  onWidthChange?: (width: number) => void;
+  direction?: 'horizontal' | 'vertical';
+}
+
+export const useResizer = ({
+  initialWidth = 300,
+  minWidth = 200,
+  maxWidth = 500,
   onWidthChange,
-  direction = 'horizontal' // 'horizontal' | 'vertical'
-}) => {
+  direction = 'horizontal'
+}: UseResizerProps) => {
   const [size, setSize] = useState(initialWidth);
   const [isResizing, setIsResizing] = useState(false);
+  const startPos = useRef(0);
+  const startSize = useRef(0);
 
-  const handleMouseDown = useCallback((e) => {
+  const handleMouseDown = useCallback((e: MouseEvent) => {
     setIsResizing(true);
+    // Store the starting position and current size
+    startPos.current = direction === 'horizontal' ? e.clientX : e.clientY;
+    startSize.current = size;
     e.preventDefault();
-  }, []);
+  }, [direction, size]);
 
-  const handleMouseMove = useCallback((e) => {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isResizing) return;
     
-    const newSize = direction === 'horizontal' ? e.clientX : e.clientY;
+    const currentPos = direction === 'horizontal' ? e.clientX : e.clientY;
+    const delta = currentPos - startPos.current;
+    const newSize = startSize.current + delta;
+    
+    // Apply constraints
     const constrainedSize = Math.min(Math.max(newSize, minWidth), maxWidth);
     
     setSize(constrainedSize);

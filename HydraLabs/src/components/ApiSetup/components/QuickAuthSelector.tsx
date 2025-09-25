@@ -3,8 +3,8 @@ import { Lock, Eye, EyeOff } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { AUTH_TYPES } from '../utils/apiConstants';
-import { usePasswordVisibility } from '../hooks/usePasswordVisibility';
+import { AUTH_TYPES } from '@/utils/apiConstants';
+import { usePasswordVisibility } from '../hooks/useApiRequest';
 
 const QuickAuthSelector = ({ auth, onUpdate, className = '' }) => {
   const { togglePassword, isVisible } = usePasswordVisibility();

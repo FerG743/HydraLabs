@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Globe } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { validateUrl } from '../utils/apiHelpers';
+import { Alert } from '@/components/ui/alert';
+import { validateUrl } from '@/utils/apiConstants';
 
 const UrlInput = ({ 
   value, 

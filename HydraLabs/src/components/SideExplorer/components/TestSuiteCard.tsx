@@ -1,6 +1,7 @@
 import React from 'react';
 import { XCircle } from 'lucide-react';
-import { getStatusIcon, getTypeColor } from '../utils/testSuiteUtils';
+import { getStatusIcon, getTypeColor } from '../Utils'; 
+
 
 const TestSuiteCard = ({ 
   suite, 

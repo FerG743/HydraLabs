@@ -1,5 +1,5 @@
 import React from 'react';
-import { useResultCard } from './hooks/useResultCard';
+import { useResultCard } from '../hooks';
 
 // ResultCard Component (45 lines)
 const ResultCard = ({

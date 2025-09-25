@@ -1,6 +1,6 @@
 import React from 'react';
 import { Copy } from 'lucide-react';
-import { useActivityItem } from './hooks/useActivityItem';
+import { useActivityItem } from '../Index';
 
 // ActivityItem Component (40 lines)
 const ActivityItem = ({

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
-import TestSuiteCard from '../TestSuiteCard';
+import TestSuiteCard from './TestSuiteCard';
 
 const TestSuitesSection = ({ 
   testSuites, 

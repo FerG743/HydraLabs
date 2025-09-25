@@ -1,7 +1,19 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+
+/* Force the dark theme to apply immediately */
+html, body, #root {
+  background-color: hsl(300, 15%, 6%) !important;
+  color: hsl(60, 9%, 98%) !important;
+  min-height: 100vh;
+}
+
+/* Your existing CSS custom properties... */
 @layer base {
   :root {
     /* Striking Dark Theme - No Blue Colors */

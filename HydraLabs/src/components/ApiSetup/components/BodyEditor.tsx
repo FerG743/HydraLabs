@@ -1,10 +1,9 @@
 import React from 'react';
 import { Code } from 'lucide-react';
-import { BODY_TYPES, CONTENT_TYPES } from '../utils/apiConstants';
-import { getDefaultRequestTemplate } from '../utils/apiHelpers';
-import KeyValueEditor from '../KeyValueEditor';
-import ExpandableSection from './ExpandableSection';
-
+import { BODY_TYPES, CONTENT_TYPES } from '@/utils/apiConstants';
+import { getDefaultRequestTemplate } from '@/utils/apiConstants';
+import KeyValueEditor from './KeyValueEditor';
+import ExpandableSection from './ExpandibleSection';
 const BodyEditor = ({
   body,
   method,

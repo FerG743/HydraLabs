@@ -1,9 +1,9 @@
 import React from 'react';
 import { FileText, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { COMMON_HEADERS } from '../utils/apiConstants';
+import { COMMON_HEADERS } from '@/utils/apiConstants';
 
 const QuickHeaders = ({ headers, onAdd, onRemove, onUpdate, className = '' }) => {
   const enabledHeaders = headers.filter(h => h.key && h.enabled);

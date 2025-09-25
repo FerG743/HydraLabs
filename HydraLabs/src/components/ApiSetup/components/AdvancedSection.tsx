@@ -2,8 +2,8 @@ import React from 'react';
 import { Settings } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import KeyValueEditor from '../KeyValueEditor';
-import ExpandableSection from './ExpandableSection';
+import KeyValueEditor from './KeyValueEditor';
+import ExpandableSection from './ExpandibleSection';
 
 const AdvancedSection = ({
   isExpanded,

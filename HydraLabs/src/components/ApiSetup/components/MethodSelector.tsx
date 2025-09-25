@@ -1,7 +1,7 @@
 import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { HTTP_METHODS } from '../utils/apiConstants';
+import { Badge } from 'lucide-react';
+import { HTTP_METHODS } from '@/utils/apiConstants';
 
 const MethodSelector = ({ method, onChange, className = '' }) => {
   const getMethodVariant = (method) => {

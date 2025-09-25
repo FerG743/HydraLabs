@@ -1,7 +1,7 @@
 import React from 'react';
 import { Settings, X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from 'lucide-react';
 
 const QuickParams = ({ params, onAdd, onRemove, className = '' }) => {
   const enabledParams = params.filter(p => p.key && p.enabled);

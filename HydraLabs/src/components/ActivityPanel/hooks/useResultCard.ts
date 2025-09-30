@@ -30,20 +30,20 @@ export const useResultCard = (result, index, onClick, options = {}) => {
     warning: { icon: AlertTriangle, color: 'text-yellow-500' },
     partial: { icon: AlertTriangle, color: 'text-yellow-500' },
     
-    running: { icon: Play, color: 'text-blue-500' },
-    active: { icon: Play, color: 'text-blue-500' },
-    processing: { icon: Play, color: 'text-blue-500' },
+    running: { icon: Play, color: 'text-primary' },
+    active: { icon: Play, color: 'text-primary' },
+    processing: { icon: Play, color: 'text-primary' },
     
-    pending: { icon: Clock, color: 'text-gray-500' },
-    waiting: { icon: Clock, color: 'text-gray-500' },
-    queued: { icon: Clock, color: 'text-gray-500' },
+    pending: { icon: Clock, color: 'text-muted-foreground' },
+    waiting: { icon: Clock, color: 'text-muted-foreground' },
+    queued: { icon: Clock, color: 'text-muted-foreground' },
     
     paused: { icon: Pause, color: 'text-yellow-600' },
     stopped: { icon: StopCircle, color: 'text-gray-600' },
     cancelled: { icon: StopCircle, color: 'text-gray-600' },
     
-    info: { icon: Info, color: 'text-blue-500' },
-    default: { icon: Target, color: 'text-gray-500' }
+    info: { icon: Info, color: 'text-primary' },
+    default: { icon: Target, color: 'text-muted-foreground' }
   };
 
   // Get status styling

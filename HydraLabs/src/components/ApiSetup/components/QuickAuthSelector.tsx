@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AUTH_TYPES } from '@/utils/apiConstants';
-import { usePasswordVisibility } from '../hooks/useApiRequest';
+import { usePasswordVisibility } from '../hooks';
 
 const QuickAuthSelector = ({ auth, onUpdate, className = '' }) => {
   const { togglePassword, isVisible } = usePasswordVisibility();

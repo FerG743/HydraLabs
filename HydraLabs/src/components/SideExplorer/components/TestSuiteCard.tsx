@@ -14,7 +14,7 @@ const TestSuiteCard = ({
       className={`p-3 rounded border cursor-pointer transition-all duration-300 hover:shadow-sm group animate-fade-in-up ${
         isActive 
           ? 'border-blue-500 bg-blue-50 shadow-sm scale-[1.02] animate-scale-in' 
-          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 hover:scale-[1.01]'
+          : 'border-border hover:border-gray-300 hover:bg-muted hover:scale-[1.01]'
       }`}
       style={{ animationDelay: `${index * 100}ms` }}
       onClick={() => onSelect && onSelect(suite)}
@@ -27,8 +27,8 @@ const TestSuiteCard = ({
           <span className="text-sm font-medium truncate">{suite.name}</span>
         </div>
         {suite.status === 'running' && (
-          <button className="p-1 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110">
-            <XCircle className="w-3 h-3 text-gray-400" />
+          <button className="p-1 hover:bg-border rounded opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110">
+            <XCircle className="w-3 h-3 text-muted-foreground" />
           </button>
         )}
       </div>
@@ -39,7 +39,7 @@ const TestSuiteCard = ({
         </span>
       </div>
       
-      <div className="flex items-center justify-between text-xs text-gray-500">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{suite.passed}/{suite.tests} passed</span>
         <span>{suite.lastRun}</span>
       </div>
@@ -51,7 +51,7 @@ const TestSuiteCard = ({
       )}
       
       {/* Progress Bar */}
-      <div className="mt-2 w-full bg-gray-200 rounded-full h-1 overflow-hidden">
+      <div className="mt-2 w-full bg-border rounded-full h-1 overflow-hidden">
         <div 
           className={`h-1 rounded-full transition-all duration-700 ease-out ${
             suite.status === 'failed' ? 'bg-red-500' : 

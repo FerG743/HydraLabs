@@ -23,7 +23,7 @@ const ActivityItem = ({
 
   return (
     <div
-      className={`flex items-start gap-3 p-2 hover:bg-gray-50 rounded group cursor-pointer 
+      className={`flex items-start gap-3 p-2 hover:bg-muted rounded group cursor-pointer 
         animate-fade-in-up transition-all duration-200 ${className}`}
       style={{ animationDelay: `${index * animationDelay}ms` }}
       onClick={handleClick}
@@ -31,7 +31,7 @@ const ActivityItem = ({
       {/* Status and Type Icons */}
       <div className="flex items-center gap-2 min-w-0">
         <StatusIcon className={`w-4 h-4 ${statusColor}`} />
-        <TypeIcon className="w-4 h-4 text-gray-500" />
+        <TypeIcon className="w-4 h-4 text-muted-foreground" />
       </div>
 
       {/* Content */}
@@ -41,7 +41,7 @@ const ActivityItem = ({
             {activity.message || activity.title || 'No message'}
           </p>
           {showTimestamp && (
-            <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
+            <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
               {formattedTimestamp}
             </span>
           )}
@@ -62,7 +62,7 @@ const ActivityItem = ({
       {showCopyButton && (
         <button
           onClick={handleCopy}
-          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-gray-600 
+          className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-gray-600 
             transition-all duration-200 hover:scale-110 active:scale-95"
           title="Copy activity message"
         >

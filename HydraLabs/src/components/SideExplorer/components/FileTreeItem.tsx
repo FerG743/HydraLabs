@@ -13,7 +13,8 @@ const FileTreeItem = ({
   return (
     <div>
       <div 
-        className="flex items-center gap-1 px-2 py-1 hover:bg-gray-100 cursor-pointer text-sm group transition-all duration-200 hover:scale-[1.01] animate-fade-in"
+        // FIXED: Changed from light theme to your dark theme
+        className="flex items-center gap-1 px-2 py-1 hover:bg-muted cursor-pointer text-sm group transition-all duration-200 hover:scale-[1.01] animate-fade-in text-foreground"
         style={{ paddingLeft: `${8 + level * 16}px` }}
         onClick={() => {
           if (item.type === 'folder') {
@@ -26,20 +27,21 @@ const FileTreeItem = ({
         {item.type === 'folder' ? (
           <>
             {isExpanded ? 
-              <ChevronDown className="w-3 h-3 text-gray-500" /> : 
-              <ChevronRight className="w-3 h-3 text-gray-500" />
+              <ChevronDown className="w-3 h-3 text-muted-foreground" /> : 
+              <ChevronRight className="w-3 h-3 text-muted-foreground" />
             }
-            <Folder className="w-4 h-4 text-blue-500" />
+            {/* FIXED: Changed folder color to electric lime instead of blue */}
+            <Folder className="w-4 h-4 text-primary" />
           </>
         ) : (
           <>
             <div className="w-3 h-3" />
-            <FileText className="w-4 h-4 text-gray-500" />
+            <FileText className="w-4 h-4 text-muted-foreground" />
           </>
         )}
-        <span className="truncate flex-1">{item.name}</span>
+        <span className="truncate flex-1 text-foreground">{item.name}</span>
         {item.size && (
-          <span className="text-xs text-gray-400 opacity-0 group-hover:opacity-100">
+          <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100">
             {item.size}
           </span>
         )}

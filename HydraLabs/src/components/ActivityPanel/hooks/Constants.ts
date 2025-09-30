@@ -25,6 +25,6 @@ export const STATUS_STYLES = {
   error:   { icon: XCircle,     color: "text-red-500",   bg: "bg-red-100",   text: "text-red-700" },
   failed:  { icon: XCircle,     color: "text-red-500",   bg: "bg-red-100",   text: "text-red-700" },
   warning: { icon: AlertCircle, color: "text-yellow-500",bg: "bg-yellow-100",text: "text-yellow-700" },
-  info:    { icon: Info,        color: "text-blue-500",  bg: "bg-blue-100",  text: "text-blue-700" },
-  pending: { icon: Clock,       color: "text-gray-500",  bg: "bg-gray-100",  text: "text-gray-700" },
+  info:    { icon: Info,        color: "text-primary",  bg: "bg-blue-100",  text: "text-blue-700" },
+  pending: { icon: Clock,       color: "text-muted-foreground",  bg: "bg-muted",  text: "text-gray-700" },
 };

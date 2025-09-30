@@ -5,17 +5,19 @@ const FooterStats = ({ activeSection, testSuites, fileTree }) => {
   const runningTestSuites = testSuites.filter(s => s.status === 'running').length;
 
   return (
-    <div className="p-3 border-t border-gray-200 bg-gray-50">
-      <div className="text-xs text-gray-500">
+    // FIXED: Changed from light theme to dark theme
+    <div className="p-3 border-t border-border bg-card">
+      <div className="text-xs text-muted-foreground">
         {activeSection === 'suites' ? (
           <div className="space-y-1">
             <div className="flex justify-between">
               <span>Total Suites:</span>
-              <span>{testSuites.length}</span>
+              <span className="text-foreground">{testSuites.length}</span>
             </div>
             <div className="flex justify-between">
               <span>Running:</span>
-              <span className="text-yellow-600">{runningTestSuites}</span>
+              {/* FIXED: Changed yellow to warning color from your theme */}
+              <span className="text-warning">{runningTestSuites}</span>
             </div>
           </div>
         ) : (

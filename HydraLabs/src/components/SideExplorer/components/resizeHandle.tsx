@@ -1,16 +1,36 @@
+// components/ResizeHandle.tsx
 import React from 'react';
 
-const ResizeHandle = ({ isResizing, onMouseDown }) => {
+interface ResizeHandleProps {
+  isResizing: boolean;
+  onMouseDown: (e: React.MouseEvent) => void;
+  direction?: 'horizontal' | 'vertical';
+}
+
+export const ResizeHandle = ({ 
+  isResizing, 
+  onMouseDown, 
+  direction = 'horizontal' 
+}: ResizeHandleProps) => {
+  const isVertical = direction === 'vertical';
+  
   return (
     <div
-      className={`w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize transition-all duration-300 relative group ${
-        isResizing ? 'bg-blue-500 animate-pulse-subtle' : ''
-      }`}
       onMouseDown={onMouseDown}
+      className={`${
+        isVertical 
+          ? 'h-1 cursor-row-resize' 
+          : 'w-1 cursor-col-resize'
+      } bg-border hover:bg-primary/50 transition-colors relative group ${
+        isResizing ? 'bg-primary' : ''
+      }`}
     >
-      <div className="absolute inset-y-0 -inset-x-1 flex items-center justify-center">
-        <div className="w-0.5 h-8 bg-gray-400 rounded opacity-0 group-hover:opacity-100 transition-all duration-300 animate-fade-in" />
-      </div>
+      {/* Wider hit area for easier grabbing */}
+      <div className={
+        isVertical 
+          ? 'absolute inset-x-0 -top-1 -bottom-1 h-3' 
+          : 'absolute inset-y-0 -left-1 -right-1 w-3'
+      } />
     </div>
   );
 };

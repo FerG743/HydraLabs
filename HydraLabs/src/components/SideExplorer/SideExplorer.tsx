@@ -1,14 +1,15 @@
 import React from 'react';
-import { useResizer } from '@/hooks'; // Still fix this typo if needed
+import { useResizer } from '@/hooks';
 import { useExplorerState } from './hooks'; 
 import { defaultTestSuites, defaultFileTree } from './Utils';
+import { ResizeHandle } from './components/ResizeHandle';
 import { 
-  ResizeHandle,    // This will import from resizeHandle.tsx
-  Header,          // This will import from header.tsx
+  Header,
   FileTreeSection,
   TestSuiteSection,
   FooterStats 
 } from './components';
+
 export const SideExplorer = ({ 
   width: initialWidth = 300,
   minWidth = 200,
@@ -29,7 +30,8 @@ export const SideExplorer = ({
     initialWidth,
     minWidth,
     maxWidth,
-    onWidthChange
+    onWidthChange,
+    direction: 'horizontal'
   });
 
   const {
@@ -45,7 +47,7 @@ export const SideExplorer = ({
   return (
     <div className="flex h-full">
       <div 
-        className="bg-white border-r border-gray-200 flex flex-col h-full"
+        className="bg-card text-card-foreground border-r border-border flex flex-col h-full"
         style={{ width: `${width}px` }}
       >
         {/* Header */}
@@ -57,7 +59,7 @@ export const SideExplorer = ({
         />
         
         {/* Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto bg-card">
           {activeSection === 'files' ? (
             <FileTreeSection
               fileTree={currentFileTree}
@@ -66,7 +68,7 @@ export const SideExplorer = ({
               onFileSelect={onFileSelect}
             />
           ) : (
-            <TestSuitesSection
+            <TestSuiteSection
               testSuites={filteredTestSuites}
               activeTestSuite={activeTestSuite}
               onTestSuiteSelect={onTestSuiteSelect}
@@ -86,6 +88,7 @@ export const SideExplorer = ({
       <ResizeHandle
         isResizing={isResizing}
         onMouseDown={handleMouseDown}
+        direction="horizontal"
       />
     </div>
   );

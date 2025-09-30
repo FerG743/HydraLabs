@@ -9,7 +9,7 @@ const MetricCard = ({
   className = '',
   animationDelay = 150,
   showIcon = true,
-  iconColor = 'text-blue-500',
+  iconColor = 'text-primary',
   size = 'default' // 'small', 'default', 'large'
 }) => {
   const {
@@ -35,8 +35,8 @@ const MetricCard = ({
 
   return (
     <div
-      className={`bg-gray-50 rounded-lg animate-scale-in transition-all duration-200 
-        hover:shadow-sm hover:bg-gray-100 ${sizeClasses[size]} ${className} ${
+      className={`bg-muted rounded-lg animate-scale-in transition-all duration-200 
+        hover:shadow-sm hover:bg-muted ${sizeClasses[size]} ${className} ${
         onClick ? 'cursor-pointer' : ''
       }`}
       style={{ animationDelay: `${index * animationDelay}ms` }}

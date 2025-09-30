@@ -71,7 +71,7 @@ const getStatusIcon = (status) => {
     case 'passed': return <CheckCircle className="w-4 h-4 text-green-500" />;
     case 'failed': return <X className="w-4 h-4 text-red-500" />;
     case 'running': return <Clock className="w-4 h-4 text-yellow-500 animate-pulse" />;
-    default: return <AlertCircle className="w-4 h-4 text-gray-400" />;
+    default: return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
   }
 };
 
@@ -81,7 +81,7 @@ const getTypeColor = (type) => {
     case 'integration': return 'bg-purple-100 text-purple-800';
     case 'functional': return 'bg-green-100 text-green-800';
     case 'performance': return 'bg-orange-100 text-orange-800';
-    default: return 'bg-gray-100 text-gray-800';
+    default: return 'bg-muted text-gray-800';
   }
 };
 
@@ -275,7 +275,7 @@ const RequestBuilder = ({ onSendRequest, requestData, setRequestData }) => {
       {/* URL Bar */}
       <div className="flex gap-2 mb-4">
         <select 
-          className={`px-3 py-2 rounded border text-sm font-medium ${methodColors[requestData.method] || 'bg-gray-100'}`}
+          className={`px-3 py-2 rounded border text-sm font-medium ${methodColors[requestData.method] || 'bg-muted'}`}
           value={requestData.method}
           onChange={(e) => updateRequestData('method', e.target.value)}
         >
@@ -438,7 +438,7 @@ const ResponseViewer = ({ response, isLoading }) => {
     return (
       <div className="p-8 text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-        <p className="text-gray-500">Sending request...</p>
+        <p className="text-muted-foreground">Sending request...</p>
       </div>
     );
   }

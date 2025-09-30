@@ -20,9 +20,9 @@ export const useResizer = ({
   const startPos = useRef(0);
   const startSize = useRef(0);
 
-  const handleMouseDown = useCallback((e: MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    console.log('Mouse down triggered', direction);
     setIsResizing(true);
-    // Store the starting position and current size
     startPos.current = direction === 'horizontal' ? e.clientX : e.clientY;
     startSize.current = size;
     e.preventDefault();
@@ -33,30 +33,33 @@ export const useResizer = ({
     
     const currentPos = direction === 'horizontal' ? e.clientX : e.clientY;
     const delta = currentPos - startPos.current;
-    const newSize = startSize.current + delta;
     
-    // Apply constraints
+    console.log('Moving:', { currentPos, startPos: startPos.current, delta });
+    
+    // Invert delta for vertical direction so dragging down increases size
+    const adjustedDelta = direction === 'vertical' ? -delta : delta;
+    const newSize = startSize.current + adjustedDelta;
+    
     const constrainedSize = Math.min(Math.max(newSize, minWidth), maxWidth);
+    
+    console.log('New size:', constrainedSize);
     
     setSize(constrainedSize);
     onWidthChange?.(constrainedSize);
   }, [isResizing, minWidth, maxWidth, onWidthChange, direction]);
 
   const handleMouseUp = useCallback(() => {
+    console.log('Mouse up');
     setIsResizing(false);
   }, []);
 
   useEffect(() => {
     if (isResizing) {
+      console.log('Attaching listeners');
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = direction === 'horizontal' ? 'col-resize' : 'row-resize';
       document.body.style.userSelect = 'none';
-    } else {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
     }
 
     return () => {
@@ -68,9 +71,9 @@ export const useResizer = ({
   }, [isResizing, handleMouseMove, handleMouseUp, direction]);
 
   return {
-    size,
+    width: size,
     isResizing,
     handleMouseDown,
-    setSize // Allow manual size changes
+    setSize
   };
 };

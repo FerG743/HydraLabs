@@ -50,8 +50,8 @@ export const useActivityItem = (activity, index, onClick) => {
     error: 'text-red-500',
     failed: 'text-red-500',
     warning: 'text-yellow-500',
-    info: 'text-blue-500',
-    pending: 'text-gray-500'
+    info: 'text-primary',
+    pending: 'text-muted-foreground'
   };
 
   // Memoized icon and color calculations

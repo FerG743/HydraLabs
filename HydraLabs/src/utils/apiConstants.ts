@@ -7,7 +7,7 @@ export const METHOD_COLORS = {
   PUT: 'bg-orange-100 text-orange-700 border-orange-200',
   PATCH: 'bg-yellow-100 text-yellow-700 border-yellow-200',
   DELETE: 'bg-red-100 text-red-700 border-red-200',
-  HEAD: 'bg-gray-100 text-gray-700 border-gray-200',
+  HEAD: 'bg-muted text-gray-700 border-border',
   OPTIONS: 'bg-purple-100 text-purple-700 border-purple-200'
 };
 
@@ -49,7 +49,7 @@ export const BODY_TYPES = [
 
 // utils/apiHelpers.js
 export const getMethodColor = (method) => {
-  return METHOD_COLORS[method] || 'bg-gray-100 text-gray-700 border-gray-200';
+  return METHOD_COLORS[method] || 'bg-muted text-gray-700 border-border';
 };
 
 export const hasRequestBody = (method) => {

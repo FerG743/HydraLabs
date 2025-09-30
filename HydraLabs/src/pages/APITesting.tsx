@@ -1,25 +1,47 @@
 import React from 'react';
 import ActivityPanel from '@/components/ActivityPanel/ActivityPanel';
+import ApiSetup from '@/components/ApiSetup';
+import SideExplorer from '@/components/SideExplorer';
 
 const APITesting = () => {
   return (
-    // Apply the background directly using your CSS variables
-    <div 
-      className="min-h-screen p-6 space-y-6" 
-      style={{ 
-        backgroundColor: 'hsl(300, 15%, 6%)', // Your --background value
-        color: 'hsl(60, 9%, 98%)'  // Your --foreground value
-      }}
-    >
-      <h1 style={{ color: 'hsl(75, 100%, 50%)' }}>Testing</h1> {/* Your --primary */}
-      <div style={{ 
-        backgroundColor: 'hsl(315, 20%, 9%)', // Your --card value
-        color: 'hsl(60, 9%, 98%)',
-        borderRadius: '0.75rem',
-        padding: '1rem'
-      }}>
-        <ActivityPanel />
+    <div className="h-screen bg-background flex flex-col">
+      {/* Header */}
+      <div className="bg-card border-b border-border px-4 py-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-foreground">HydraLabs</h1>
+          <div className="flex items-center gap-2">
+            <button className="px-3 py-1 text-sm bg-muted text-muted-foreground rounded hover:bg-muted/80">
+              Save
+            </button>
+            <button className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90">
+              Settings
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Main Layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar */}
+        <SideExplorer />
+
+        {/* Main Content - Request Builder + Response Viewer */}
+        <div className="flex-1 flex flex-col">
+          {/* Request Builder (Top Half) */}
+          <div className="flex-1 min-h-0">
+            <ApiSetup />
+          </div>
+
+          {/* Response Viewer (Bottom Half) */}
+          <div className="flex-1 min-h-0">
+            {/* Your ResponseViewer component here */}
+          </div>
+        </div>
+      </div>
+
+      {/* Activity Panel (Bottom) */}
+      <ActivityPanel />
     </div>
   );
 };

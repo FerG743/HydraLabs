@@ -30,7 +30,7 @@ const ResultCard = ({
 
   return (
     <div
-      className={`p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-all 
+      className={`p-4 border border-border rounded-lg hover:shadow-sm transition-all 
         duration-200 cursor-pointer animate-fade-in-up hover:border-gray-300 
         hover:scale-[1.01] ${className} ${
         onClick ? 'cursor-pointer' : 'cursor-default'
@@ -45,7 +45,7 @@ const ResultCard = ({
           <h4 className="font-medium text-gray-900 truncate">{title}</h4>
         </div>
         {showTimestamp && formattedTimestamp && (
-          <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+          <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
             {formattedTimestamp}
           </span>
         )}
@@ -56,7 +56,7 @@ const ResultCard = ({
         <div className={layoutClasses[layout]}>
           {displayFields.map(([key, value]) => (
             <div key={key} className="min-w-0">
-              <span className="text-gray-500 capitalize block">
+              <span className="text-muted-foreground capitalize block">
                 {key.replace(/([A-Z])/g, ' $1').toLowerCase()}:
               </span>
               <span className="font-medium text-gray-900 block truncate" title={String(value)}>
@@ -69,7 +69,7 @@ const ResultCard = ({
 
       {/* Progress indicator for test results */}
       {result.tests && (result.passed || result.failed) && (
-        <div className="mt-3 w-full bg-gray-200 rounded-full h-1.5">
+        <div className="mt-3 w-full bg-border rounded-full h-1.5">
           <div
             className={`h-1.5 rounded-full transition-all duration-500 ${
               result.status === 'passed' ? 'bg-green-500' :

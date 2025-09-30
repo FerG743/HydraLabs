@@ -11,12 +11,14 @@ const FileTreeSection = ({
   return (
     <div className="p-2">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-gray-500 px-2">PROJECT FILES</span>
+        {/* FIXED: Changed from gray text to muted foreground */}
+        <span className="text-xs font-medium text-muted-foreground px-2">PROJECT FILES</span>
         <button 
-          className="p-1 hover:bg-gray-100 rounded transition-all duration-200 hover:scale-110" 
+          // FIXED: Changed hover from gray to muted, and icon color
+          className="p-1 hover:bg-muted rounded transition-all duration-200 hover:scale-110" 
           title="New File"
         >
-          <Plus className="w-3 h-3 text-gray-400" />
+          <Plus className="w-3 h-3 text-muted-foreground" />
         </button>
       </div>
       {fileTree.map((item, idx) => (

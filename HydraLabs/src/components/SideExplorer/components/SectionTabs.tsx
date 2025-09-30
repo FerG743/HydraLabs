@@ -7,14 +7,14 @@ const SectionTabs = ({ activeSection, onSectionChange }) => {
   ];
 
   return (
-    <div className="flex mt-3 bg-gray-100 rounded p-1">
+    <div className="flex mt-3 bg-muted rounded p-1">
       {tabs.map(tab => (
         <button
           key={tab.id}
           className={`flex-1 px-3 py-1 text-xs font-medium rounded transition-all duration-300 ${
             activeSection === tab.id 
-              ? 'bg-white text-gray-900 shadow-sm animate-scale-in' 
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              ? 'bg-card text-gray-900 shadow-sm animate-scale-in' 
+              : 'text-muted-foreground hover:text-gray-700 hover:bg-muted'
           }`}
           onClick={() => onSectionChange(tab.id)}
         >

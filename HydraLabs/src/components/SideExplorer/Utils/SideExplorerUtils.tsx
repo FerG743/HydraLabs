@@ -6,7 +6,7 @@ export const getStatusIcon = (status) => {
     case 'passed': return <CheckCircle className="w-4 h-4 text-green-500" />;
     case 'failed': return <XCircle className="w-4 h-4 text-red-500" />;
     case 'running': return <AlertCircle className="w-4 h-4 text-yellow-500 animate-pulse" />;
-    default: return <AlertCircle className="w-4 h-4 text-gray-400" />;
+    default: return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
   }
 };
 
@@ -16,7 +16,7 @@ export const getTypeColor = (type) => {
     case 'integration': return 'bg-purple-100 text-purple-800';
     case 'functional': return 'bg-green-100 text-green-800';
     case 'performance': return 'bg-orange-100 text-orange-800';
-    default: return 'bg-gray-100 text-gray-800';
+    default: return 'bg-muted text-gray-800';
   }
 };
 

@@ -8,7 +8,7 @@ import QuickAuthSelector from './QuickAuthSelector';
 import QuickParams from './QuickParams';
 import QuickHeaders from './QuickHeaders';
 
-const RequestHeader = ({
+export const RequestHeader = ({
   requestData,
   isLoading,
   onUpdate,

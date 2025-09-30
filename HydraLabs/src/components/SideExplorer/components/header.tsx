@@ -10,24 +10,29 @@ const Header = ({
   onSectionChange 
 }) => {
   return (
-    <div className="p-3 border-b border-gray-200">
+    // FIXED: Changed border color to use theme variable
+    <div className="p-3 border-b border-border">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="font-semibold text-sm">Side Explorer</h2>
+        {/* FIXED: Added proper text color */}
+        <h2 className="font-semibold text-sm text-foreground">Side Explorer</h2>
         <div className="flex items-center gap-1">
           <button 
-            className="p-1 hover:bg-gray-100 rounded text-green-600 transition-all duration-200 hover:scale-110 active:scale-95" 
+            // FIXED: Changed hover and icon colors to use theme
+            className="p-1 hover:bg-muted rounded text-success transition-all duration-200 hover:scale-110 active:scale-95" 
             title="Run All Tests"
           >
             <Play className="w-4 h-4" />
           </button>
           <button 
-            className="p-1 hover:bg-gray-100 rounded transition-all duration-200 hover:scale-110 active:scale-95 hover:animate-spin-slow" 
+            // FIXED: Changed hover background and text color
+            className="p-1 hover:bg-muted rounded text-muted-foreground transition-all duration-200 hover:scale-110 active:scale-95 hover:animate-spin-slow" 
             title="Refresh"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
           <button 
-            className="p-1 hover:bg-gray-100 rounded transition-all duration-200 hover:scale-110 active:scale-95" 
+            // FIXED: Changed hover background and text color
+            className="p-1 hover:bg-muted rounded text-muted-foreground transition-all duration-200 hover:scale-110 active:scale-95" 
             title="Search"
           >
             <Search className="w-4 h-4" />

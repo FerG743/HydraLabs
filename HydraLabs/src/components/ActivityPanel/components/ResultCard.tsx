@@ -31,7 +31,7 @@ const ResultCard = ({
   return (
     <div
       className={`p-4 border border-border rounded-lg hover:shadow-sm transition-all 
-        duration-200 cursor-pointer animate-fade-in-up hover:border-gray-300 
+        duration-200 cursor-pointer animate-fade-in-up hover:border-border 
         hover:scale-[1.01] ${className} ${
         onClick ? 'cursor-pointer' : 'cursor-default'
       }`}
@@ -42,7 +42,7 @@ const ResultCard = ({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3 min-w-0">
           <StatusIcon className={`w-4 h-4 ${statusColor} flex-shrink-0`} />
-          <h4 className="font-medium text-gray-900 truncate">{title}</h4>
+          <h4 className="font-medium text-foreground truncate">{title}</h4>
         </div>
         {showTimestamp && formattedTimestamp && (
           <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
@@ -59,7 +59,7 @@ const ResultCard = ({
               <span className="text-muted-foreground capitalize block">
                 {key.replace(/([A-Z])/g, ' $1').toLowerCase()}:
               </span>
-              <span className="font-medium text-gray-900 block truncate" title={String(value)}>
+              <span className="font-medium text-foreground block truncate" title={String(value)}>
                 {String(value)}
               </span>
             </div>
@@ -72,8 +72,8 @@ const ResultCard = ({
         <div className="mt-3 w-full bg-border rounded-full h-1.5">
           <div
             className={`h-1.5 rounded-full transition-all duration-500 ${
-              result.status === 'passed' ? 'bg-green-500' :
-              result.status === 'failed' ? 'bg-red-500' : 'bg-yellow-500'
+              result.status === 'passed' ? 'bg-success' :
+              result.status === 'failed' ? 'bg-error' : 'bg-warning'
             }`}
             style={{ 
               width: `${((result.passed || 0) / (result.tests || 1)) * 100}%` 

@@ -14,7 +14,7 @@ const TestSuiteCard = ({
       className={`p-3 rounded border cursor-pointer transition-all duration-300 hover:shadow-sm group animate-fade-in-up ${
         isActive 
           ? 'border-blue-500 bg-blue-50 shadow-sm scale-[1.02] animate-scale-in' 
-          : 'border-border hover:border-gray-300 hover:bg-muted hover:scale-[1.01]'
+          : 'border-border hover:border-border hover:bg-muted hover:scale-[1.01]'
       }`}
       style={{ animationDelay: `${index * 100}ms` }}
       onClick={() => onSelect && onSelect(suite)}
@@ -45,7 +45,7 @@ const TestSuiteCard = ({
       </div>
       
       {suite.failed > 0 && (
-        <div className="mt-2 text-xs text-red-600 animate-fade-in">
+        <div className="mt-2 text-xs text-error animate-fade-in">
           {suite.failed} failed test{suite.failed !== 1 ? 's' : ''}
         </div>
       )}
@@ -54,8 +54,8 @@ const TestSuiteCard = ({
       <div className="mt-2 w-full bg-border rounded-full h-1 overflow-hidden">
         <div 
           className={`h-1 rounded-full transition-all duration-700 ease-out ${
-            suite.status === 'failed' ? 'bg-red-500' : 
-            suite.status === 'running' ? 'bg-yellow-500 animate-shimmer' : 'bg-green-500'
+            suite.status === 'failed' ? 'bg-error' : 
+            suite.status === 'running' ? 'bg-warning animate-shimmer' : 'bg-success'
           } ${suite.status === 'running' ? 'animate-pulse-subtle' : ''}`}
           style={{ 
             width: `${(suite.passed / suite.tests) * 100}%`,

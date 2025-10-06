@@ -18,16 +18,15 @@ module.exports = {
     },
     extend: {
       colors: {
-        //Pastel Professional palette
-        'deep-purple-gray': '#1F2937',
-        'panel-gray': '#374151',
-        'off-white': '#F8FAFC',
-        'brand-teal': '#14B8A6',
-        'success-lime': '#65A30D',
-        'error-rose': '#E11D48',
-        'warning-amber': '#D97706',
+        // Radioactive Sunset custom colors
+        'toxic-yellow': '#CCFF00',
+        'electric-orange': '#FF6600',
+        'hot-red': '#FF0040',
+        'amber': '#FFBF00',
+        'tangerine': '#FF9500',
+        'lemon-cream': '#FFFACD',
         
-        // shadcn/ui semantic colors
+        // shadcn/ui semantic colors - Radioactive Sunset palette
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -61,11 +60,30 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        error: {
+          DEFAULT: "hsl(var(--error))",
+          foreground: "hsl(var(--error-foreground))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      boxShadow: {
+        'glow-toxic-yellow': '0 0 20px rgba(204, 255, 0, 0.4)',
+        'glow-electric-orange': '0 0 20px rgba(255, 102, 0, 0.4)',
+        'glow-hot-red': '0 0 20px rgba(255, 0, 64, 0.4)',
+        'glow-amber': '0 0 20px rgba(255, 191, 0, 0.4)',
+        'glow-tangerine': '0 0 20px rgba(255, 149, 0, 0.4)',
       },
       keyframes: {
         // shadcn/ui default keyframes
@@ -142,14 +160,14 @@ module.exports = {
           '100%': { height: '0', opacity: '0' },
         },
         testSuccess: {
-          '0%': { transform: 'scale(1)', backgroundColor: 'rgb(34 197 94)' },
-          '50%': { transform: 'scale(1.05)', backgroundColor: 'rgb(22 163 74)' },
-          '100%': { transform: 'scale(1)', backgroundColor: 'rgb(34 197 94)' },
+          '0%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(204, 255, 0, 0.7)' },
+          '50%': { transform: 'scale(1.05)', boxShadow: '0 0 20px 10px rgba(204, 255, 0, 0)' },
+          '100%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(204, 255, 0, 0)' },
         },
         testError: {
-          '0%': { transform: 'scale(1)', backgroundColor: 'rgb(239 68 68)' },
-          '50%': { transform: 'scale(1.05)', backgroundColor: 'rgb(220 38 38)' },
-          '100%': { transform: 'scale(1)', backgroundColor: 'rgb(239 68 68)' },
+          '0%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(255, 0, 64, 0.7)' },
+          '50%': { transform: 'scale(1.05)', boxShadow: '0 0 20px 10px rgba(255, 0, 64, 0)' },
+          '100%': { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(255, 0, 64, 0)' },
         },
         ripple: {
           '0%': { transform: 'scale(0)', opacity: '1' },
@@ -166,6 +184,19 @@ module.exports = {
         wiggle: {
           '0%, 100%': { transform: 'rotate(-3deg)' },
           '50%': { transform: 'rotate(3deg)' },
+        },
+        // Radioactive pulse animations
+        pulseToxic: {
+          '0%, 100%': { opacity: '1', boxShadow: '0 0 0 0 rgba(204, 255, 0, 0.7)' },
+          '50%': { opacity: '.9', boxShadow: '0 0 0 15px rgba(204, 255, 0, 0)' },
+        },
+        pulseOrange: {
+          '0%, 100%': { opacity: '1', boxShadow: '0 0 0 0 rgba(255, 102, 0, 0.7)' },
+          '50%': { opacity: '.9', boxShadow: '0 0 0 15px rgba(255, 102, 0, 0)' },
+        },
+        pulseRed: {
+          '0%, 100%': { opacity: '1', boxShadow: '0 0 0 0 rgba(255, 0, 64, 0.7)' },
+          '50%': { opacity: '.9', boxShadow: '0 0 0 15px rgba(255, 0, 64, 0)' },
         },
       },
       animation: {
@@ -209,6 +240,11 @@ module.exports = {
         'shimmer': 'shimmer 2s linear infinite',
         'float': 'float 3s ease-in-out infinite',
         'wiggle': 'wiggle 1s ease-in-out infinite',
+        
+        // Radioactive animations
+        'pulse-toxic': 'pulseToxic 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'pulse-orange': 'pulseOrange 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'pulse-red': 'pulseRed 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
       transitionDuration: {
         '400': '400ms',
@@ -223,6 +259,9 @@ module.exports = {
       },
       backgroundImage: {
         'shimmer': 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent)',
+        'gradient-nuclear': 'linear-gradient(135deg, #CCFF00 0%, #FF6600 100%)',
+        'gradient-inferno': 'linear-gradient(135deg, #FF6600 0%, #FF0040 100%)',
+        'gradient-sunset': 'linear-gradient(135deg, #FFBF00 0%, #FF6600 100%)',
       },
     },
   },

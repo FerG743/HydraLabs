@@ -19,16 +19,16 @@ export const useResultCard = (result, index, onClick, options = {}) => {
 
   // Status icon and color mappings
   const STATUS_STYLES = {
-    passed: { icon: CheckCircle, color: 'text-green-500' },
-    success: { icon: CheckCircle, color: 'text-green-500' },
-    completed: { icon: CheckCircle, color: 'text-green-500' },
+    passed: { icon: CheckCircle, color: 'text-success' },
+    success: { icon: CheckCircle, color: 'text-success' },
+    completed: { icon: CheckCircle, color: 'text-success' },
     
-    failed: { icon: XCircle, color: 'text-red-500' },
-    error: { icon: XCircle, color: 'text-red-500' },
-    rejected: { icon: XCircle, color: 'text-red-500' },
+    failed: { icon: XCircle, color: 'text-error' },
+    error: { icon: XCircle, color: 'text-error' },
+    rejected: { icon: XCircle, color: 'text-error' },
     
-    warning: { icon: AlertTriangle, color: 'text-yellow-500' },
-    partial: { icon: AlertTriangle, color: 'text-yellow-500' },
+    warning: { icon: AlertTriangle, color: 'text-warning' },
+    partial: { icon: AlertTriangle, color: 'text-warning' },
     
     running: { icon: Play, color: 'text-primary' },
     active: { icon: Play, color: 'text-primary' },
@@ -38,9 +38,9 @@ export const useResultCard = (result, index, onClick, options = {}) => {
     waiting: { icon: Clock, color: 'text-muted-foreground' },
     queued: { icon: Clock, color: 'text-muted-foreground' },
     
-    paused: { icon: Pause, color: 'text-yellow-600' },
-    stopped: { icon: StopCircle, color: 'text-gray-600' },
-    cancelled: { icon: StopCircle, color: 'text-gray-600' },
+    paused: { icon: Pause, color: 'text-warning' },
+    stopped: { icon: StopCircle, color: 'text-muted-foreground' },
+    cancelled: { icon: StopCircle, color: 'text-muted-foreground' },
     
     info: { icon: Info, color: 'text-primary' },
     default: { icon: Target, color: 'text-muted-foreground' }

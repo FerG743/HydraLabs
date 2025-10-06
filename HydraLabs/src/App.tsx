@@ -68,9 +68,9 @@ const defaultActivities = [
 // Utility functions
 const getStatusIcon = (status) => {
   switch(status) {
-    case 'passed': return <CheckCircle className="w-4 h-4 text-green-500" />;
-    case 'failed': return <X className="w-4 h-4 text-red-500" />;
-    case 'running': return <Clock className="w-4 h-4 text-yellow-500 animate-pulse" />;
+    case 'passed': return <CheckCircle className="w-4 h-4 text-success" />;
+    case 'failed': return <X className="w-4 h-4 text-error" />;
+    case 'running': return <Clock className="w-4 h-4 text-warning animate-pulse" />;
     default: return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
   }
 };
@@ -81,7 +81,7 @@ const getTypeColor = (type) => {
     case 'integration': return 'bg-purple-100 text-purple-800';
     case 'functional': return 'bg-green-100 text-green-800';
     case 'performance': return 'bg-orange-100 text-orange-800';
-    default: return 'bg-muted text-gray-800';
+    default: return 'bg-muted text-foreground';
   }
 };
 

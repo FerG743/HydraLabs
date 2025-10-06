@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChevronRight, ChevronDown, Folder, FileText } from 'lucide-react';
+import { AnimatedCollapse } from '../../Animations/index'
 
 const FileTreeItem = ({ 
   item, 
@@ -13,8 +14,7 @@ const FileTreeItem = ({
   return (
     <div>
       <div 
-        // FIXED: Changed from light theme to your dark theme
-        className="flex items-center gap-1 px-2 py-1 hover:bg-muted cursor-pointer text-sm group transition-all duration-200 hover:scale-[1.01] animate-fade-in text-foreground"
+        className="flex items-center gap-1 px-2 py-1 hover:bg-muted cursor-pointer text-sm group transition-all duration-200 hover:scale-[1.01] text-foreground rounded"
         style={{ paddingLeft: `${8 + level * 16}px` }}
         onClick={() => {
           if (item.type === 'folder') {
@@ -30,41 +30,35 @@ const FileTreeItem = ({
               <ChevronDown className="w-3 h-3 text-muted-foreground" /> : 
               <ChevronRight className="w-3 h-3 text-muted-foreground" />
             }
-            {/* FIXED: Changed folder color to electric lime instead of blue */}
-            <Folder className="w-4 h-4 text-primary" />
+            <Folder className="w-4 h-4 text-primary transition-all group-hover:drop-shadow-[0_0_4px_hsl(var(--primary))]" />
           </>
         ) : (
           <>
             <div className="w-3 h-3" />
-            <FileText className="w-4 h-4 text-muted-foreground" />
+            <FileText className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
           </>
         )}
-        <span className="truncate flex-1 text-foreground">{item.name}</span>
+        <span className="truncate flex-1 text-foreground group-hover:text-primary transition-colors">{item.name}</span>
         {item.size && (
-          <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100">
+          <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
             {item.size}
           </span>
         )}
       </div>
       
-      {item.type === 'folder' && isExpanded && item.children && (
-        <div className="animate-slide-down">
+      {item.type === 'folder' && item.children && (
+        <AnimatedCollapse isOpen={isExpanded} staggerChildren staggerDelay={30}>
           {item.children.map((child, idx) => (
-            <div 
-              key={idx} 
-              className="animate-fade-in-up" 
-              style={{ animationDelay: `${idx * 50}ms` }}
-            >
-              <FileTreeItem 
-                item={child} 
-                level={level + 1}
-                expandedFolders={expandedFolders}
-                onToggleFolder={onToggleFolder}
-                onFileSelect={onFileSelect}
-              />
-            </div>
+            <FileTreeItem 
+              key={idx}
+              item={child} 
+              level={level + 1}
+              expandedFolders={expandedFolders}
+              onToggleFolder={onToggleFolder}
+              onFileSelect={onFileSelect}
+            />
           ))}
-        </div>
+        </AnimatedCollapse>
       )}
     </div>
   );

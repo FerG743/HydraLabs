@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { AnimatedCollapse } from '../../Animations/index'; // Adjust path as needed
 
 const ExpandableSection = ({
   title,
@@ -14,7 +15,7 @@ const ExpandableSection = ({
   contentClassName = ''
 }) => {
   return (
-    <div className={`border-b border-gray-100 ${className}`}>
+    <div className={`border-b border-border ${className}`}>
       <button
         onClick={onToggle}
         className={`w-full flex items-center gap-3 p-3 text-left hover:bg-muted transition-all duration-200 ${headerClassName}`}
@@ -25,13 +26,13 @@ const ExpandableSection = ({
           <ChevronRight className="w-4 h-4 flex-shrink-0 transition-transform duration-200" />
         )}
         
-        {Icon && <Icon className="w-4 h-4 text-gray-600 flex-shrink-0" />}
+        {Icon && <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium truncate">{title}</span>
             {badge && (
-              <span className="text-xs bg-muted text-gray-600 px-2 py-0.5 rounded flex-shrink-0">
+              <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded flex-shrink-0">
                 {badge}
               </span>
             )}
@@ -44,18 +45,11 @@ const ExpandableSection = ({
         </div>
       </button>
       
-      {/* Fixed animation - keep element in DOM */}
-      <div
-        className={`grid transition-all duration-300 ease-in-out ${
-          isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-        }`}
-      >
-        <div className="overflow-hidden">
-          <div className={`p-4 pt-0 ${contentClassName}`}>
-            {children}
-          </div>
+      <AnimatedCollapse isOpen={isExpanded} duration={300}>
+        <div className={`p-4 pt-0 ${contentClassName}`}>
+          {children}
         </div>
-      </div>
+      </AnimatedCollapse>
     </div>
   );
 };

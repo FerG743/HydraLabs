@@ -9,6 +9,7 @@ import {
   TestSuiteSection,
   FooterStats 
 } from './components';
+import { ScrollableContainer } from '../GlobalComponents';
 
 export const SideExplorer = ({ 
   width: initialWidth = 300,
@@ -58,8 +59,8 @@ export const SideExplorer = ({
           onSectionChange={setActiveSection}
         />
         
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto bg-card">
+        {/* Content with ScrollableContainer */}
+        <ScrollableContainer className="flex-1 bg-card">
           {activeSection === 'files' ? (
             <FileTreeSection
               fileTree={currentFileTree}
@@ -74,7 +75,7 @@ export const SideExplorer = ({
               onTestSuiteSelect={onTestSuiteSelect}
             />
           )}
-        </div>
+        </ScrollableContainer>
 
         {/* Footer Stats */}
         <FooterStats

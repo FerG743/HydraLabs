@@ -53,7 +53,7 @@ const BodyEditor = ({
               className={`px-3 py-1 text-sm rounded transition-all duration-200 ${
                 body.type === type.value
                   ? 'bg-blue-100 text-blue-700'
-                  : 'bg-muted text-gray-600 hover:bg-border'
+                  : 'bg-muted text-muted-foreground hover:bg-border'
               }`}
             >
               {type.label}

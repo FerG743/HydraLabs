@@ -13,8 +13,8 @@ const SectionTabs = ({ activeSection, onSectionChange }) => {
           key={tab.id}
           className={`flex-1 px-3 py-1 text-xs font-medium rounded transition-all duration-300 ${
             activeSection === tab.id 
-              ? 'bg-card text-gray-900 shadow-sm animate-scale-in' 
-              : 'text-muted-foreground hover:text-gray-700 hover:bg-muted'
+              ? 'bg-card text-foreground shadow-sm animate-scale-in' 
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
           }`}
           onClick={() => onSectionChange(tab.id)}
         >

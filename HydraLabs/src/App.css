@@ -1,102 +1,98 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
-
-/* Force the dark theme to apply immediately */
+/* Force the radioactive sunset theme to apply immediately */
 html, body, #root {
-  background-color: hsl(300, 15%, 6%) !important;
-  color: hsl(60, 9%, 98%) !important;
+  background-color: #0D0D0D !important;
+  color: #FFFACD !important;
   min-height: 100vh;
 }
 
-/* Your existing CSS custom properties... */
+/* CSS custom properties with Radioactive Sunset palette */
 @layer base {
   :root {
-    /* Striking Dark Theme - No Blue Colors */
-    --background: 300 15% 6%; /* Deep Purple Black #0F0A0F */
-    --foreground: 60 9% 98%; /* Warm White #FBFBF6 */
-    --card: 315 20% 9%; /* Dark Charcoal Purple #1A0F1A */
-    --card-foreground: 60 9% 98%;
-    --popover: 315 20% 9%;
-    --popover-foreground: 60 9% 98%;
+    /* Radioactive Sunset Theme - Nuclear Desert Vibes */
+    --background: 0 0% 5%; /* #0D0D0D - Near Black */
+    --foreground: 60 100% 90%; /* #FFFACD - Lemon Cream */
+    --card: 0 0% 8%; /* #141414 - Dark Charcoal */
+    --card-foreground: 60 100% 90%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 60 100% 90%;
     
-    /* Primary - Electric Lime Green */
-    --primary: 75 100% 50%; /* #80FF00 - Bright Electric Lime */
-    --primary-foreground: 300 15% 6%;
+    /* Primary - Toxic Yellow (GET/Success) */
+    --primary: 74 100% 50%; /* #CCFF00 - Neon Yellow */
+    --primary-foreground: 0 0% 5%;
     
-    /* Secondary - Deep Magenta */
-    --secondary: 320 60% 15%; /* #3D0B26 */
-    --secondary-foreground: 60 9% 98%;
+    /* Secondary - Amber (PUT) */
+    --secondary: 45 100% 50%; /* #FFBF00 - Amber Gold */
+    --secondary-foreground: 0 0% 5%;
     
     /* Muted colors */
-    --muted: 315 20% 12%; /* #241A24 */
-    --muted-foreground: 300 15% 65%;
+    --muted: 0 0% 12%; /* #1F1F1F */
+    --muted-foreground: 60 20% 70%;
     
-    /* Accent - Hot Coral/Salmon */
-    --accent: 15 100% 60%; /* #FF4D00 - Vibrant Orange-Red */
-    --accent-foreground: 60 9% 98%;
+    /* Accent - Electric Orange (POST) */
+    --accent: 24 100% 50%; /* #FF6600 - Electric Orange */
+    --accent-foreground: 0 0% 5%;
     
-    /* Status colors - Bold and unique */
-    --destructive: 355 85% 60%; /* #E6194D - Hot Pink Red */
-    --destructive-foreground: 60 9% 98%;
+    /* Status colors */
+    --destructive: 348 100% 50%; /* #FF0040 - Hot Red */
+    --destructive-foreground: 60 100% 90%;
     
-    /* Success - Neon Lime */
-    --success: 75 100% 50%; /* #80FF00 - Electric Lime Green */
-    --success-foreground: 300 15% 6%;
+    /* Success - Toxic Yellow */
+    --success: 74 100% 50%; /* #CCFF00 - Neon Yellow */
+    --success-foreground: 0 0% 5%;
     
-    /* Warning - Vibrant Orange */
-    --warning: 35 100% 55%; /* #FF9900 - Bright Orange */
-    --warning-foreground: 300 15% 6%;
+    /* Warning - Electric Orange */
+    --warning: 24 100% 50%; /* #FF6600 - Electric Orange */
+    --warning-foreground: 0 0% 5%;
     
-    /* Error - Magenta Red */
-    --error: 340 90% 58%; /* #F0336B - Bright Magenta */
-    --error-foreground: 60 9% 98%;
+    /* Error - Hot Red */
+    --error: 348 100% 50%; /* #FF0040 - Hot Red */
+    --error-foreground: 60 100% 90%;
     
     /* Border and input */
-    --border: 315 20% 18%; /* #3A2B3A */
-    --input: 315 20% 18%;
-    --ring: 75 100% 50%; /* Electric Lime ring */
+    --border: 0 0% 15%; /* #262626 */
+    --input: 0 0% 15%;
+    --ring: 74 100% 50%; /* Toxic Yellow ring */
     
-    /* Chart colors - Vibrant spectrum (no blue) */
-    --chart-1: 75 100% 50%; /* Electric Lime */
-    --chart-2: 35 100% 55%; /* Vibrant Orange */
-    --chart-3: 340 90% 58%; /* Magenta */
-    --chart-4: 285 100% 70%; /* Electric Purple */
-    --chart-5: 15 100% 60%; /* Hot Coral */
+    /* Chart colors - Radioactive spectrum */
+    --chart-1: 74 100% 50%; /* Toxic Yellow */
+    --chart-2: 24 100% 50%; /* Electric Orange */
+    --chart-3: 348 100% 50%; /* Hot Red */
+    --chart-4: 45 100% 50%; /* Amber Gold */
+    --chart-5: 33 100% 50%; /* Tangerine */
     
     --radius: 0.75rem;
   }
 
-  /* Dark mode (same colors since we're going full dark) */
+  /* Dark mode (same colors) */
   .dark {
-    --background: 300 15% 6%;
-    --foreground: 60 9% 98%;
-    --card: 315 20% 9%;
-    --card-foreground: 60 9% 98%;
-    --popover: 315 20% 9%;
-    --popover-foreground: 60 9% 98%;
-    --primary: 75 100% 50%;
-    --primary-foreground: 300 15% 6%;
-    --secondary: 320 60% 15%;
-    --secondary-foreground: 60 9% 98%;
-    --muted: 315 20% 12%;
-    --muted-foreground: 300 15% 65%;
-    --accent: 15 100% 60%;
-    --accent-foreground: 60 9% 98%;
-    --destructive: 355 85% 60%;
-    --destructive-foreground: 60 9% 98%;
-    --border: 315 20% 18%;
-    --input: 315 20% 18%;
-    --ring: 75 100% 50%;
-    --chart-1: 75 100% 50%;
-    --chart-2: 35 100% 55%;
-    --chart-3: 340 90% 58%;
-    --chart-4: 285 100% 70%;
-    --chart-5: 15 100% 60%;
+    --background: 0 0% 5%;
+    --foreground: 60 100% 90%;
+    --card: 0 0% 8%;
+    --card-foreground: 60 100% 90%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 60 100% 90%;
+    --primary: 74 100% 50%;
+    --primary-foreground: 0 0% 5%;
+    --secondary: 45 100% 50%;
+    --secondary-foreground: 0 0% 5%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 60 20% 70%;
+    --accent: 24 100% 50%;
+    --accent-foreground: 0 0% 5%;
+    --destructive: 348 100% 50%;
+    --destructive-foreground: 60 100% 90%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 74 100% 50%;
+    --chart-1: 74 100% 50%;
+    --chart-2: 24 100% 50%;
+    --chart-3: 348 100% 50%;
+    --chart-4: 45 100% 50%;
+    --chart-5: 33 100% 50%;
   }
 }
 
@@ -110,229 +106,77 @@ html, body, #root {
   }
 }
 
-/* Enhanced utility classes with striking non-blue colors */
-@layer utilities {
-  .bg-panel {
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Force inputs to use theme colors */
+  input:not([type="checkbox"]):not([type="radio"]) {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+  
+  textarea {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+  
+  button {
+    color: hsl(var(--foreground));
+  }
+}
+
+@layer components {
+  /* Ensure hover states work properly */
+  .hover\:bg-muted:hover {
+    background-color: hsl(var(--muted));
+  }
+  
+  .hover\:bg-card:hover {
     background-color: hsl(var(--card));
   }
   
-  /* Success - Electric Lime */
-  .text-success {
-    color: hsl(var(--success));
+  .hover\:text-foreground:hover {
+    color: hsl(var(--foreground));
   }
   
-  .bg-success {
-    background-color: hsl(var(--success));
+  .hover\:text-primary:hover {
+    color: hsl(var(--primary));
   }
   
-  /* Warning - Vibrant Orange */
-  .text-warning {
+  .hover\:text-warning:hover {
     color: hsl(var(--warning));
   }
   
-  .bg-warning {
-    background-color: hsl(var(--warning));
+  .hover\:scale-110:hover {
+    transform: scale(1.1);
   }
   
-  /* Error - Magenta Red */
-  .text-error {
-    color: hsl(var(--error));
+  .hover\:scale-105:hover {
+    transform: scale(1.05);
   }
   
-  .bg-error {
-    background-color: hsl(var(--error));
-  }
-
-  /* Additional striking utilities - NO BLUE */
-  .text-electric-lime {
-    color: #80FF00;
+  /* Add glow on hover */
+  .hover\:glow-toxic-yellow:hover {
+    box-shadow: 0 0 25px rgba(204, 255, 0, 0.6);
   }
   
-  .bg-electric-lime {
-    background-color: #80FF00;
-  }
-  
-  .text-hot-coral {
-    color: #FF4D00;
-  }
-  
-  .bg-hot-coral {
-    background-color: #FF4D00;
-  }
-  
-  .text-magenta {
-    color: #F0336B;
-  }
-  
-  .bg-magenta {
-    background-color: #F0336B;
-  }
-  
-  .text-electric-purple {
-    color: #CC66FF;
-  }
-  
-  .bg-electric-purple {
-    background-color: #CC66FF;
-  }
-
-  .text-golden-yellow {
-    color: #FFD700;
-  }
-  
-  .bg-golden-yellow {
-    background-color: #FFD700;
-  }
-
-  /* Gradient utilities with warm colors */
-  .bg-gradient-fire {
-    background: linear-gradient(135deg, #80FF00 0%, #FF4D00 100%);
-  }
-  
-  .bg-gradient-sunset {
-    background: linear-gradient(135deg, #FF9900 0%, #F0336B 100%);
-  }
-  
-  .bg-gradient-neon {
-    background: linear-gradient(135deg, #80FF00 0%, #CC66FF 100%);
-  }
-
-  .bg-gradient-volcanic {
-    background: linear-gradient(135deg, #FF4D00 0%, #E6194D 100%);
-  }
-
-  /* Glowing effects - warm colors */
-  .glow-lime {
-    box-shadow: 0 0 20px rgba(128, 255, 0, 0.4);
-  }
-  
-  .glow-coral {
-    box-shadow: 0 0 20px rgba(255, 77, 0, 0.4);
-  }
-  
-  .glow-magenta {
-    box-shadow: 0 0 20px rgba(240, 51, 107, 0.4);
-  }
-
-  .glow-purple {
-    box-shadow: 0 0 20px rgba(204, 102, 255, 0.4);
-  }
-
-  /* Hover glow effects */
-  .hover-glow-lime:hover {
-    box-shadow: 0 0 25px rgba(128, 255, 0, 0.6);
-    transition: box-shadow 0.3s ease;
-  }
-  
-  .hover-glow-coral:hover {
-    box-shadow: 0 0 25px rgba(255, 77, 0, 0.6);
-    transition: box-shadow 0.3s ease;
-  }
-
-  .hover-glow-magenta:hover {
-    box-shadow: 0 0 25px rgba(240, 51, 107, 0.6);
-    transition: box-shadow 0.3s ease;
-  }
-
-  /* Status indicator improvements */
-  .status-dot-success {
-    background-color: hsl(var(--success));
-    box-shadow: 0 0 8px rgba(128, 255, 0, 0.7);
-  }
-  
-  .status-dot-error {
-    background-color: hsl(var(--error));
-    box-shadow: 0 0 8px rgba(240, 51, 107, 0.7);
-  }
-  
-  .status-dot-warning {
-    background-color: hsl(var(--warning));
-    box-shadow: 0 0 8px rgba(255, 153, 0, 0.7);
-  }
-
-  /* Enhanced method colors for HTTP requests - NO BLUE */
-  .method-get {
-    @apply bg-success/20 text-success border-success/30;
-  }
-  
-  .method-post {
-    @apply bg-warning/20 text-warning border-warning/30;
-  }
-  
-  .method-put {
-    @apply bg-accent/20 text-accent border-accent/30;
-  }
-  
-  .method-patch {
-    @apply bg-electric-purple/20 text-electric-purple border-electric-purple/30;
-  }
-  
-  .method-delete {
-    @apply bg-destructive/20 text-destructive border-destructive/30;
-  }
-
-  /* Animated pulse for loading states */
-  .pulse-lime {
-    animation: pulse-lime 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-  
-  @keyframes pulse-lime {
-    0%, 100% {
-      opacity: 1;
-      box-shadow: 0 0 0 0 rgba(128, 255, 0, 0.7);
-    }
-    50% {
-      opacity: .8;
-      box-shadow: 0 0 0 10px rgba(128, 255, 0, 0);
-    }
-  }
-
-  .pulse-coral {
-    animation: pulse-coral 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-  
-  @keyframes pulse-coral {
-    0%, 100% {
-      opacity: 1;
-      box-shadow: 0 0 0 0 rgba(255, 77, 0, 0.7);
-    }
-    50% {
-      opacity: .8;
-      box-shadow: 0 0 0 10px rgba(255, 77, 0, 0);
-    }
-  }
-
-  /* Border gradients */
-  .border-gradient-fire {
-    border: 2px solid transparent;
-    background: linear-gradient(var(--background), var(--background)) padding-box,
-                linear-gradient(135deg, #80FF00, #FF4D00) border-box;
-  }
-
-  .border-gradient-sunset {
-    border: 2px solid transparent;
-    background: linear-gradient(var(--background), var(--background)) padding-box,
-                linear-gradient(135deg, #FF9900, #F0336B) border-box;
+  .hover\:glow-electric-orange:hover {
+    box-shadow: 0 0 25px rgba(255, 102, 0, 0.6);
   }
 }
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
-}
-
-/* Enhanced utility classes with striking colors */
+/* Enhanced utility classes with Radioactive Sunset palette */
 @layer utilities {
   .bg-panel {
     background-color: hsl(var(--card));
   }
   
-  /* Success - Neon Green */
+  /* Success - Toxic Yellow */
   .text-success {
     color: hsl(var(--success));
   }
@@ -359,133 +203,270 @@ html, body, #root {
     background-color: hsl(var(--error));
   }
 
-  /* Additional striking utilities */
-  .text-electric-cyan {
-    color: #00D9FF;
+  /* Additional color utilities */
+  .text-toxic-yellow {
+    color: #CCFF00;
   }
   
-  .bg-electric-cyan {
-    background-color: #00D9FF;
+  .bg-toxic-yellow {
+    background-color: #CCFF00;
   }
   
-  .text-hot-pink {
-    color: #FF0080;
+  .text-electric-orange {
+    color: #FF6600;
   }
   
-  .bg-hot-pink {
-    background-color: #FF0080;
+  .bg-electric-orange {
+    background-color: #FF6600;
   }
   
-  .text-neon-green {
-    color: #00FF00;
+  .text-hot-red {
+    color: #FF0040;
   }
   
-  .bg-neon-green {
-    background-color: #00FF00;
+  .bg-hot-red {
+    background-color: #FF0040;
   }
   
-  .text-electric-purple {
-    color: #8B5CF6;
+  .text-amber {
+    color: #FFBF00;
   }
   
-  .bg-electric-purple {
-    background-color: #8B5CF6;
+  .bg-amber {
+    background-color: #FFBF00;
   }
 
-  /* Gradient utilities for extra flair */
-  .bg-gradient-cyber {
-    background: linear-gradient(135deg, #00D9FF 0%, #FF0080 100%);
+  .text-tangerine {
+    color: #FF9500;
   }
   
-  .bg-gradient-neon {
-    background: linear-gradient(135deg, #00FF00 0%, #00D9FF 100%);
-  }
-  
-  .bg-gradient-fire {
-    background: linear-gradient(135deg, #FF8C00 0%, #F23030 100%);
+  .bg-tangerine {
+    background-color: #FF9500;
   }
 
-  /* Glowing effects */
-  .glow-cyan {
-    box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
-  }
-  
-  .glow-pink {
-    box-shadow: 0 0 20px rgba(255, 0, 128, 0.3);
-  }
-  
-  .glow-green {
-    box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+  .text-lemon-cream {
+    color: #FFFACD;
   }
 
-  /* Hover glow effects */
-  .hover-glow-cyan:hover {
-    box-shadow: 0 0 25px rgba(0, 217, 255, 0.5);
+  /* Gradient utilities - RADIOACTIVE */
+  .bg-gradient-nuclear {
+    background: linear-gradient(135deg, #CCFF00 0%, #FF6600 100%);
+  }
+  
+  .bg-gradient-inferno {
+    background: linear-gradient(135deg, #FF6600 0%, #FF0040 100%);
+  }
+  
+  .bg-gradient-sunset {
+    background: linear-gradient(135deg, #FFBF00 0%, #FF6600 100%);
+  }
+
+  .bg-gradient-toxic {
+    background: linear-gradient(135deg, #CCFF00 0%, #FFBF00 100%);
+  }
+
+  .bg-gradient-warning {
+    background: linear-gradient(135deg, #FF9500 0%, #FF0040 100%);
+  }
+
+  /* Glowing effects - RADIOACTIVE INTENSITY */
+  .glow-toxic-yellow {
+    box-shadow: 0 0 30px rgba(204, 255, 0, 0.7), 0 0 15px rgba(204, 255, 0, 0.9);
+  }
+  
+  .glow-electric-orange {
+    box-shadow: 0 0 30px rgba(255, 102, 0, 0.7), 0 0 15px rgba(255, 102, 0, 0.9);
+  }
+  
+  .glow-hot-red {
+    box-shadow: 0 0 30px rgba(255, 0, 64, 0.7), 0 0 15px rgba(255, 0, 64, 0.9);
+  }
+
+  .glow-amber {
+    box-shadow: 0 0 30px rgba(255, 191, 0, 0.7), 0 0 15px rgba(255, 191, 0, 0.9);
+  }
+
+  .glow-tangerine {
+    box-shadow: 0 0 30px rgba(255, 149, 0, 0.7), 0 0 15px rgba(255, 149, 0, 0.9);
+  }
+
+  /* Hover glow effects - EXTRA RADIOACTIVE */
+  .hover-glow-toxic-yellow:hover {
+    box-shadow: 0 0 45px rgba(204, 255, 0, 0.9), 0 0 20px rgba(204, 255, 0, 1);
     transition: box-shadow 0.3s ease;
+    transform: scale(1.02);
   }
   
-  .hover-glow-pink:hover {
-    box-shadow: 0 0 25px rgba(255, 0, 128, 0.5);
+  .hover-glow-electric-orange:hover {
+    box-shadow: 0 0 45px rgba(255, 102, 0, 0.9), 0 0 20px rgba(255, 102, 0, 1);
     transition: box-shadow 0.3s ease;
+    transform: scale(1.02);
   }
 
-  /* Status indicator improvements */
+  .hover-glow-hot-red:hover {
+    box-shadow: 0 0 45px rgba(255, 0, 64, 0.9), 0 0 20px rgba(255, 0, 64, 1);
+    transition: box-shadow 0.3s ease;
+    transform: scale(1.02);
+  }
+
+  .hover-glow-amber:hover {
+    box-shadow: 0 0 45px rgba(255, 191, 0, 0.9), 0 0 20px rgba(255, 191, 0, 1);
+    transition: box-shadow 0.3s ease;
+    transform: scale(1.02);
+  }
+
+  /* Status indicator improvements - GLOWING */
   .status-dot-success {
     background-color: hsl(var(--success));
-    box-shadow: 0 0 8px rgba(0, 255, 0, 0.6);
+    box-shadow: 0 0 15px rgba(204, 255, 0, 1);
+    animation: pulse-toxic 2s ease-in-out infinite;
   }
   
   .status-dot-error {
     background-color: hsl(var(--error));
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+    box-shadow: 0 0 15px rgba(255, 0, 64, 1);
+    animation: pulse-hot-red 2s ease-in-out infinite;
   }
   
   .status-dot-warning {
     background-color: hsl(var(--warning));
-    box-shadow: 0 0 8px rgba(255, 140, 0, 0.6);
+    box-shadow: 0 0 15px rgba(255, 102, 0, 1);
+    animation: pulse-orange 2s ease-in-out infinite;
   }
 
-  /* Enhanced method colors for HTTP requests */
+  /* Enhanced method colors for HTTP requests - RADIOACTIVE STYLE */
   .method-get {
-    @apply bg-success/20 text-success border-success/30;
+    @apply bg-success/25 text-success border-success/50;
+    box-shadow: 0 0 15px rgba(204, 255, 0, 0.3);
   }
   
   .method-post {
-    @apply bg-primary/20 text-primary border-primary/30;
+    @apply bg-warning/25 text-warning border-warning/50;
+    box-shadow: 0 0 15px rgba(255, 102, 0, 0.3);
   }
   
   .method-put {
-    @apply bg-warning/20 text-warning border-warning/30;
+    @apply bg-amber/25 text-amber border-amber/50;
+    box-shadow: 0 0 15px rgba(255, 191, 0, 0.3);
   }
   
   .method-patch {
-    @apply bg-accent/20 text-accent border-accent/30;
+    @apply bg-tangerine/25 text-tangerine border-tangerine/50;
+    box-shadow: 0 0 15px rgba(255, 149, 0, 0.3);
   }
   
   .method-delete {
-    @apply bg-destructive/20 text-destructive border-destructive/30;
+    @apply bg-destructive/25 text-destructive border-destructive/50;
+    box-shadow: 0 0 15px rgba(255, 0, 64, 0.3);
   }
 
-  /* Animated pulse for loading states */
-  .pulse-cyan {
-    animation: pulse-cyan 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  /* Animated pulse for loading states - NUCLEAR POWER */
+  .pulse-toxic {
+    animation: pulse-toxic 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
   
-  @keyframes pulse-cyan {
+  @keyframes pulse-toxic {
     0%, 100% {
       opacity: 1;
-      box-shadow: 0 0 0 0 rgba(0, 217, 255, 0.7);
+      box-shadow: 0 0 0 0 rgba(204, 255, 0, 1);
     }
     50% {
-      opacity: .8;
-      box-shadow: 0 0 0 10px rgba(0, 217, 255, 0);
+      opacity: .9;
+      box-shadow: 0 0 0 20px rgba(204, 255, 0, 0);
     }
   }
 
-  /* Border gradients */
-  .border-gradient-cyber {
+  .pulse-orange {
+    animation: pulse-orange 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes pulse-orange {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 rgba(255, 102, 0, 1);
+    }
+    50% {
+      opacity: .9;
+      box-shadow: 0 0 0 20px rgba(255, 102, 0, 0);
+    }
+  }
+
+  .pulse-hot-red {
+    animation: pulse-hot-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes pulse-hot-red {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 rgba(255, 0, 64, 1);
+    }
+    50% {
+      opacity: .9;
+      box-shadow: 0 0 0 20px rgba(255, 0, 64, 0);
+    }
+  }
+
+  .pulse-amber {
+    animation: pulse-amber 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes pulse-amber {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 rgba(255, 191, 0, 1);
+    }
+    50% {
+      opacity: .9;
+      box-shadow: 0 0 0 20px rgba(255, 191, 0, 0);
+    }
+  }
+
+  /* Border gradients - NUCLEAR */
+  .border-gradient-nuclear {
     border: 2px solid transparent;
     background: linear-gradient(var(--background), var(--background)) padding-box,
-                linear-gradient(135deg, #00D9FF, #FF0080) border-box;
+                linear-gradient(135deg, #CCFF00, #FF6600) border-box;
+  }
+
+  .border-gradient-inferno {
+    border: 2px solid transparent;
+    background: linear-gradient(var(--background), var(--background)) padding-box,
+                linear-gradient(135deg, #FF6600, #FF0040) border-box;
+  }
+
+  .border-gradient-sunset {
+    border: 2px solid transparent;
+    background: linear-gradient(var(--background), var(--background)) padding-box,
+                linear-gradient(135deg, #FFBF00, #FF6600) border-box;
+  }
+
+  /* Radioactive warning stripes */
+  .warning-stripes {
+    background-image: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 10px,
+      rgba(204, 255, 0, 0.1) 10px,
+      rgba(204, 255, 0, 0.1) 20px
+    );
+  }
+
+  /* Nuclear glow text */
+  .text-glow-toxic {
+    text-shadow: 0 0 10px rgba(204, 255, 0, 0.8),
+                 0 0 20px rgba(204, 255, 0, 0.6),
+                 0 0 30px rgba(204, 255, 0, 0.4);
+  }
+
+  .text-glow-orange {
+    text-shadow: 0 0 10px rgba(255, 102, 0, 0.8),
+                 0 0 20px rgba(255, 102, 0, 0.6),
+                 0 0 30px rgba(255, 102, 0, 0.4);
+  }
+
+  .text-glow-red {
+    text-shadow: 0 0 10px rgba(255, 0, 64, 0.8),
+                 0 0 20px rgba(255, 0, 64, 0.6),
+                 0 0 30px rgba(255, 0, 64, 0.4);
   }
 }

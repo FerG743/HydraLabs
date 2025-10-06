@@ -45,11 +45,11 @@ export const useActivityItem = (activity, index, onClick) => {
   };
 
   const STATUS_COLORS = {
-    success: 'text-green-500',
-    passed: 'text-green-500',
-    error: 'text-red-500',
-    failed: 'text-red-500',
-    warning: 'text-yellow-500',
+    success: 'text-success',
+    passed: 'text-success',
+    error: 'text-error',
+    failed: 'text-error',
+    warning: 'text-warning',
     info: 'text-primary',
     pending: 'text-muted-foreground'
   };

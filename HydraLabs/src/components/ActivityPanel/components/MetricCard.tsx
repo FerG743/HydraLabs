@@ -47,13 +47,13 @@ const MetricCard = ({
         {showIcon && (
           <MetricIcon className={`w-5 h-5 ${iconColor}`} />
         )}
-        <span className="text-sm text-gray-600 capitalize font-medium">
+        <span className="text-sm text-muted-foreground capitalize font-medium">
           {formattedKey}
         </span>
       </div>
       
       {/* Value */}
-      <div className={`font-bold text-gray-900 ${valueSizeClasses[size]}`}>
+      <div className={`font-bold text-foreground ${valueSizeClasses[size]}`}>
         {formattedValue}
       </div>
     </div>

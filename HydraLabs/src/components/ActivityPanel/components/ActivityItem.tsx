@@ -37,7 +37,7 @@ const ActivityItem = ({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-gray-900 truncate">
+          <p className="text-sm font-medium text-foreground truncate">
             {activity.message || activity.title || 'No message'}
           </p>
           {showTimestamp && (
@@ -49,7 +49,7 @@ const ActivityItem = ({
         
         {/* Activity Details */}
         {activity.details && (
-          <div className="mt-1 text-xs text-gray-600">
+          <div className="mt-1 text-xs text-muted-foreground">
             {typeof activity.details === 'string' 
               ? activity.details 
               : `${Object.keys(activity.details).length} details`
@@ -62,7 +62,7 @@ const ActivityItem = ({
       {showCopyButton && (
         <button
           onClick={handleCopy}
-          className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-gray-600 
+          className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-foreground 
             transition-all duration-200 hover:scale-110 active:scale-95"
           title="Copy activity message"
         >

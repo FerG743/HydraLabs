@@ -1,37 +1,22 @@
 import React from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { HTTP_METHODS } from '@/utils/apiConstants';
 
 const MethodSelector = ({ method, onChange, className = '' }) => {
-  const getMethodVariant = (method) => {
-    switch(method) {
-      case 'GET': return 'secondary';
-      case 'POST': return 'default';
-      case 'PUT': return 'secondary';
-      case 'PATCH': return 'outline';
-      case 'DELETE': return 'destructive';
-      default: return 'outline';
-    }
-  };
-
   return (
-    <Select value={method} onValueChange={onChange}>
-      <SelectTrigger className={`w-[100px] ${className}`}>
-        <Badge variant={getMethodVariant(method)} className="text-xs">
-          {method}
-        </Badge>
-      </SelectTrigger>
-      <SelectContent>
-        {HTTP_METHODS.map(httpMethod => (
-          <SelectItem key={httpMethod} value={httpMethod}>
-            <Badge variant={getMethodVariant(httpMethod)} className="text-xs">
-              {httpMethod}
-            </Badge>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className={`flex gap-1 ${className}`}>
+      {HTTP_METHODS.map(httpMethod => (
+        <Button
+          key={httpMethod}
+          onClick={() => onChange(httpMethod)}
+          variant={method === httpMethod ? "default" : "outline"}
+          size="sm"
+          className="text-xs font-medium"
+        >
+          {httpMethod}
+        </Button>
+      ))}
+    </div>
   );
 };
 

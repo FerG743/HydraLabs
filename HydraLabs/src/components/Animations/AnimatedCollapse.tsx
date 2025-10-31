@@ -8,24 +8,45 @@ const AnimatedCollapse = ({
   staggerChildren = false 
 }) => {
   const contentRef = useRef(null);
+  const innerRef = useRef(null);
   const [height, setHeight] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
   
   useEffect(() => {
-    if (contentRef.current) {
-      setHeight(isOpen ? contentRef.current.scrollHeight : 0);
-    }
-  }, [isOpen, children]);
+    const measureHeight = () => {
+      if (innerRef.current) {
+        const measuredHeight = innerRef.current.offsetHeight;
+        setHeight(isOpen ? measuredHeight : 0);
+      }
+    };
+
+    setIsAnimating(true);
+    measureHeight();
+    
+    const timer = setTimeout(measureHeight, 10);
+    
+    // Mark animation as complete after duration
+    const animationTimer = setTimeout(() => {
+      setIsAnimating(false);
+    }, duration);
+    
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(animationTimer);
+    };
+  }, [isOpen, children, duration]);
   
   return (
     <div 
       ref={contentRef}
       style={{ 
         height: `${height}px`,
-        overflow: 'hidden',
+        maxHeight: isOpen && !isAnimating ? 'none' : undefined,
+        overflow: isAnimating ? 'hidden' : (isOpen ? 'visible' : 'hidden'),
         transition: `height ${duration}ms cubic-bezier(0.4, 0, 0.2, 1)`,
       }}
     >
-      <div>
+      <div ref={innerRef}>
         {staggerChildren ? (
           React.Children.map(children, (child, idx) => (
             <div

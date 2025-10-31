@@ -7,6 +7,7 @@ import { hasRequestBody } from '@/utils/apiConstants';
 import { RequestHeader } from './components';
 import BodyEditor from './components/BodyEditor';
 import AdvancedSection from './components/AdvancedSection';
+import { ScrollableContainer } from '@/components/GlobalComponents';
 
 const ApiSetup = ({ 
   onSendRequest,
@@ -62,20 +63,22 @@ const ApiSetup = ({
   const showBodySection = hasRequestBody(requestData.method);
 
   return (
-    <Card className={className}>
+    <Card className={`${className} flex flex-col h-full rounded-none`}>
       {/* Request Header */}
-      <RequestHeader
-        requestData={requestData}
-        isLoading={isLoading}
-        onUpdate={updateRequestData}
-        onSendRequest={handleSendRequest}
-        onSaveRequest={onSaveRequest}
-        headerActions={headerActions}
-        paramActions={paramActions}
-      />
+      <div className="flex-shrink-0">
+        <RequestHeader
+          requestData={requestData}
+          isLoading={isLoading}
+          onUpdate={updateRequestData}
+          onSendRequest={handleSendRequest}
+          onSaveRequest={onSaveRequest}
+          headerActions={headerActions}
+          paramActions={paramActions}
+        />
+      </div>
 
-      {/* Expandable Sections */}
-      <div className="border-t">
+      {/* Expandable Sections with ScrollableContainer */}
+      <ScrollableContainer className="flex-1 border-t overflow-y-auto">
         {/* Body Section */}
         {showBodySection && (
           <BodyEditor
@@ -104,7 +107,7 @@ const ApiSetup = ({
           headerActions={headerActions}
           paramActions={paramActions}
         />
-      </div>
+      </ScrollableContainer>
     </Card>
   );
 };

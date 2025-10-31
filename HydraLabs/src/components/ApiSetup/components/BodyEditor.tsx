@@ -4,6 +4,7 @@ import { BODY_TYPES, CONTENT_TYPES } from '@/utils/apiConstants';
 import { getDefaultRequestTemplate } from '@/utils/apiConstants';
 import KeyValueEditor from './KeyValueEditor';
 import ExpandableSection from './ExpandibleSection';
+
 const BodyEditor = ({
   body,
   method,
@@ -52,8 +53,8 @@ const BodyEditor = ({
               onClick={() => handleBodyTypeChange(type.value)}
               className={`px-3 py-1 text-sm rounded transition-all duration-200 ${
                 body.type === type.value
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-muted text-muted-foreground hover:bg-border'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
               {type.label}
@@ -67,7 +68,7 @@ const BodyEditor = ({
             <div className="flex gap-2">
               <select
                 onChange={(e) => handleContentTypeChange(e.target.value)}
-                className="text-sm px-3 py-1 border border-border rounded focus:ring-1 focus:ring-blue-500"
+                className="text-sm px-3 py-1.5 bg-muted/30 border border-border text-foreground focus:border-muted-foreground focus:outline-none appearance-none cursor-pointer hover:bg-muted/50 transition-colors"
                 defaultValue=""
               >
                 <option value="">Select Content Type</option>
@@ -83,9 +84,9 @@ const BodyEditor = ({
                 value={body.raw}
                 onChange={(e) => onUpdate('body.raw', e.target.value)}
                 rows={8}
-                className="w-full px-3 py-3 border border-border rounded focus:ring-2 focus:ring-blue-500 transition-all duration-200 font-mono text-sm resize-y"
+                className="w-full px-3 py-3 bg-background border border-border rounded text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:outline-none transition-all duration-200 font-mono text-sm resize-y"
               />
-              <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
+              <div className="absolute bottom-2 right-2 text-xs text-muted-foreground bg-background/80 px-2 py-1 rounded">
                 {body.raw.length} characters
               </div>
             </div>

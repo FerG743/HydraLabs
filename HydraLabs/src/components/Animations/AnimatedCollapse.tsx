@@ -25,7 +25,6 @@ const AnimatedCollapse = ({
     
     const timer = setTimeout(measureHeight, 10);
     
-    // Mark animation as complete after duration
     const animationTimer = setTimeout(() => {
       setIsAnimating(false);
     }, duration);

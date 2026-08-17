@@ -1,0 +1,29 @@
+{
+  "start": "n_login",
+  "nodes": [
+    {
+      "id": "n_login",
+      "type": "login",
+      "config": { "username": "alice", "shouldSucceed": true }
+    },
+    {
+      "id": "n_buy",
+      "type": "buy",
+      "config": { "item": "widget" },
+      "rules": [
+        { "kind": "requires_key", "key": "auth_token" },
+        { "kind": "requires_block_upstream", "block": "login" }
+      ]
+    },
+    {
+      "id": "n_report",
+      "type": "log",
+      "config": { "message": "checkout complete" }
+    }
+  ],
+  "edges": [
+    { "from": "n_login", "to": "n_buy", "on": "passed" },
+    { "from": "n_login", "to": "n_report", "on": "failed" },
+    { "from": "n_buy", "to": "n_report" }
+  ]
+}

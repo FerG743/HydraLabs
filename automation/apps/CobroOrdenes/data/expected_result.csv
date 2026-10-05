@@ -1,0 +1,4 @@
+test_id,expected_result
+DWQ-130,"""Procesar"" is disabled before the order is added and enabled after. After processing, the order appears in ""Un vistazo a tus ordenes"". The ""No hay resultados disponibles"" empty state disappears."
+DWQ-131,The download succeeds. Orders 9800074297 (LIVR) and 9800074362 (SBB) appear in the results table. The sample file round-trips through the upload without errors.
+DWQ-132,"The non-CSV file is rejected client-side and ""Subir y Procesar"" stays disabled. The double-click sends at most one POST request (no duplicate charge). An error toast or alert is shown to the user. The button returns to the enabled state with no stuck spinner. No Next.js ""Application error"" crash screen appears."

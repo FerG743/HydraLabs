@@ -1,0 +1,55 @@
+{
+  "id": "DWQ-130-es",
+  "name": "TC-1 – Captura manual y procesamiento de orden (Flujo feliz)",
+  "language": "es",
+  "meta": {
+    "type": "Test Case",
+    "priority": "High",
+    "labels": [
+      "e2e",
+      "smoke",
+      "cobro-ordenes"
+    ],
+    "gate": "Blocker",
+    "parent": "DWQ-129"
+  },
+  "precondition": "El portal está desplegado y accesible. La tabla \"Un vistazo a tus ordenes\" está vacía.",
+  "steps": [
+    {
+      "n": "1",
+      "action": "Navegar a `/cobro_ordenes`."
+    },
+    {
+      "n": "2",
+      "action": "Verificar que \"Procesar\" está deshabilitado."
+    },
+    {
+      "n": "3",
+      "action": "Ingresar el número de orden `9800074297`."
+    },
+    {
+      "n": "4",
+      "action": "Seleccionar la tienda `LIVR`."
+    },
+    {
+      "n": "5",
+      "action": "Hacer clic en \"Agregar\"."
+    },
+    {
+      "n": "6",
+      "action": "Hacer clic en \"Procesar\"."
+    }
+  ],
+  "expected": [
+    {
+      "text": "\"Procesar\" está deshabilitado antes de agregar la orden y habilitado después."
+    },
+    {
+      "text": "Después de procesar, la orden aparece en \"Un vistazo a tus ordenes\"."
+    },
+    {
+      "text": "El estado vacío \"No hay resultados disponibles\" desaparece."
+    }
+  ],
+  "notes": ""
+}

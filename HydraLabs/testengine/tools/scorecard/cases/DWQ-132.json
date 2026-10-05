@@ -1,0 +1,59 @@
+{
+  "id": "DWQ-132",
+  "name": "TC-3 – Invalid input and backend failure under duplicate submission (Negative / Resilience)",
+  "language": "en",
+  "meta": {
+    "type": "Test Case",
+    "priority": "Highest",
+    "labels": [
+      "e2e",
+      "negative",
+      "resilience",
+      "idempotency",
+      "cobro-ordenes"
+    ],
+    "gate": "Blocker",
+    "parent": "DWQ-129"
+  },
+  "precondition": "The POST endpoint is mocked to return HTTP 500 after a 1.5 s delay. A request counter is attached.",
+  "steps": [
+    {
+      "n": "1",
+      "action": "Navigate to `/cobro_ordenes`."
+    },
+    {
+      "n": "2",
+      "action": "Upload `evil.csv.exe` (binary content, `application/octet-stream`)."
+    },
+    {
+      "n": "3",
+      "action": "Upload `junk.csv` containing: an empty order number; an unknown store (`XXXX`); a 10,000-character order number; an SQL-injection string (`'; DROP TABLE x;--`)"
+    },
+    {
+      "n": "4",
+      "action": "Double-click \"Subir y Procesar\"."
+    },
+    {
+      "n": "5",
+      "action": "Wait for the response."
+    }
+  ],
+  "expected": [
+    {
+      "text": "The non-CSV file is rejected client-side and \"Subir y Procesar\" stays disabled."
+    },
+    {
+      "text": "The double-click sends at most one POST request (no duplicate charge)."
+    },
+    {
+      "text": "An error toast or alert is shown to the user."
+    },
+    {
+      "text": "The button returns to the enabled state with no stuck spinner."
+    },
+    {
+      "text": "No Next.js \"Application error\" crash screen appears."
+    }
+  ],
+  "notes": "A duplicate POST is a potential double-charge defect. Raise it as Severity 1."
+}

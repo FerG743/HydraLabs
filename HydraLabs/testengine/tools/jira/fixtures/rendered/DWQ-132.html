@@ -1,0 +1,31 @@
+<ul>
+	<li><b>Type:</b> Test Case | <b>Priority:</b> Highest | <b>Labels:</b> <tt>e2e</tt>, <tt>negative</tt>, <tt>resilience</tt>, <tt>idempotency</tt>, <tt>cobro-ordenes</tt></li>
+	<li><b>Preconditions:</b> The POST endpoint is mocked to return HTTP 500 after a 1.5 s delay. A request counter is attached.</li>
+	<li><b>Steps:</b>
+	<ol>
+		<li>Navigate to <tt>/cobro_ordenes</tt>.</li>
+		<li>Upload <tt>evil.csv.exe</tt> (binary content, <tt>application/octet-stream</tt>).</li>
+		<li>Upload <tt>junk.csv</tt> containing:
+		<ul>
+			<li>an empty order number</li>
+			<li>an unknown store (<tt>XXXX</tt>)</li>
+			<li>a 10,000-character order number</li>
+			<li>an SQL-injection string (<tt>'; DROP TABLE x;--</tt>)</li>
+		</ul>
+		</li>
+		<li>Double-click "Subir y Procesar".</li>
+		<li>Wait for the response.</li>
+	</ol>
+	</li>
+	<li><b>Expected Result:</b>
+	<ul>
+		<li>The non-CSV file is rejected client-side and "Subir y Procesar" stays disabled.</li>
+		<li>The double-click sends at most one POST request (no duplicate charge).</li>
+		<li>An error toast or alert is shown to the user.</li>
+		<li>The button returns to the enabled state with no stuck spinner.</li>
+		<li>No Next.js "Application error" crash screen appears.</li>
+	</ul>
+	</li>
+	<li><b>Pipeline gate:</b> Blocker.</li>
+	<li><b>Note:</b> A duplicate POST is a potential double-charge defect. Raise it as Severity 1.</li>
+</ul>

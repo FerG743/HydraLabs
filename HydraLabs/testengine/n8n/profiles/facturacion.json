@@ -1,0 +1,14 @@
+{
+  "_doc": "One file per project. {root} = testengine dir, ~ = home. Column names are matched by slug prefix (see cmd/matrix, cmd/suite).",
+  "binDir": "{root}/bin",
+  "outDir": "{root}/out",
+  "matrixCsv": "~/Downloads/EPL TI FO 048 Test Matrix.csv",
+  "suiteCsv": "~/Downloads/Suite Facturación Hoja 1.csv",
+  "nameCol": "NOMBRE DE CASO",
+  "stepCol": "PASOS",
+  "expectedCol": "RESULTADOS ESPERADOS",
+  "numCol": "No. de Pasos",
+  "keyCol": "Boleta",
+  "blockedRegex": "Dependencia de insumos",
+  "tagCols": "prioridad,ciclo,nivel_de_prueba,parent"
+}

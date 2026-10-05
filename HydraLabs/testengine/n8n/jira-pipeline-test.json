@@ -1,0 +1,461 @@
+{
+  "name": "Jira → Gherkin (test)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        120
+      ],
+      "id": "schedule"
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -80
+      ],
+      "id": "manual-trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "jiraBaseUrl",
+              "name": "jiraBaseUrl",
+              "value": "https://liverpooldigital.atlassian.net",
+              "type": "string"
+            },
+            {
+              "id": "jql",
+              "name": "jql",
+              "value": "parent = DWQ-129 ORDER BY key ASC",
+              "type": "string"
+            },
+            {
+              "id": "lang",
+              "name": "lang",
+              "value": "en",
+              "type": "string"
+            },
+            {
+              "id": "pollMinutes",
+              "name": "pollMinutes",
+              "value": "5",
+              "type": "string"
+            },
+            {
+              "id": "toolsDir",
+              "name": "toolsDir",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/tools/jira",
+              "type": "string"
+            },
+            {
+              "id": "binDir",
+              "name": "binDir",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/bin",
+              "type": "string"
+            },
+            {
+              "id": "outDir",
+              "name": "outDir",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/out/jira",
+              "type": "string"
+            },
+            {
+              "id": "python",
+              "name": "python",
+              "value": "python3",
+              "type": "string"
+            },
+            {
+              "id": "version",
+              "name": "version",
+              "value": "4",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "id": "config"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return { json: { issues: [{\"key\": \"DWQ-130\", \"fields\": {\"updated\": \"2026-10-05T09:00:00.000-0500\"}}, {\"key\": \"DWQ-131\", \"fields\": {\"updated\": \"2026-10-05T09:00:00.000-0500\"}}, {\"key\": \"DWQ-132\", \"fields\": {\"updated\": \"2026-10-05T09:00:00.000-0500\"}}, {\"key\": \"DWQ-999\", \"fields\": {\"updated\": \"2026-10-05T09:00:00.000-0500\"}}] } };"
+      },
+      "name": "Search Jira",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "search-jira"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const html = {\"DWQ-130\": \"<ul data-local-id=\\\"23999b671fe4\\\"><li data-local-id=\\\"aa2cfdcfb0a4\\\"><p data-local-id=\\\"7ee313c8deb5\\\"><strong>Preconditions:</strong> Portal is deployed and reachable. The &quot;Un vistazo a tus ordenes&quot; table is empty.</p></li><li data-local-id=\\\"64892bf69257\\\"><p data-local-id=\\\"7c0c8688d0d7\\\"><strong>Steps:</strong></p><ol data-local-id=\\\"8635a17e987f\\\"><li data-local-id=\\\"70372e3da5ac\\\"><p data-local-id=\\\"5e64585629b6\\\">Navigate to <code>/cobro_ordenes</code>.</p></li><li data-local-id=\\\"f7860a2d4068\\\"><p data-local-id=\\\"31b1d1019caf\\\">Verify &quot;Procesar&quot; is disabled.</p></li><li data-local-id=\\\"b7914f357a69\\\"><p data-local-id=\\\"0a8180402980\\\">Enter order number <code>9800074297</code>.</p></li><li data-local-id=\\\"a271922aeb3f\\\"><p data-local-id=\\\"de5f3164b82a\\\">Select store <code>LIVR</code>.</p></li><li data-local-id=\\\"776ba0f4a6fb\\\"><p data-local-id=\\\"911787fe046f\\\">Click &quot;Agregar&quot;.</p></li><li data-local-id=\\\"35c7b17fdeab\\\"><p data-local-id=\\\"a605f273ea87\\\">Click &quot;Procesar&quot;.</p></li></ol></li><li data-local-id=\\\"87c72db12e03\\\"><p data-local-id=\\\"96b603722eb7\\\"><strong>Expected Result:</strong></p><ul data-local-id=\\\"eea90bdb5b17\\\"><li data-local-id=\\\"66f049bc7c0c\\\"><p data-local-id=\\\"80e8fed2bf76\\\">&quot;Procesar&quot; is disabled before the order is added and enabled after.</p></li><li data-local-id=\\\"24d50b0e2d22\\\"><p data-local-id=\\\"770d6019fec4\\\">After processing, the order appears in &quot;Un vistazo a tus ordenes&quot;.</p></li><li data-local-id=\\\"fef625e04b23\\\"><p data-local-id=\\\"0acb8c41a772\\\">The &quot;No hay resultados disponibles&quot; empty state disappears.</p></li></ul></li><li data-local-id=\\\"462e23c229a6\\\"><p data-local-id=\\\"02f2d5264a9e\\\"><strong>Pipeline gate:</strong> Blocker. A failure here fails the build</p></li></ul>\\n\", \"DWQ-131\": \"<ul data-local-id=\\\"1b18378b7f8b\\\"><li data-local-id=\\\"a493790ab40b\\\"><p data-local-id=\\\"feccd1f1115d\\\"><strong>Type:</strong> Test Case | <strong>Priority:</strong> High | <strong>Labels:</strong> <code>e2e</code>, <code>smoke</code>, <code>cobro-ordenes</code>, <code>file-upload</code></p></li><li data-local-id=\\\"b22a87c1753c\\\"><p data-local-id=\\\"6b868c3fdadb\\\"><strong>Preconditions:</strong> Same as TC-1.</p></li><li data-local-id=\\\"e57ff13d0b65\\\"><p data-local-id=\\\"a51ddc5ea359\\\"><strong>Steps:</strong></p><ol data-local-id=\\\"79d21a89f79d\\\"><li data-local-id=\\\"2cfcdd013cac\\\"><p data-local-id=\\\"28008d3c191b\\\">Navigate to <code>/cobro_ordenes</code>.</p></li><li data-local-id=\\\"38948ddb81b2\\\"><p data-local-id=\\\"af5690404e25\\\">Click &quot;Descargar CSV&quot; and capture the downloaded file.</p></li><li data-local-id=\\\"21107bbfeac3\\\"><p data-local-id=\\\"2216d9fa5950\\\">Upload that file via the drop zone.</p></li><li data-local-id=\\\"469eaaa74715\\\"><p data-local-id=\\\"2a0de0f525c1\\\">Verify &quot;Subir y Procesar&quot; is enabled.</p></li><li data-local-id=\\\"9a227753a029\\\"><p data-local-id=\\\"d9716df7ea9b\\\">Click &quot;Subir y Procesar&quot;.</p></li></ol></li><li data-local-id=\\\"b3420fe9de47\\\"><p data-local-id=\\\"78bae1cbd4d1\\\"><strong>Expected Result:</strong></p><ul data-local-id=\\\"105931f74da4\\\"><li data-local-id=\\\"df6d65e56256\\\"><p data-local-id=\\\"1a279c549cbe\\\">The download succeeds.</p></li><li data-local-id=\\\"527ec1590624\\\"><p data-local-id=\\\"292af3b47103\\\">Orders <code>9800074297</code> (LIVR) and <code>9800074362</code> (SBB) appear in the results table.</p></li><li data-local-id=\\\"ce1cdaa4661d\\\"><p data-local-id=\\\"0409b6d5193d\\\">The sample file round-trips through the upload without errors.</p></li></ul></li><li data-local-id=\\\"8e8709ef2c7c\\\"><p data-local-id=\\\"22f410075c0d\\\"><strong>Pipeline gate:</strong> Blocker.</p></li></ul>\\n\", \"DWQ-132\": \"<ul data-local-id=\\\"b6860f66e460\\\"><li data-local-id=\\\"29d1d1b69d59\\\"><p data-local-id=\\\"b5440cdfaf6c\\\"><strong>Type:</strong> Test Case | <strong>Priority:</strong> Highest | <strong>Labels:</strong> <code>e2e</code>, <code>negative</code>, <code>resilience</code>, <code>idempotency</code>, <code>cobro-ordenes</code></p></li><li data-local-id=\\\"05bcd7621b4b\\\"><p data-local-id=\\\"f70a3f5893a3\\\"><strong>Preconditions:</strong> The POST endpoint is mocked to return HTTP 500 after a 1.5 s delay. A request counter is attached.</p></li><li data-local-id=\\\"ea5f25610b09\\\"><p data-local-id=\\\"793f22dc34fb\\\"><strong>Steps:</strong></p><ol data-local-id=\\\"4376215703d2\\\"><li data-local-id=\\\"6eaeb350ba33\\\"><p data-local-id=\\\"9ed98a596b2c\\\">Navigate to <code>/cobro_ordenes</code>.</p></li><li data-local-id=\\\"824cbf816e14\\\"><p data-local-id=\\\"1291b423fd23\\\">Upload <code>evil.csv.exe</code> (binary content, <code>application/octet-stream</code>).</p></li><li data-local-id=\\\"f5e2667bd2e8\\\"><p data-local-id=\\\"0ba86fa5c09c\\\">Upload <code>junk.csv</code> containing:</p><ul data-local-id=\\\"6b5f06e19a61\\\"><li data-local-id=\\\"33286f5d9038\\\"><p data-local-id=\\\"b84460de3a25\\\">an empty order number</p></li><li data-local-id=\\\"dff836bdb699\\\"><p data-local-id=\\\"be89f0dc8f07\\\">an unknown store (<code>XXXX</code>)</p></li><li data-local-id=\\\"9275efc632a3\\\"><p data-local-id=\\\"0c36484d7b67\\\">a 10,000-character order number</p></li><li data-local-id=\\\"ef75f7b9341d\\\"><p data-local-id=\\\"1bbcdf0bf97e\\\">an SQL-injection string (<code>&#039;; DROP TABLE x;--</code>)</p></li></ul></li><li data-local-id=\\\"8e3ee9dd1eb4\\\"><p data-local-id=\\\"2f522043500e\\\">Double-click &quot;Subir y Procesar&quot;.</p></li><li data-local-id=\\\"d9c87c2daa50\\\"><p data-local-id=\\\"d29d4a1eb2ad\\\">Wait for the response.</p></li></ol></li><li data-local-id=\\\"3b631b19089a\\\"><p data-local-id=\\\"ab5608e8b5c3\\\"><strong>Expected Result:</strong></p><ul data-local-id=\\\"fb0fc5757a02\\\"><li data-local-id=\\\"267562951d8a\\\"><p data-local-id=\\\"959a7e018b26\\\">The non-CSV file is rejected client-side and &quot;Subir y Procesar&quot; stays disabled.</p></li><li data-local-id=\\\"cd4c057fa392\\\"><p data-local-id=\\\"2ba28284af32\\\">The double-click sends at most one POST request (no duplicate charge).</p></li><li data-local-id=\\\"ae9a7302662c\\\"><p data-local-id=\\\"0c5f4d11f9b3\\\">An error toast or alert is shown to the user.</p></li><li data-local-id=\\\"52db1026ec80\\\"><p data-local-id=\\\"8e42245db787\\\">The button returns to the enabled state with no stuck spinner.</p></li><li data-local-id=\\\"7f526a163206\\\"><p data-local-id=\\\"78cab1a3da80\\\">No Next.js &quot;Application error&quot; crash screen appears.</p></li></ul></li><li data-local-id=\\\"0399774043c4\\\"><p data-local-id=\\\"1e68a0b5962f\\\"><strong>Pipeline gate:</strong> Blocker.</p></li><li data-local-id=\\\"049e0695471b\\\"><p data-local-id=\\\"7408e27b361c\\\"><strong>Note:</strong> A duplicate POST is a potential double-charge defect. Raise it as Severity 1.</p></li></ul>\\n\", \"DWQ-999\": \"<ul><li><p><strong>Preconditions:</strong> Only a precondition, no steps.</p></li></ul>\"};\nconst k = $json.key;\nreturn { json: { key: k, fields: { summary: 'Fixture ' + k + ' \"quoted\"', priority: { name: 'Medium' }, parent: { key: 'DWQ-129' }, updated: $json.fields.updated }, renderedFields: { description: html[k] } } };"
+      },
+      "name": "Get Issue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "id": "get-issue"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "issues",
+        "options": {}
+      },
+      "name": "Split Issues",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ],
+      "id": "split-issues"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\n// remember (key -> updated) in workflow static data: process each issue once per edit\nconst seen = $getWorkflowStaticData('global').seen || {};\nconst v = $('Config').first().json.version;\nreturn $input.all().filter(i => seen[i.json.key] !== i.json.fields.updated + '|' + v);\n"
+      },
+      "name": "New Or Changed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "id": "new-or-changed"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst cfg = $('Config').first().json, f = $json.fields;\nconst input = { key: $json.key, summary: f.summary, html: ($json.renderedFields || {}).description || '',\n  lang: cfg.lang, parent: f.parent && f.parent.key, jira_priority: f.priority && f.priority.name };\nreturn { json: { key: $json.key, summary: f.summary, updated: f.updated,\n  inputB64: Buffer.from(JSON.stringify(input)).toString('base64') } };\n"
+      },
+      "name": "Build Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
+      ],
+      "id": "build-input"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "={{ \"echo \" + $json.inputB64 + \" | base64 -d | \" + $('Config').first().json.python + \" \\\"\" + $('Config').first().json.toolsDir + \"/jira2feature.py\\\"\" }}"
+      },
+      "name": "Convert",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        0
+      ],
+      "id": "convert"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst st = $('Build Input').item.json;\nlet r;\ntry { r = JSON.parse($json.stdout); } catch (e) { r = { feature: '', case: {}, warnings: ['convert failed: ' + ($json.stderr || e.message)] }; }\nreturn { json: { ...st, feature: r.feature, caseJson: JSON.stringify(r.case), warnings: r.warnings,\n  featureB64: Buffer.from(r.feature).toString('base64') } };\n"
+      },
+      "name": "Parse Convert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        0
+      ],
+      "id": "parse-convert"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "={{ \"echo \" + $json.featureB64 + \" | base64 -d | \\\"\" + $('Config').first().json.binDir + \"/lint\\\" -lang \" + $('Config').first().json.lang + \" -max-scenarios 1\" }}"
+      },
+      "name": "Lint",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        0
+      ],
+      "id": "lint"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst st = $('Parse Convert').item.json;\nlet r;\ntry { r = JSON.parse($json.stdout); } catch (e) { r = { ok: false, errors: ['lint output was not JSON'], needs_input: [] }; }\n// clean = parses, and nothing is missing or unresolved; otherwise a human looks at it in review/.\n// A priority mismatch is reported in the notes but does not block.\nconst blocking = st.warnings.filter(w => !/^priority conflict/.test(w));\nconst clean = r.ok && r.needs_input.length === 0 && blocking.length === 0;\nconst notes = [...r.errors.map(e => 'LINT: ' + e), ...r.needs_input, ...st.warnings].join('\\n');\nconst base = st.key + '_' + st.summary.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^\\w.-]+/g, '_').slice(0, 60);\nconst b64 = s => Buffer.from(s).toString('base64');\nreturn { json: { key: st.key, updated: st.updated, clean, base, featureB64: st.featureB64,\n  caseB64: b64(st.caseJson), notesB64: notes ? b64(notes + '\\n') : '' } };\n"
+      },
+      "name": "Decide",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        0
+      ],
+      "id": "decide"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "={{ \"d=\\\"\" + $('Config').first().json.outDir + ($json.clean ? \"\" : \"/review\") + \"\\\"; mkdir -p \\\"$d\\\" && echo \" + $json.featureB64 + \" | base64 -d > \\\"$d/\" + $json.base + \".feature\\\" && echo \" + $json.caseB64 + \" | base64 -d > \\\"$d/\" + $json.base + \".case.json\\\"\" + ($json.notesB64 ? \" && echo \" + $json.notesB64 + \" | base64 -d > \\\"$d/\" + $json.base + \".notes.txt\\\"\" : \"\") + \" && echo \\\"$d/\" + $json.base + \".feature\\\"\" }}"
+      },
+      "name": "Save",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2420,
+        0
+      ],
+      "id": "save"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\n// only after a successful Save: a failed run is retried on the next poll\nconst sd = $getWorkflowStaticData('global');\nsd.seen = sd.seen || {};\nconst v = $('Config').first().json.version;\nfor (const d of $('Decide').all()) sd.seen[d.json.key] = d.json.updated + '|' + v;\nreturn $input.all();\n"
+      },
+      "name": "Remember",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        0
+      ],
+      "id": "remember"
+    },
+    {
+      "parameters": {
+        "executeOnce": true,
+        "command": "={{ $('Config').first().json.python + \" \\\"\" + $('Config').first().json.toolsDir + \"/resolve_refs.py\\\" --dir \\\"\" + $('Config').first().json.outDir + \"\\\" --lint \\\"\" + $('Config').first().json.binDir + \"/lint\\\" --lang \" + $('Config').first().json.lang }}"
+      },
+      "name": "Resolve References",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2860,
+        160
+      ],
+      "id": "resolve-references"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.jiraBaseUrl }}/rest/api/3/issue/{{ $('Decide').item.json.key }}/comment",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "jiraSoftwareCloudApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Gherkin generated: ' + ($('Decide').item.json.clean ? 'clean' : 'needs review') }] }] } }) }}"
+      },
+      "name": "Comment on Jira (off)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        0
+      ],
+      "id": "comment-on-jira-(off)",
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Search Jira",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Jira": {
+      "main": [
+        [
+          {
+            "node": "Split Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Issues": {
+      "main": [
+        [
+          {
+            "node": "New Or Changed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Or Changed": {
+      "main": [
+        [
+          {
+            "node": "Get Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Issue": {
+      "main": [
+        [
+          {
+            "node": "Build Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Input": {
+      "main": [
+        [
+          {
+            "node": "Convert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert": {
+      "main": [
+        [
+          {
+            "node": "Parse Convert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Convert": {
+      "main": [
+        [
+          {
+            "node": "Lint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lint": {
+      "main": [
+        [
+          {
+            "node": "Decide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide": {
+      "main": [
+        [
+          {
+            "node": "Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save": {
+      "main": [
+        [
+          {
+            "node": "Remember",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remember": {
+      "main": [
+        [
+          {
+            "node": "Resolve References",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Comment on Jira (off)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "id": "jira-gherkin-test"
+}

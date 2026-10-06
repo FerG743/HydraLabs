@@ -1,0 +1,9 @@
+{
+  "locators": {
+    "BOTON_AGREGAR": "role=button[name=\"Agregar\"]",
+    "BOTON_DESCARGAR_CSV": "role=button[name=\"Descargar CSV\"]",
+    "BOTON_PROCESAR": "role=button[name=\"Procesar\"]",
+    "BOTON_SUBIR_Y_PROCESAR": "role=button[name=\"Subir y Procesar\"]"
+  },
+  "widgets": {}
+}

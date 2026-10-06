@@ -1,0 +1,20 @@
+{
+  "page": "cobro_ordenes",
+  "locators": {
+    "BOTON_DESCARGAR_CSV": "role=button[name=\"Descargar CSV\"]",
+    "INPUT_ARCHIVO": "#file-upload",
+    "BOTON_SUBIR_Y_PROCESAR": "role=button[name=\"Subir y Procesar\"]"
+  },
+  "steps": [
+    {"n": 1, "do": {"action": "goto", "path": "/cobro_ordenes"}},
+    {"n": 2, "do": {"action": "download", "locator": "BOTON_DESCARGAR_CSV", "save_as": "csv_muestra"}},
+    {"n": 3, "do": {"action": "upload_file", "locator": "INPUT_ARCHIVO", "from_download": "csv_muestra"}},
+    {"n": 4, "do": {"action": "verify", "kind": "enabled", "locator": "BOTON_SUBIR_Y_PROCESAR"}},
+    {"n": 5, "do": {"action": "click", "locator": "BOTON_SUBIR_Y_PROCESAR"}}
+  ],
+  "checks": [
+    {"n": 1, "check": {"kind": "download_ok"}},
+    {"n": 2, "check": [{"kind": "visible", "text": "9800074297"}, {"kind": "visible", "text": "9800074362"}]},
+    {"n": 3, "skip": "el round-trip sin errores no es observable de forma directa"}
+  ]
+}

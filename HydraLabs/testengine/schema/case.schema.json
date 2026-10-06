@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Normalized test case",
+  "description": "The contract every source adapter (CSV, Jira, ...) must produce. Downstream stages see only this shape. cmd/casecheck enforces it.",
+  "type": "object",
+  "required": ["cases"],
+  "properties": {
+    "orphans": { "type": "array", "items": { "type": "string" } },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "status", "steps"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "description": "unique within a run; leading zeros are insignificant" },
+          "name": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["ready", "blocked", "no-data", "depends"] },
+          "note": { "type": "string" },
+          "meta": { "type": "object", "additionalProperties": { "type": "string" }, "description": "free-form case attributes (priority, cycle, precondition, parent, ...)" },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["action"],
+              "properties": {
+                "n": { "type": "string" },
+                "action": { "type": "string", "minLength": 1 },
+                "expected": { "type": "string" },
+                "extra": { "type": "object" }
+              }
+            }
+          },
+          "data": {
+            "type": "object",
+            "required": ["rows"],
+            "properties": {
+              "shared": { "type": "object", "additionalProperties": { "type": "string" }, "description": "same value for every row" },
+              "rows": { "type": "array", "minItems": 1, "items": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "string" } }, "description": "one scenario per row" },
+              "lists": { "type": "object", "description": "multi-valued data that could not be paired with rows; never guessed" }
+            }
+          },
+          "depends_on": { "type": "array", "items": { "type": "string" }, "description": "ids of cases whose output this one needs" },
+          "warnings": { "type": "array", "items": { "type": "string" } }
+        },
+        "allOf": [
+          { "if": { "properties": { "status": { "const": "ready" } } },
+            "then": { "required": ["data"], "properties": { "steps": { "minItems": 1 } } } }
+        ]
+      }
+    }
+  }
+}

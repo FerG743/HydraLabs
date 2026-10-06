@@ -1,0 +1,376 @@
+{
+  "id": "hydra-pipeline",
+  "name": "HydraPloy: Jira -> automated tests",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Manual: poll now",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        100
+      ],
+      "id": "manual-poll-now"
+    },
+    {
+      "parameters": {},
+      "name": "Manual: run one issue",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "id": "manual-run-one-issue"
+    },
+    {
+      "parameters": {},
+      "name": "Manual: crawl the app",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        500
+      ],
+      "id": "manual-crawl-the-app"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Weekdays 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        700
+      ],
+      "id": "weekdays-0700"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "hydra",
+              "name": "hydra",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/bin/hydra",
+              "type": "string"
+            },
+            {
+              "id": "profile",
+              "name": "profile",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/profiles/cobro-ordenes.json",
+              "type": "string"
+            },
+            {
+              "id": "cwd",
+              "name": "cwd",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        100
+      ],
+      "id": "config"
+    },
+    {
+      "parameters": {
+        "executeOnce": true,
+        "command": "=cd \"{{ $('Config').first().json.cwd }}\" && \"{{ $('Config').first().json.hydra }}\" poll --json --profile \"{{ $('Config').first().json.profile }}\" 2>&1"
+      },
+      "name": "hydra poll",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        480,
+        100
+      ],
+      "id": "hydra-poll"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "key",
+              "name": "key",
+              "value": "DWQ-130",
+              "type": "string"
+            },
+            {
+              "id": "intent",
+              "name": "intent",
+              "value": "automate",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Pick issue",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        200
+      ],
+      "id": "pick-issue"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "hydra",
+              "name": "hydra",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/bin/hydra",
+              "type": "string"
+            },
+            {
+              "id": "profile",
+              "name": "profile",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/profiles/cobro-ordenes.json",
+              "type": "string"
+            },
+            {
+              "id": "cwd",
+              "name": "cwd",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Config Run",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "id": "config-run"
+    },
+    {
+      "parameters": {
+        "executeOnce": true,
+        "command": "=cd \"{{ $('Config Run').first().json.cwd }}\" && \"{{ $('Config Run').first().json.hydra }}\" poll --json --only \"{{ $('Pick issue').first().json.key }}\" --intent \"{{ $('Pick issue').first().json.intent }}\" --profile \"{{ $('Config Run').first().json.profile }}\" 2>&1"
+      },
+      "name": "hydra run one",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        480,
+        300
+      ],
+      "id": "hydra-run-one"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "hydra",
+              "name": "hydra",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/bin/hydra",
+              "type": "string"
+            },
+            {
+              "id": "profile",
+              "name": "profile",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/profiles/cobro-ordenes.json",
+              "type": "string"
+            },
+            {
+              "id": "cwd",
+              "name": "cwd",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Config Crawl",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        500
+      ],
+      "id": "config-crawl"
+    },
+    {
+      "parameters": {
+        "executeOnce": true,
+        "command": "=cd \"{{ $('Config Crawl').first().json.cwd }}\" && \"{{ $('Config Crawl').first().json.hydra }}\" crawl --profile \"{{ $('Config Crawl').first().json.profile }}\" 2>&1"
+      },
+      "name": "hydra crawl",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        480,
+        500
+      ],
+      "id": "hydra-crawl"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\n// One row per run. Lines that are not JSON (errors, crawl progress) are kept as a 'log' row so nothing is hidden.\nconst out = [], text = ($input.first().json.stdout || '') + ($input.first().json.stderr || '');\nfor (const line of text.split('\\n').filter(Boolean)) {\n  try { const r = JSON.parse(line); out.push({ json: { key: r.key, intent: r.intent, tier: r.tier, status: r.status,\n    tokens: r.tokens, ms: r.ms, detail: (r.detail || []).join(' | ') } }); }\n  catch (e) { out.push({ json: { log: line } }); }\n}\nreturn out.length ? out : [{ json: { log: 'No runs: nothing new, or no issue carries the automate/execute label (poll), or the command printed nothing.' } }];\n"
+      },
+      "name": "Runs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        240
+      ],
+      "id": "runs"
+    }
+  ],
+  "connections": {
+    "Manual: poll now": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekdays 07:00": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "hydra poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual: run one issue": {
+      "main": [
+        [
+          {
+            "node": "Pick issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick issue": {
+      "main": [
+        [
+          {
+            "node": "Config Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config Run": {
+      "main": [
+        [
+          {
+            "node": "hydra run one",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual: crawl the app": {
+      "main": [
+        [
+          {
+            "node": "Config Crawl",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config Crawl": {
+      "main": [
+        [
+          {
+            "node": "hydra crawl",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "hydra poll": {
+      "main": [
+        [
+          {
+            "node": "Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "hydra run one": {
+      "main": [
+        [
+          {
+            "node": "Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "hydra crawl": {
+      "main": [
+        [
+          {
+            "node": "Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

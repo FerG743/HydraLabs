@@ -203,6 +203,14 @@ func main() {
 				os.Exit(3)
 			}
 		}
+	case "announce": // backfill: comment on cases that were delivered before write-back existed
+		post, keys := fs.Bool("post", false, "actually post (default: only print what would be posted)"), fs.String("keys", "", "comma-separated keys (default: every passing case)")
+		fs.Parse(os.Args[2:])
+		var on []string
+		if *keys != "" {
+			on = strings.Split(*keys, ",")
+		}
+		err = cfg.Announce(on, *post)
 	case "deliver":
 		only, exclude := fs.String("only", "", "comma-separated keys to deliver (default: every passing case)"), fs.String("exclude", "", "comma-separated keys to leave out")
 		fs.StringVar(&cfg.DeliverRepo, "repo", cfg.DeliverRepo, "framework repo that receives the tests")
@@ -220,6 +228,7 @@ func main() {
 		if d, err = cfg.Deliver(on, ex); err == nil {
 			b, _ := json.MarshalIndent(d, "", "  ")
 			fmt.Println(string(b))
+			cfg.writeBack(d)
 			if d.Gate != "" {
 				os.Exit(3) // distinct from 1 (error): the pipeline worked and is asking a person
 			}
@@ -304,7 +313,8 @@ func poll(cfg Config, jql string, comment bool, only string, force bool, forceIn
 		seen[jb.key] = jb.stamp
 		if needsPerson(r) {
 			if comment {
-				if e := j.Comment(jb.key, Message(r)); e != nil {
+				msg := Message(r)
+				if _, e := cfg.PostOnce(j, jb.key, shortID(r.Status, msg), msg); e != nil {
 					fmt.Fprintln(os.Stderr, "comment failed:", e)
 				}
 			}

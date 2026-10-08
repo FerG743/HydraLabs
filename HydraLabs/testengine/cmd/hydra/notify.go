@@ -2,10 +2,13 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -39,4 +42,46 @@ func ChatNotify(envName string, r Run) error {
 		return fmt.Errorf("chat webhook: %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// DeliveredMessage is what the issue's owner reads when the case is finished: the result, the cost, and where the test is.
+func DeliveredMessage(r Run, d Delivery, repoName, testFile string, runs int) string {
+	msg := fmt.Sprintf("HydraPloy: automated and delivered.\n"+
+		"Result: passed %d of %d consecutive runs in the framework.\n"+
+		"Test: %s\n"+
+		"Repo: %s, branch %s, commit %s.\n"+
+		"Cost: %d tokens (%s).",
+		runs, runs, testFile, repoName, d.Branch, d.Commit, r.Tokens, r.Tier)
+	if strings.HasPrefix(d.Branch, "hydra/") { // a review branch: not merged yet
+		msg += "\nA person reviews the branch before it is merged."
+	}
+	return msg
+}
+
+// BlockedMessage: a delivery was stopped on this case (flaky or failing in the real framework).
+func BlockedMessage(o CaseOutcome, runs int) string {
+	return fmt.Sprintf("HydraPloy: delivery blocked, needs a person.\nStatus: %s (passed %d of %d runs).\n%s", o.Status, o.Passes, runs, o.Detail)
+}
+
+// PostOnce posts msg to the issue unless this exact news (id) was already posted: re-running a case must not
+// spam the board. The record lives in out/hydra/posted.json, so deleting it resets the memory.
+func (c Config) PostOnce(j *Jira, key, id, msg string) (bool, error) {
+	path := filepath.Join(c.Out, "posted.json")
+	posted := map[string]string{}
+	if b, err := os.ReadFile(path); err == nil {
+		json.Unmarshal(b, &posted)
+	}
+	if posted[key] == id {
+		return false, nil
+	}
+	if err := j.Comment(key, msg); err != nil {
+		return false, err
+	}
+	posted[key] = id
+	return true, writeJSON(path, posted)
+}
+
+func shortID(parts ...string) string {
+	h := sha1.Sum([]byte(strings.Join(parts, "\x00")))
+	return hex.EncodeToString(h[:6])
 }

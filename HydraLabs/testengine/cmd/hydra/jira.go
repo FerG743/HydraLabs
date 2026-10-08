@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -101,9 +102,20 @@ func (j *Jira) Get(key string) (*Issue, error) {
 	return is, nil
 }
 
-// Comment posts the run outcome. Off unless asked: write-back waits until the results are trusted.
+// CommentADF builds the comment body: one paragraph per line (ADF ignores "\n" inside a text node).
+func CommentADF(msg string) map[string]any {
+	var paras []any
+	for _, line := range strings.Split(strings.TrimSpace(msg), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		paras = append(paras, map[string]any{"type": "paragraph", "content": []any{map[string]any{"type": "text", "text": line}}})
+	}
+	return map[string]any{"body": map[string]any{"type": "doc", "version": 1, "content": paras}}
+}
+
+// Comment posts to an issue. Callers go through PostOnce so the same news is never posted twice.
 func (j *Jira) Comment(key, msg string) error {
-	adf := map[string]any{"body": map[string]any{"type": "doc", "version": 1, "content": []any{
-		map[string]any{"type": "paragraph", "content": []any{map[string]any{"type": "text", "text": msg}}}}}}
-	return j.do("POST", "/rest/api/3/issue/"+key+"/comment", url.Values{}, adf, nil)
+	return j.do("POST", "/rest/api/3/issue/"+key+"/comment", url.Values{}, CommentADF(msg), nil)
 }

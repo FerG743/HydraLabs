@@ -91,7 +91,7 @@ One Jira project (board) = one application under test. Humans write and document
 - **Registry** (`projects.json`): the Jira projects the pipeline automates, each with its app name and profile (`"DWQ": {"app": "CobroOrdenes", ...}`). Registration is explicit on purpose: a Jira token sees dozens of projects and must never turn each one into a repo.
 - **Onboarding** (`hydra onboard --project KEY`, and automatically before every poll): the first time a registered project is seen, the pipeline creates **`Hydra-<App>`** next to the other repos on the machine that runs n8n (`reposRoot`, default `~/Documents/GitHub`). It is built from the framework template (`templates/framework/`), with the suite registered in `runner_central.py` and one baseline commit, so every later review branch shows only generated tests. It never writes into a folder that is not already a Hydra repo, and a second run changes nothing.
 - **Onboarding gate**: Jira cannot know where the app runs. A new project gets a read-only default profile with an empty `baseUrl` and stops with `needs-onboarding` until a person sets it (and `allowWrites` only for a QA environment that may be changed). With a URL set, the first crawl runs automatically.
-- **Delivery** goes to that app's repo: `hydra deliver --project KEY`. Local branches only; nothing is pushed or merged.
+- **Delivery** goes to that app's repo: `hydra deliver --project KEY [--runs N]`. The cases are run N times in a row in the real framework (stability gate, default 3; repeating stops at the first failure). Only a case that passes every run is committed, on a local review branch; a flaky or failing case blocks the whole delivery (exit 3) until a person decides. Re-delivering identical files reports "already delivered" instead of failing. Nothing is pushed or merged. Note: a case that writes (e.g. DWQ-130) writes N times per delivery, so a QA environment must tolerate that.
 - n8n polls the whole registry (`hydra poll`); "Manual: run one issue" finds the project from the key's prefix.
 
 ## Routing: cheapest tier that can finish, escalating only when it cannot
@@ -133,6 +133,7 @@ A failure says *why*, and only test bugs reach the model:
 | `needs-clarification` | the case is incomplete or ambiguous (gate) | the author, with questions |
 | `needs-writes` | only the write guard stopped it | a decision on the environment |
 | `env-down` | the app (or VPN, backend) is unreachable | a person; never the model: it would burn tokens on something no model can fix |
+| `flaky` (delivery) | passed some stability runs and failed others | a person; never delivered |
 | `failed` + "possible app bug" | the elements were found and an **assertion** about behavior failed | a person; never the model, which must not loosen the check |
 | `failed` (locator, timeout, strict-mode) | a test bug | T3 agent, once |
 | `needs-review` | the pipeline could not finish within its budget | a person, with the bundle and the reason |
@@ -199,7 +200,7 @@ Source of truth is requirements, not code. If no requirements exist for a featur
 2. **Regeneration check**: facturación FACT_0001-0004 regenerate and match the hand-written tests.
 3. **Auto-learn from failures**: failures that teach something become a line in `knowledge/<App>.md`.
 4. **Jira write-back** (comment + status) and the Google Chat space, enabled only after 1-3 are trusted (`jiraComments`, `HYDRA_CHAT_WEBHOOK`).
-5. **Stability gate**: a case counts as automated only after N consecutive passes.
+5. ~~Stability gate~~ **Done**: delivery runs the suite `stabilityRuns` times (default 3) in the real framework; a case is delivered only if it passes every run. A mix of pass and fail is reported as `flaky` and never reaches the repo.
 6. **Stage 0 design** from requirements; then **Loop B** and the mutation score.
 
 ## Parked (not deleted)

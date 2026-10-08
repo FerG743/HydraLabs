@@ -39,22 +39,23 @@ type Config struct {
 	MaxTokens   int    `json:"maxTokens"`   // hard token cap for T3 per case (a stuck run once cost 314k)
 	AllowWrites bool   `json:"allowWrites"` // let tests send real writes (default: read-only safety net)
 
-	Crawler      string              `json:"crawler"` // path to tools/crawl/crawl.py
-	Paths        []string            `json:"paths"`   // entry paths for the crawl
-	MaxPages     int                 `json:"maxPages"`
-	Project      string              `json:"-"` // the registered Jira project this run is for
-	Registry     *Registry           `json:"-"`
-	DeliverRepo  string              `json:"deliverRepo"` // the framework repo that receives verified tests on review branches
-	BaseBranch   string              `json:"baseBranch"`
-	SlowMS       int                 `json:"slowMs"`     // crawl: reveal elements one at a time, this many ms apart (0 = as fast as possible)
-	SafeClicks   bool                `json:"safeClicks"` // open comboboxes/tabs to record their options (never selects or submits)
-	LoginFile    string              `json:"loginFile"`  // steps whose values are ENV: tokens, same convention as the framework CSVs
-	LoginPath    string              `json:"loginPath"`
-	EnvFile      string              `json:"envFile"`        // the framework's .env; the pipeline reads it only to resolve ENV: tokens
-	Synonyms     map[string][]string `json:"synonyms"`       // extra word pairs for this app, e.g. {"order": ["remesa"]}
-	Knowledge    string              `json:"knowledge"`      // dir with <App>.md: what is peculiar about each application
-	JiraComments bool                `json:"jiraComments"`   // post every outcome that needs a person (off until results are trusted)
-	ChatWebhook  string              `json:"chatWebhookEnv"` // NAME of the env var holding the Google Chat webhook URL
+	Crawler       string              `json:"crawler"` // path to tools/crawl/crawl.py
+	Paths         []string            `json:"paths"`   // entry paths for the crawl
+	MaxPages      int                 `json:"maxPages"`
+	Project       string              `json:"-"` // the registered Jira project this run is for
+	Registry      *Registry           `json:"-"`
+	StabilityRuns int                 `json:"stabilityRuns"` // consecutive real-framework passes a case needs before it is delivered (default 3)
+	DeliverRepo   string              `json:"deliverRepo"`   // the framework repo that receives verified tests on review branches
+	BaseBranch    string              `json:"baseBranch"`
+	SlowMS        int                 `json:"slowMs"`     // crawl: reveal elements one at a time, this many ms apart (0 = as fast as possible)
+	SafeClicks    bool                `json:"safeClicks"` // open comboboxes/tabs to record their options (never selects or submits)
+	LoginFile     string              `json:"loginFile"`  // steps whose values are ENV: tokens, same convention as the framework CSVs
+	LoginPath     string              `json:"loginPath"`
+	EnvFile       string              `json:"envFile"`        // the framework's .env; the pipeline reads it only to resolve ENV: tokens
+	Synonyms      map[string][]string `json:"synonyms"`       // extra word pairs for this app, e.g. {"order": ["remesa"]}
+	Knowledge     string              `json:"knowledge"`      // dir with <App>.md: what is peculiar about each application
+	JiraComments  bool                `json:"jiraComments"`   // post every outcome that needs a person (off until results are trusted)
+	ChatWebhook   string              `json:"chatWebhookEnv"` // NAME of the env var holding the Google Chat webhook URL
 }
 
 type Run struct {

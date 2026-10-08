@@ -80,3 +80,46 @@ func TestOnlyPassingCasesAreDeliverable(t *testing.T) {
 		t.Errorf("exclude ignored: %v", got)
 	}
 }
+
+func oc(status string) CaseOutcome { return CaseOutcome{Status: status, Detail: status + " detail"} }
+
+func TestStabilityVerdicts(t *testing.T) {
+	run := func(a, b string) map[string]CaseOutcome { return map[string]CaseOutcome{"A": oc(a), "B": oc(b)} }
+	keys := []string{"A", "B"}
+	by := func(os []CaseOutcome) map[string]CaseOutcome {
+		m := map[string]CaseOutcome{}
+		for _, o := range os {
+			m[o.Key] = o
+		}
+		return m
+	}
+
+	got := by(judgeRuns(keys, []map[string]CaseOutcome{run("passed", "passed"), run("passed", "passed"), run("passed", "passed")}, 3))
+	if got["A"].Status != "passed" || got["A"].Passes != 3 || got["B"].Passes != 3 {
+		t.Errorf("three clean runs: %+v", got)
+	}
+
+	got = by(judgeRuns(keys, []map[string]CaseOutcome{run("passed", "passed"), run("passed", "failed")}, 3)) // B passed once, then failed
+	if got["B"].Status != "flaky" || !strings.Contains(got["B"].Detail, "1 of 2") {
+		t.Errorf("a case that passes and then fails is flaky, not failed: %+v", got["B"])
+	}
+	if got["A"].Status != "passed" || got["A"].Passes != 2 || !strings.Contains(got["A"].Detail, "not completed") {
+		t.Errorf("a passing case whose repeats were cut short must say so: %+v", got["A"])
+	}
+
+	got = by(judgeRuns(keys, []map[string]CaseOutcome{run("passed", "failed")}, 3)) // stopped at the first failure
+	if got["B"].Status != "failed" || got["B"].Passes != 0 {
+		t.Errorf("a case that never passed is failed: %+v", got["B"])
+	}
+
+	got = by(judgeRuns(keys, nil, 3))
+	if got["A"].Status != "missing" {
+		t.Errorf("no results at all: %+v", got["A"])
+	}
+}
+
+func TestAllPassedNeedsEveryKey(t *testing.T) {
+	if allPassed([]string{"A", "B"}, map[string]CaseOutcome{"A": oc("passed")}) {
+		t.Error("a case with no result is not passed")
+	}
+}

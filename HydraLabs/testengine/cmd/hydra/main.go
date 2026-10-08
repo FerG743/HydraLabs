@@ -24,7 +24,7 @@ func cfgFlags(fs *flag.FlagSet, args []string) (*Config, error) {
 	here, _ := os.Getwd()
 	c := &Config{Out: filepath.Join(here, "out", "hydra"), ToolsDir: filepath.Join(here, "tools", "jira"),
 		AppMap: filepath.Join(here, "tools", "jira", "appmap"), Python: "python3", Lang: "en", MaxTurns: 25,
-		LMURL: "http://127.0.0.1:1234/v1", MaxPages: 25, BaseBranch: "main", Crawler: filepath.Join(here, "tools", "crawl", "crawl.py"), Knowledge: filepath.Join(here, "knowledge"), JQL: `labels in ("automate", "execute") ORDER BY key ASC`} // "execute" is a reserved JQL word: it must be quoted
+		LMURL: "http://127.0.0.1:1234/v1", MaxPages: 25, BaseBranch: "main", StabilityRuns: 3, Crawler: filepath.Join(here, "tools", "crawl", "crawl.py"), Knowledge: filepath.Join(here, "knowledge"), JQL: `labels in ("automate", "execute") ORDER BY key ASC`} // "execute" is a reserved JQL word: it must be quoted
 	profilePath, project := argValue(args, "profile"), argValue(args, "project")
 	regPath := argValue(args, "registry")
 	if regPath == "" && fileExists(filepath.Join(here, "projects.json")) {
@@ -206,6 +206,7 @@ func main() {
 	case "deliver":
 		only, exclude := fs.String("only", "", "comma-separated keys to deliver (default: every passing case)"), fs.String("exclude", "", "comma-separated keys to leave out")
 		fs.StringVar(&cfg.DeliverRepo, "repo", cfg.DeliverRepo, "framework repo that receives the tests")
+		fs.IntVar(&cfg.StabilityRuns, "runs", cfg.StabilityRuns, "consecutive passes in the real framework a case needs (stability gate)")
 		fs.Parse(os.Args[2:])
 		ex := map[string]bool{}
 		for _, k := range strings.Split(*exclude, ",") {

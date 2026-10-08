@@ -27,15 +27,19 @@ import (
 
 type CaseOutcome struct {
 	Key    string `json:"key"`
-	Status string `json:"status"` // passed | failed | skipped | missing
+	Status string `json:"status"` // passed | failed | flaky | skipped | missing
 	Detail string `json:"detail,omitempty"`
+	Passes int    `json:"passes"` // runs it passed, out of Of runs requested
+	Of     int    `json:"of"`
 }
 
 type Delivery struct {
 	Branch    string        `json:"branch,omitempty"`
 	Commit    string        `json:"commit,omitempty"`
+	Runs      int           `json:"runs"` // consecutive real-framework runs actually executed
 	Delivered []string      `json:"delivered,omitempty"`
 	Gate      string        `json:"gate,omitempty"` // why nothing was committed
+	Note      string        `json:"note,omitempty"` // an outcome that needs no person (e.g. already delivered)
 	Outcomes  []CaseOutcome `json:"outcomes"`
 }
 
@@ -233,51 +237,54 @@ func (c Config) Deliver(only []string, exclude map[string]bool) (d Delivery, err
 		return d, err
 	}
 
-	// pytest runs from inside the repo, so every path handed to it must be absolute
-	agentDir, _ := filepath.Abs(filepath.Dir(expand(c.Agent)))
-	junit, _ := filepath.Abs(filepath.Join(work, "junit.xml"))
-	cmd := exec.Command(c.Python, "-m", "pytest", "tests/"+c.App, "-p", "hydra_guard", "-v", "--tb=short", "--junitxml="+junit)
-	cmd.Dir = repo
-	allow := "0"
-	if c.AllowWrites {
-		allow = "1"
+	// Stability gate: a case counts as automated only if it passes `runs` consecutive runs in the real framework.
+	// Repeating stops at the first run where anything fails: a person has to look, more runs would only waste time.
+	runs := c.StabilityRuns
+	if runs < 1 {
+		runs = 1
 	}
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+repo+string(os.PathListSeparator)+agentDir,
-		"BASE_URL="+c.PortalURL, "HEADLESS=true", "HYDRA_ALLOW_WRITES="+allow, "PYTHONDONTWRITEBYTECODE=1")
-	var logb bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &logb, &logb
-	cmd.Run() // a failing test is a result, not an error; judged from the junit file
-	os.WriteFile(filepath.Join(work, "pytest.log"), logb.Bytes(), 0o644)
-
-	got, perr := parseJUnit(junit)
-	if perr != nil {
-		d.Gate = "pytest did not run: " + strings.TrimSpace(tail(logb.String(), 400))
-	}
-	allGreen := perr == nil && len(got) > 0
-	for _, k := range keys {
-		o, ok := got[k]
-		if !ok {
-			o = CaseOutcome{Key: k, Status: "missing", Detail: "pytest produced no result for this case"}
+	var results []map[string]CaseOutcome
+	var lastLog string
+	for i := 1; i <= runs; i++ {
+		got, logPath, perr := c.runPytest(repo, work, i)
+		lastLog = logPath
+		if perr != nil {
+			d.Gate = "pytest did not run: " + perr.Error()
+			break
 		}
-		if o.Status != "passed" {
+		results = append(results, got)
+		if !allPassed(keys, got) {
+			break
+		}
+	}
+	d.Runs = len(results)
+	d.Outcomes = judgeRuns(keys, results, runs)
+	allGreen := d.Gate == "" && len(results) == runs
+	for _, o := range d.Outcomes {
+		if o.Status != "passed" || o.Passes != runs {
 			allGreen = false
 		}
-		d.Outcomes = append(d.Outcomes, o)
 	}
 	if !allGreen {
 		if d.Gate == "" {
-			d.Gate = "the real framework did not pass every case: nothing was committed. A person decides: fix, --exclude the case, or accept. Log: " + filepath.Join(work, "pytest.log")
+			d.Gate = "the real framework did not pass every case on every run: nothing was committed. A person decides: fix, --exclude the case, or accept. Log: " + lastLog
 		}
 		restore()
 		d.Branch = ""
 		return d, c.recordDelivery(d, stamp)
 	}
 
+	if st, _ := git(repo, "status", "--porcelain"); st == "" { // same files as the base branch: nothing to review
+		d.Note = fmt.Sprintf("already delivered: the generated files match %s and the cases are still stable over %d runs", base, runs)
+		restore()
+		d.Branch = ""
+		return d, c.recordDelivery(d, stamp)
+	}
 	if _, err = git(repo, "add", "apps", "tests", "utils", "runner_central.py"); err != nil {
 		restore()
 		return d, err
 	}
-	msg := fmt.Sprintf("hydra: %s (%s)\n\nGenerated from Jira and verified by the framework against %s.\n%s", strings.Join(keys, ", "), c.App, c.PortalURL, note)
+	msg := fmt.Sprintf("hydra: %s (%s)\n\nGenerated from Jira; passed %d consecutive runs in the framework against %s.\n%s", strings.Join(keys, ", "), c.App, runs, c.PortalURL, note)
 	if _, err = git(repo, "commit", "-q", "-m", msg); err != nil {
 		restore()
 		return d, err
@@ -297,4 +304,78 @@ func tail(s string, n int) string {
 		return s[len(s)-n:]
 	}
 	return s
+}
+
+// runPytest runs the generated suite once in the real framework and returns each case's result.
+// pytest runs from inside the repo, so every path handed to it must be absolute.
+func (c Config) runPytest(repo, work string, n int) (map[string]CaseOutcome, string, error) {
+	agentDir, _ := filepath.Abs(filepath.Dir(expand(c.Agent)))
+	junit, _ := filepath.Abs(filepath.Join(work, fmt.Sprintf("junit-%d.xml", n)))
+	logPath := filepath.Join(work, fmt.Sprintf("pytest-%d.log", n))
+	cmd := exec.Command(c.Python, "-m", "pytest", "tests/"+c.App, "-p", "hydra_guard", "-v", "--tb=short", "--junitxml="+junit)
+	cmd.Dir = repo
+	allow := "0"
+	if c.AllowWrites {
+		allow = "1"
+	}
+	cmd.Env = append(os.Environ(), "PYTHONPATH="+repo+string(os.PathListSeparator)+agentDir,
+		"BASE_URL="+c.PortalURL, "HEADLESS=true", "HYDRA_ALLOW_WRITES="+allow, "PYTHONDONTWRITEBYTECODE=1")
+	var logb bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &logb, &logb
+	cmd.Run() // a failing test is a result, not an error; judged from the junit file
+	os.WriteFile(logPath, logb.Bytes(), 0o644)
+	got, err := parseJUnit(junit)
+	if err != nil || len(got) == 0 {
+		return nil, logPath, fmt.Errorf("%s", strings.TrimSpace(tail(logb.String(), 400)))
+	}
+	return got, logPath, nil
+}
+
+func allPassed(keys []string, got map[string]CaseOutcome) bool {
+	for _, k := range keys {
+		if got[k].Status != "passed" {
+			return false
+		}
+	}
+	return true
+}
+
+// judgeRuns turns the per-run results into one verdict per case:
+//
+//	passed   passed every run that was executed (and Passes == Of when all runs were done)
+//	flaky    passed some runs and failed others: the worst kind, it must never reach the repo
+//	failed / skipped / missing   never passed
+func judgeRuns(keys []string, results []map[string]CaseOutcome, want int) []CaseOutcome {
+	var out []CaseOutcome
+	for _, k := range keys {
+		o := CaseOutcome{Key: k, Of: want}
+		var first *CaseOutcome
+		for _, r := range results {
+			x, ok := r[k]
+			if !ok {
+				x = CaseOutcome{Key: k, Status: "missing", Detail: "pytest produced no result for this case"}
+			}
+			if x.Status == "passed" {
+				o.Passes++
+			} else if first == nil {
+				cp := x
+				first = &cp
+			}
+		}
+		switch {
+		case len(results) == 0:
+			o.Status, o.Detail = "missing", "pytest did not run"
+		case first == nil:
+			o.Status = "passed"
+			if len(results) < want {
+				o.Detail = "stability not completed: another case failed first"
+			}
+		case o.Passes > 0:
+			o.Status, o.Detail = "flaky", fmt.Sprintf("passed %d of %d runs; first failure: %s", o.Passes, len(results), first.Detail)
+		default:
+			o.Status, o.Detail = first.Status, first.Detail
+		}
+		out = append(out, o)
+	}
+	return out
 }

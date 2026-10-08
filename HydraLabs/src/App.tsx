@@ -5,7 +5,6 @@ import {
   Globe, Lock, Database, Folder, Trash2, Download, Send
 } from 'lucide-react';
 
-// Mock data based on your components
 const defaultTestSuites = [
   {
     id: 'test-suite-1',

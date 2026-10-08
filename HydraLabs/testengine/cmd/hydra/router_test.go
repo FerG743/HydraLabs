@@ -105,3 +105,15 @@ func TestAssertionFailureIsReportedNotEscalated(t *testing.T) {
 		t.Errorf("%v", r.Detail)
 	}
 }
+
+const down = "import json,sys; print(json.dumps({'status':'failed','error':'Error: Page.goto: net::ERR_CONNECTION_REFUSED at http://x'})); sys.exit(1)"
+
+func TestAppDownIsNotSentToTheModel(t *testing.T) {
+	r := fakeEnv(t, "[]", down).Route("ABC-1", "automate")
+	if r.Status != "env-down" || r.Tier != "T1-render" || r.Tokens != 0 {
+		t.Fatalf("an unreachable app must not cost tokens: %+v", r)
+	}
+	if !needsPerson(r) {
+		t.Error("someone has to be told the app is down")
+	}
+}

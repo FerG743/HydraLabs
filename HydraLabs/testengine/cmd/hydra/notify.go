@@ -14,7 +14,7 @@ import (
 // in the automators' Google Chat space. The webhook URL is a secret: it lives in an env var, never in a profile.
 
 func needsPerson(r Run) bool {
-	return r.Status == "needs-clarification" || r.Status == "needs-review" || r.Status == "failed" || r.Status == "needs-writes"
+	return r.Status == "needs-clarification" || r.Status == "needs-review" || r.Status == "failed" || r.Status == "needs-writes" || r.Status == "env-down" || r.Status == "needs-onboarding"
 }
 
 func Message(r Run) string {

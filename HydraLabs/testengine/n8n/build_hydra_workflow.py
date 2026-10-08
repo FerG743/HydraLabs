@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Generates hydra-pipeline.json: n8n as a thin, visible shell around the Go `hydra` binary.
 
-  Manual: poll now        -> hydra poll          (every issue labeled automate/execute that changed)
+  Manual: poll now        -> hydra poll          (every REGISTERED project, projects.json: new ones are onboarded first)
   Manual: run one issue   -> hydra poll --only KEY --force [--intent ...]   (edit the "Pick issue" node, click Execute)
-  Manual: crawl the app   -> hydra crawl         (read-only; add --watch :8099 yourself to show people)
+  Manual: crawl the app   -> hydra crawl --project KEY  (read-only; add --watch :8099 yourself to show people)
   Weekdays 07:00          -> hydra poll          (the morning run)
 
 Every manual trigger is a separate entry point, so while testing nothing waits on a timer. Each run becomes one row
@@ -42,13 +42,12 @@ def config(name, y):  # one Config per branch so each command can name its own n
     node(name, "n8n-nodes-base.set", {"assignments": {"assignments": [
         {"id": k, "name": k, "value": v, "type": "string"} for k, v in {
             "hydra": os.path.join(ROOT, "bin", "hydra"),
-            "profile": os.path.join(ROOT, "profiles", "cobro-ordenes.json"),
+            "project": "DWQ",  # only the crawl button uses it: which registered project to crawl
             "cwd": ROOT}.items()]}, "options": {}}, [240, y], 3.4)
 
 
-def hydra(cfg, args):
-    return sh(f'cd "{{{{ $(\'{cfg}\').first().json.cwd }}}}" && "{{{{ $(\'{cfg}\').first().json.hydra }}}}" {args} '
-              f'--profile "{{{{ $(\'{cfg}\').first().json.profile }}}}"')
+def hydra(cfg, args):  # no --profile: projects.json says which Jira projects exist and where each app's profile and repo are
+    return sh(f'cd "{{{{ $(\'{cfg}\').first().json.cwd }}}}" && "{{{{ $(\'{cfg}\').first().json.hydra }}}}" {args}')
 
 
 # poll now + the morning schedule -> hydra poll
@@ -67,7 +66,7 @@ link("Manual: run one issue", "Pick issue"); link("Pick issue", "Config Run"); l
 
 # crawl the app (read-only)
 config("Config Crawl", 500)
-node("hydra crawl", "n8n-nodes-base.executeCommand", hydra("Config Crawl", "crawl"), [480, 500])
+node("hydra crawl", "n8n-nodes-base.executeCommand", hydra("Config Crawl", "crawl --project \"{{ $('Config Crawl').first().json.project }}\""), [480, 500])
 link("Manual: crawl the app", "Config Crawl"); link("Config Crawl", "hydra crawl")
 
 node("Runs", "n8n-nodes-base.code", {"mode": "runOnceForAllItems", "jsCode": """

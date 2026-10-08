@@ -66,9 +66,9 @@
               "type": "string"
             },
             {
-              "id": "profile",
-              "name": "profile",
-              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/profiles/cobro-ordenes.json",
+              "id": "project",
+              "name": "project",
+              "value": "DWQ",
               "type": "string"
             },
             {
@@ -93,7 +93,7 @@
     {
       "parameters": {
         "executeOnce": true,
-        "command": "=cd \"{{ $('Config').first().json.cwd }}\" && \"{{ $('Config').first().json.hydra }}\" poll --json --profile \"{{ $('Config').first().json.profile }}\" 2>&1"
+        "command": "=cd \"{{ $('Config').first().json.cwd }}\" && \"{{ $('Config').first().json.hydra }}\" poll --json 2>&1"
       },
       "name": "hydra poll",
       "type": "n8n-nodes-base.executeCommand",
@@ -144,9 +144,9 @@
               "type": "string"
             },
             {
-              "id": "profile",
-              "name": "profile",
-              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/profiles/cobro-ordenes.json",
+              "id": "project",
+              "name": "project",
+              "value": "DWQ",
               "type": "string"
             },
             {
@@ -171,7 +171,7 @@
     {
       "parameters": {
         "executeOnce": true,
-        "command": "=cd \"{{ $('Config Run').first().json.cwd }}\" && \"{{ $('Config Run').first().json.hydra }}\" poll --json --only \"{{ $('Pick issue').first().json.key }}\" --intent \"{{ $('Pick issue').first().json.intent }}\" --profile \"{{ $('Config Run').first().json.profile }}\" 2>&1"
+        "command": "=cd \"{{ $('Config Run').first().json.cwd }}\" && \"{{ $('Config Run').first().json.hydra }}\" poll --json --only \"{{ $('Pick issue').first().json.key }}\" --intent \"{{ $('Pick issue').first().json.intent }}\" 2>&1"
       },
       "name": "hydra run one",
       "type": "n8n-nodes-base.executeCommand",
@@ -193,9 +193,9 @@
               "type": "string"
             },
             {
-              "id": "profile",
-              "name": "profile",
-              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/profiles/cobro-ordenes.json",
+              "id": "project",
+              "name": "project",
+              "value": "DWQ",
               "type": "string"
             },
             {
@@ -220,7 +220,7 @@
     {
       "parameters": {
         "executeOnce": true,
-        "command": "=cd \"{{ $('Config Crawl').first().json.cwd }}\" && \"{{ $('Config Crawl').first().json.hydra }}\" crawl --profile \"{{ $('Config Crawl').first().json.profile }}\" 2>&1"
+        "command": "=cd \"{{ $('Config Crawl').first().json.cwd }}\" && \"{{ $('Config Crawl').first().json.hydra }}\" crawl --project \"{{ $('Config Crawl').first().json.project }}\" 2>&1"
       },
       "name": "hydra crawl",
       "type": "n8n-nodes-base.executeCommand",

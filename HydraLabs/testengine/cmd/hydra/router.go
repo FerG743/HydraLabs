@@ -42,6 +42,11 @@ type Config struct {
 	Crawler      string              `json:"crawler"` // path to tools/crawl/crawl.py
 	Paths        []string            `json:"paths"`   // entry paths for the crawl
 	MaxPages     int                 `json:"maxPages"`
+	Project      string              `json:"-"` // the registered Jira project this run is for
+	Registry     *Registry           `json:"-"`
+	DeliverRepo  string              `json:"deliverRepo"` // the framework repo that receives verified tests on review branches
+	BaseBranch   string              `json:"baseBranch"`
+	SlowMS       int                 `json:"slowMs"`     // crawl: reveal elements one at a time, this many ms apart (0 = as fast as possible)
 	SafeClicks   bool                `json:"safeClicks"` // open comboboxes/tabs to record their options (never selects or submits)
 	LoginFile    string              `json:"loginFile"`  // steps whose values are ENV: tokens, same convention as the framework CSVs
 	LoginPath    string              `json:"loginPath"`
@@ -62,6 +67,8 @@ type Run struct {
 	Millis  int64    `json:"ms"`
 	Updated string   `json:"updated,omitempty"`
 }
+
+var envDown = regexp.MustCompile(`ERR_CONNECTION_REFUSED|ERR_CONNECTION_TIMED_OUT|ERR_NAME_NOT_RESOLVED|ERR_ADDRESS_UNREACHABLE|ERR_NETWORK_CHANGED`)
 
 var slugRe = regexp.MustCompile(`[^a-z0-9]+`)
 
@@ -333,6 +340,10 @@ func (c Config) verify(key string) Verdict {
 	msg := strings.TrimSpace(res.Error)
 	if len(res.AbortedWrites) > 0 { // the test needed a real write the safety net refused; not a locator problem
 		return Verdict{Status: "needs-writes", Detail: []string{"blocked write(s): " + strings.Join(res.AbortedWrites, ", ") + "; set allowWrites in the profile to run for real", msg[:min(300, len(msg))]}}
+	}
+	if envDown.MatchString(msg + " " + string(out.Bytes())) {
+		// Not a test problem and not an app bug: the app (or the VPN, or the backend) is not there. A model cannot fix it.
+		return Verdict{Status: "env-down", Detail: []string{"the app under test is unreachable (" + c.PortalURL + "): is it running, is the VPN on? " + msg[:min(200, len(msg))]}}
 	}
 	if strings.HasPrefix(msg, "AssertionError") {
 		// The test found the elements and the app did something else than the case expects. That is what a test is for:

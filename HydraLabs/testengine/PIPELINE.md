@@ -84,6 +84,16 @@ Cross-cutting: **profile** (one JSON per web app), **knowledge** (`knowledge/<Ap
 - **Profile**: which columns/fields mean what, the case key, tag fields, blocked phrase. Missing required keys fail at build time.
 - **Output layout** follows the framework README exactly: `apps/<App>/{data,locators,modules}`, `tests/<App>/test_*.py`, `expected_result.csv`, `ENV:` tokens for secrets (never literal credentials), `DriverWrapper` only (no raw Playwright), `add_step(..., level="business")`.
 
+## Boards, apps and repos
+
+One Jira project (board) = one application under test. Humans write and document the cases there; the pipeline starts from that.
+
+- **Registry** (`projects.json`): the Jira projects the pipeline automates, each with its app name and profile (`"DWQ": {"app": "CobroOrdenes", ...}`). Registration is explicit on purpose: a Jira token sees dozens of projects and must never turn each one into a repo.
+- **Onboarding** (`hydra onboard --project KEY`, and automatically before every poll): the first time a registered project is seen, the pipeline creates **`Hydra-<App>`** next to the other repos on the machine that runs n8n (`reposRoot`, default `~/Documents/GitHub`). It is built from the framework template (`templates/framework/`), with the suite registered in `runner_central.py` and one baseline commit, so every later review branch shows only generated tests. It never writes into a folder that is not already a Hydra repo, and a second run changes nothing.
+- **Onboarding gate**: Jira cannot know where the app runs. A new project gets a read-only default profile with an empty `baseUrl` and stops with `needs-onboarding` until a person sets it (and `allowWrites` only for a QA environment that may be changed). With a URL set, the first crawl runs automatically.
+- **Delivery** goes to that app's repo: `hydra deliver --project KEY`. Local branches only; nothing is pushed or merged.
+- n8n polls the whole registry (`hydra poll`); "Manual: run one issue" finds the project from the key's prefix.
+
 ## Routing: cheapest tier that can finish, escalating only when it cannot
 
 Entry: a Jira issue labeled `automate` or `execute` (`execute` wins if both). Polled, not webhooked (Jira Cloud cannot call localhost). n8n is a thin, visible shell around the `hydra` binary; every manual trigger is its own entry point.
@@ -122,6 +132,7 @@ A failure says *why*, and only test bugs reach the model:
 |---|---|---|
 | `needs-clarification` | the case is incomplete or ambiguous (gate) | the author, with questions |
 | `needs-writes` | only the write guard stopped it | a decision on the environment |
+| `env-down` | the app (or VPN, backend) is unreachable | a person; never the model: it would burn tokens on something no model can fix |
 | `failed` + "possible app bug" | the elements were found and an **assertion** about behavior failed | a person; never the model, which must not loosen the check |
 | `failed` (locator, timeout, strict-mode) | a test bug | T3 agent, once |
 | `needs-review` | the pipeline could not finish within its budget | a person, with the bundle and the reason |
@@ -152,7 +163,7 @@ Source of truth is requirements, not code. If no requirements exist for a featur
 
 `hydra crawl` (read-only) visits every reachable page of an app and records, per element: role, accessible name, id, `data-testid`, the best locator by framework priority (`data-testid`, then a stable id, then role + name, CSS last), whether that locator is stable and **unique**, and the options of comboboxes/tabs (`--safe-clicks`: opens them to read, never selects or submits). Non-GET requests are aborted; links that look like logout/delete are never followed.
 
-- Output: `appmap/<App>.crawl.json`. Watch it live with `hydra crawl --watch :8099` (add `--headed` to see the real browser).
+- Output: `appmap/<App>.crawl.json`. Watch it live with `hydra crawl --watch :8099` (add `--headed` to see the real browser, and `--slow 150` to reveal elements one at a time: boxes and locator labels colored green = stable id/testid, blue = role + name, orange = weak or not unique).
 - Plan and Build **look up the map first**; the model is only asked for elements the map cannot resolve.
 - Flags worth acting on: non-unique locators (seven carousel dots share one `data-testid`), generated ids (`radix-:R19...`), and "weak" CSS fallbacks.
 - Limit: a read-only crawl sees only what is on screen after load. Results tables, dialogs and error messages appear after an action; the agent adds those when a case first exercises them, and they are remembered.
@@ -199,8 +210,8 @@ The Tauri desktop app (a possible future HydraPloy/HydraLabs dashboard), Go bloc
 
 - Decided: one repo, `ploy/` and `labs/` side by side. Open: the physical move and the final subfolder names.
 - Jira: Cloud (`liverpooldigital.atlassian.net`). Intent is signaled by the labels `automate` / `execute`; the human gate is the case being written and ready. Still to confirm against a live poll.
-- Test environment per app: where writes are allowed, how data is reset or seeded, and whether a login is needed.
-- Where generated bundles are delivered: a branch in `portal-qa-automation` for review (no auto-merge).
+- Test environment per app: where writes are allowed, how data is reset or seeded, and whether a login is needed. Today a person sets `baseUrl`/`allowWrites` in the profile (the onboarding gate).
+- Delivery: each app's own `Hydra-<App>` repo, one review branch per delivery (no auto-merge). Open: a GitHub remote for PRs; for now everything stays local.
 - Cases 05/11/12: which RFC belongs to which boleta (data question, not a pipeline one).
 
 ## Known data issues (facturación sample)

@@ -9,7 +9,10 @@ and clicks are limited to --safe-clicks (open a combobox/tab to record its optio
 login are never written to events or output (they come from ENV: tokens, same convention as the framework's CSVs).
 
     python3 crawl.py --base-url http://host:3000 --out appmap/App.crawl.json --events out/crawl/events.jsonl \
-        [--paths /cobro_ordenes,/ordenes] [--max-pages 25] [--safe-clicks] [--headed] [--login login.json] [--env-file .env]
+        [--paths /cobro_ordenes,/ordenes] [--max-pages 25] [--safe-clicks] [--headed] [--slow 150] [--login login.json] [--env-file .env]
+
+--slow MS reveals the found elements one at a time (boxes + locator labels, colored by quality) for showing people; the viewer is
+`hydra crawl --watch :8099`, and --headed also shows the real browser scrolling along.
 
 login.json: [{"fill": "#user", "value": "ENV:CORREO_ADMIN"}, {"fill": "#pw", "value": "ENV:MI_PASSWORD"}, {"click": "button[type=submit]"}]
 """
@@ -40,7 +43,8 @@ EXTRACT = """() => {
     if (!vis(e)) return;
     const tag = e.tagName; let role = e.getAttribute('role') || implicit[tag];
     if (tag === 'INPUT') role = e.getAttribute('role') || itype[e.type] || 'textbox';
-    out.push({tag: tag.toLowerCase(), role: role || null, name: nameOf(e), id: e.id || null,
+    const b = e.getBoundingClientRect();
+    out.push({rect: {x: b.left + scrollX, y: b.top + scrollY, w: b.width, h: b.height}, tag: tag.toLowerCase(), role: role || null, name: nameOf(e), id: e.id || null,
       testid: e.getAttribute('data-testid') || e.getAttribute('data-test') || e.getAttribute('data-qa') || null,
       type: e.getAttribute('type'), placeholder: e.getAttribute('placeholder'), href: e.getAttribute('href'),
       disabled: e.disabled === true || e.getAttribute('aria-disabled') === 'true',
@@ -60,6 +64,45 @@ def best_locator(el):
         return f'role={el["role"]}[name="{el["name"].replace(chr(34), chr(92) + chr(34))}"]', "role+name", True
     css = el["tag"] + (f'[type="{el["type"]}"]' if el["type"] else "")
     return css, "css-fallback", False  # not unique and not meaningful: flagged so nobody trusts it blindly
+
+
+GREEN, BLUE, ORANGE = "#16a34a", "#2563eb", "#ea580c"  # stable id/testid | role+name | weak or not unique
+
+
+def color_of(el):
+    if not el["stable"]:
+        return ORANGE
+    return GREEN if el["strategy"] in ("testid", "id") else BLUE
+
+
+def label_of(el):
+    return el["locator"] if el["strategy"] in ("testid", "id") else f'{el["role"]} "{el["name"][:22]}"'
+
+
+DRAW = """(items) => { for (const [r, color, label] of items) {
+  const d = document.createElement('div'); d.className = '__hydra';
+  d.style.cssText = `position:absolute;left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;border:2px solid ${color};background:${color}22;z-index:2147483647;pointer-events:none;box-sizing:border-box`;
+  const l = document.createElement('span'); l.textContent = label;
+  l.style.cssText = `position:absolute;left:-2px;top:-15px;font:10px/13px monospace;color:#fff;background:${color};padding:0 3px;white-space:nowrap;max-width:240px;overflow:hidden`;
+  d.appendChild(l); document.body.appendChild(d); } }"""
+
+
+def draw(page, els, slow_ms, ev, shots):
+    """Boxes + locator labels over what the crawler found. With slow_ms they appear one by one (and as events), so a
+    person watching the real browser or the viewer sees the elements being discovered; otherwise all at once."""
+    items = [(el["rect"], color_of(el), label_of(el)) for el in els if el["rect"]["w"] > 0 and el["rect"]["h"] > 0]
+    if not slow_ms:
+        page.evaluate(DRAW, items)
+        return
+    for n, (el, item) in enumerate(zip([e for e in els if e["rect"]["w"] > 0 and e["rect"]["h"] > 0], items), 1):
+        page.evaluate(DRAW, [item])
+        page.evaluate("(y) => window.scrollTo(0, Math.max(0, y - 280))", el["rect"]["y"])  # follow the element (a headed browser scrolls too)
+        live = n % 3 == 0 or n == len(items)  # an interim picture every few elements keeps the viewer in step
+        if live:  # viewport-sized on purpose: a full page of 90 elements shrinks the labels to nothing
+            page.screenshot(path=os.path.join(shots, "live.png"))
+        ev.emit("element", url=page.url, role=el["role"], name=el["name"][:40], locator=el["locator"], strategy=el["strategy"],
+                stable=el["stable"], color=item[1], live=live, n=n, of=len(items))
+        page.wait_for_timeout(slow_ms)
 
 
 def resolve_env(v):
@@ -109,7 +152,7 @@ def crawl(a):
     queue = [base + p for p in (a.paths.split(",") if a.paths else ["/"])]
     seen, pages = set(), []
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=not a.headed, slow_mo=250 if a.headed else 0)
+        browser = p.chromium.launch(headless=not a.headed)
         page = browser.new_page(viewport={"width": 1280, "height": 800})
         page.route("**/*", lambda route, req: route.continue_() if req.method == "GET" else route.abort())
         if a.login:
@@ -147,7 +190,14 @@ def crawl(a):
                         el["options"] = record_options(page, el, ev)
             sig = hashlib.sha1("|".join(sorted(f'{e["role"]}:{e["name"]}:{e["id"]}' for e in els)).encode()).hexdigest()[:10]
             shot = f"{len(pages):02d}.png"
-            page.screenshot(path=os.path.join(shots, shot))
+            if a.slow:
+                page.wait_for_timeout(a.slow * 4)  # let the page be seen before the boxes start appearing
+            draw(page, els, a.slow, ev, shots)
+            page.evaluate("() => window.scrollTo(0, 0)")
+            page.screenshot(path=os.path.join(shots, shot), full_page=True)
+            page.evaluate("() => document.querySelectorAll('.__hydra').forEach(e => e.remove())")
+            for el in els:
+                el.pop("rect", None)  # positions are for the picture only; the map stays compact
             pages.append({"url": page.url, "title": page.title(), "hash": sig, "shot": shot, "elements": els,
                           "headings": [h.strip() for h in page.locator("h1,h2,h3").all_inner_texts() if h.strip()][:10]})
             by = {}
@@ -180,6 +230,7 @@ if __name__ == "__main__":
     ap.add_argument("--max-pages", type=int, default=25)
     ap.add_argument("--safe-clicks", action="store_true")
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument("--slow", type=int, default=0, metavar="MS", help="reveal elements one at a time, MS apart (for showing people)")
     ap.add_argument("--login", default="")
     ap.add_argument("--login-path", default="")
     ap.add_argument("--env-file", default="")

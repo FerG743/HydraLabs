@@ -11,9 +11,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 )
 
 // cfgFlags: defaults, then the --profile file, then explicit flags. A new web app is a new profile file, not new code.
@@ -21,22 +24,48 @@ func cfgFlags(fs *flag.FlagSet, args []string) (*Config, error) {
 	here, _ := os.Getwd()
 	c := &Config{Out: filepath.Join(here, "out", "hydra"), ToolsDir: filepath.Join(here, "tools", "jira"),
 		AppMap: filepath.Join(here, "tools", "jira", "appmap"), Python: "python3", Lang: "en", MaxTurns: 25,
-		LMURL: "http://127.0.0.1:1234/v1", MaxPages: 25, Crawler: filepath.Join(here, "tools", "crawl", "crawl.py"), Knowledge: filepath.Join(here, "knowledge"), JQL: `labels in ("automate", "execute") ORDER BY key ASC`} // "execute" is a reserved JQL word: it must be quoted
-	for i, a := range args { // find --profile before parsing so its values become the flag defaults
-		if v, ok := strings.CutPrefix(strings.TrimLeft(a, "-"), "profile="); ok || (strings.TrimLeft(a, "-") == "profile" && i+1 < len(args)) {
-			if !ok {
-				v = args[i+1]
-			}
-			b, err := os.ReadFile(v)
-			if err != nil {
-				return nil, err
-			}
+		LMURL: "http://127.0.0.1:1234/v1", MaxPages: 25, BaseBranch: "main", Crawler: filepath.Join(here, "tools", "crawl", "crawl.py"), Knowledge: filepath.Join(here, "knowledge"), JQL: `labels in ("automate", "execute") ORDER BY key ASC`} // "execute" is a reserved JQL word: it must be quoted
+	profilePath, project := argValue(args, "profile"), argValue(args, "project")
+	regPath := argValue(args, "registry")
+	if regPath == "" && fileExists(filepath.Join(here, "projects.json")) {
+		regPath = filepath.Join(here, "projects.json")
+	}
+	if regPath != "" && (project != "" || profilePath == "") {
+		reg, err := LoadRegistry(regPath)
+		if err != nil {
+			return nil, err
+		}
+		c.Registry = reg
+	}
+	if project != "" {
+		if c.Registry == nil {
+			return nil, fmt.Errorf("--project needs a registry (projects.json)")
+		}
+		e, ok := c.Registry.Projects[project]
+		if !ok {
+			return nil, fmt.Errorf("project %s is not in the registry (%s)", project, strings.Join(c.Registry.Keys(), ", "))
+		}
+		c.Project, c.App = project, e.App
+		if profilePath == "" {
+			profilePath = c.Registry.abs(e.Profile)
+		}
+	}
+	if profilePath != "" {
+		b, err := os.ReadFile(profilePath)
+		if err != nil && !(project != "" && os.IsNotExist(err)) { // a new project has no profile yet: onboarding writes it
+			return nil, err
+		} else if err == nil {
 			if err := json.Unmarshal(b, c); err != nil {
-				return nil, fmt.Errorf("%s: %w", v, err)
+				return nil, fmt.Errorf("%s: %w", profilePath, err)
 			}
 		}
 	}
+	if c.DeliverRepo == "" && c.Registry != nil && c.App != "" {
+		c.DeliverRepo = c.Registry.RepoPath(c.App) // every app delivers to its own Hydra-<App> repo
+	}
 	fs.String("profile", "", "project profile JSON (profiles/<name>.json)")
+	fs.String("project", "", "registered Jira project key (projects.json): the profile and the repo follow from it")
+	fs.String("registry", "", "projects.json (default: next to the binary's working dir)")
 	fs.StringVar(&c.Out, "out", c.Out, "run record, cases and bundles")
 	fs.StringVar(&c.ToolsDir, "tools", c.ToolsDir, "directory with render_pytest.py and run_generated.py")
 	fs.StringVar(&c.AppMap, "appmap", c.AppMap, "locators confirmed on the real app, one <App>.json each")
@@ -52,6 +81,53 @@ func cfgFlags(fs *flag.FlagSet, args []string) (*Config, error) {
 	fs.BoolVar(&c.SafeClicks, "safe-clicks", c.SafeClicks, "crawl: open comboboxes/tabs to record options")
 	fs.BoolVar(&c.AllowWrites, "allow-writes", c.AllowWrites, "let tests send real writes (default: read-only safety net)")
 	return c, nil
+}
+
+// argValue finds "--name v" or "--name=v" in args before flag parsing (the values become the flag defaults).
+func argValue(args []string, name string) string {
+	for i, a := range args {
+		a = strings.TrimLeft(a, "-")
+		if v, ok := strings.CutPrefix(a, name+"="); ok {
+			return v
+		}
+		if a == name && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
+}
+
+// pollAll: with a registry and no --project, poll every registered project (or the one a --only key belongs to),
+// each in its own process so a failing project cannot stop the others.
+func pollAll(args []string) (handled bool, code int) {
+	if argValue(args, "project") != "" || argValue(args, "profile") != "" {
+		return false, 0
+	}
+	here, _ := os.Getwd()
+	regPath := argValue(args, "registry")
+	if regPath == "" {
+		regPath = filepath.Join(here, "projects.json")
+	}
+	reg, err := LoadRegistry(regPath)
+	if err != nil {
+		return false, 0
+	}
+	keys := reg.Keys()
+	if only := argValue(args, "only"); only != "" {
+		keys = []string{strings.SplitN(only, "-", 2)[0]}
+		if _, ok := reg.Projects[keys[0]]; !ok {
+			fmt.Fprintf(os.Stderr, "hydra: %s belongs to project %s, which is not in the registry (%s)\n", only, keys[0], strings.Join(reg.Keys(), ", "))
+			return true, 1
+		}
+	}
+	for _, k := range keys {
+		cmd := exec.Command(os.Args[0], append([]string{"poll", "--project", k}, args...)...)
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+		if err := cmd.Run(); err != nil {
+			code = 1
+		}
+	}
+	return true, code
 }
 
 var jsonOut bool
@@ -72,6 +148,11 @@ func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: hydra poll|run [flags]")
 		os.Exit(2)
+	}
+	if os.Args[1] == "poll" {
+		if handled, code := pollAll(os.Args[2:]); handled {
+			os.Exit(code)
+		}
 	}
 	fs := flag.NewFlagSet(os.Args[1], flag.ExitOnError)
 	cfg, err := cfgFlags(fs, os.Args[2:])
@@ -100,10 +181,47 @@ func main() {
 		}
 	case "crawl":
 		watch, headed := fs.String("watch", "", "serve a live view of the crawl, e.g. :8099"), fs.Bool("headed", false, "show the real browser")
+		fs.IntVar(&cfg.SlowMS, "slow", cfg.SlowMS, "reveal elements one at a time, this many ms apart (for demos)")
 		fs.Parse(os.Args[2:])
 		if err = cfg.Crawl(*watch, *headed); err == nil && *watch != "" {
-			fmt.Println("viewer still up for the last page; Ctrl-C to stop")
-			select {}
+			fmt.Println("viewer still up; Ctrl-C to stop")
+			sig := make(chan os.Signal, 1)
+			signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+			<-sig
+		}
+	case "onboard":
+		fs.Parse(os.Args[2:])
+		if cfg.Registry == nil || cfg.Project == "" {
+			err = fmt.Errorf("onboard needs --project KEY (registered in projects.json)")
+			break
+		}
+		var o Onboarding
+		if o, err = cfg.Registry.Onboard(cfg.Project, cfg); err == nil {
+			b, _ := json.MarshalIndent(o, "", "  ")
+			fmt.Println(string(b))
+			if o.Gate != "" {
+				os.Exit(3)
+			}
+		}
+	case "deliver":
+		only, exclude := fs.String("only", "", "comma-separated keys to deliver (default: every passing case)"), fs.String("exclude", "", "comma-separated keys to leave out")
+		fs.StringVar(&cfg.DeliverRepo, "repo", cfg.DeliverRepo, "framework repo that receives the tests")
+		fs.Parse(os.Args[2:])
+		ex := map[string]bool{}
+		for _, k := range strings.Split(*exclude, ",") {
+			ex[strings.TrimSpace(k)] = true
+		}
+		var on []string
+		if *only != "" {
+			on = strings.Split(*only, ",")
+		}
+		var d Delivery
+		if d, err = cfg.Deliver(on, ex); err == nil {
+			b, _ := json.MarshalIndent(d, "", "  ")
+			fmt.Println(string(b))
+			if d.Gate != "" {
+				os.Exit(3) // distinct from 1 (error): the pipeline worked and is asking a person
+			}
 		}
 	case "poll":
 		jql := fs.String("jql", cfg.JQL, "which issues to look at (profile: jql)")
@@ -111,6 +229,20 @@ func main() {
 		intent, only, force, asJSON := fs.String("intent", "", "with --only: treat the issue as automate|execute even without the label"), fs.String("only", "", "process just this issue key (for a manual trigger)"), fs.Bool("force", false, "ignore the seen-state: run it again"), fs.Bool("json", false, "one JSON object per run (for n8n)")
 		fs.Parse(os.Args[2:])
 		jsonOut = *asJSON
+		if cfg.Registry != nil && cfg.Project != "" { // a registered project is onboarded before anything else happens
+			o, e := cfg.Registry.Onboard(cfg.Project, cfg)
+			if e != nil {
+				err = e
+				break
+			}
+			if o.Created {
+				report(Run{Key: cfg.Project, Intent: "onboard", Tier: "T0-onboarding", Status: "onboarded", Detail: []string{"created " + o.Repo}})
+			}
+			if o.Gate != "" {
+				report(Run{Key: cfg.Project, Intent: "onboard", Tier: "T0-onboarding", Status: "needs-onboarding", Detail: []string{o.Gate}})
+				os.Exit(3)
+			}
+		}
 		err = poll(*cfg, *jql, *comment, *only, *force, *intent)
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])

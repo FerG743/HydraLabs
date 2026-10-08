@@ -26,3 +26,6 @@ dist-ssr
 # pipeline secrets (Jira token, chat webhook): never commit
 .hydra.env
 testengine/agent/runs/
+
+# generated knowledge graph (graphify): regenerates on every update, never commit
+graphify-out/

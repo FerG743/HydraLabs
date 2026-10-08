@@ -1,0 +1,145 @@
+{
+  "id": "FACT_0001-es",
+  "name": "FACT_0001_Emision_Menu_Articulos_Administrador",
+  "language": "es",
+  "meta": {
+    "type": "Test Case",
+    "priority": "High",
+    "labels": [
+      "e2e",
+      "facturacion"
+    ],
+    "gate": "Blocker",
+    "parent": "ATB-162"
+  },
+  "precondition": "Usuario activo con Perfil Administrador y acceso al sistema.",
+  "steps": [
+    {
+      "n": "1",
+      "action": "El usuario ingresa a la liga:  https://intrappsqa.liverpool.com.mx/LiverpoolFacturacionWebR/Logout/logout.action ingresa\nUsuario:\nContraseña:\nY da clic en el botón Tienda"
+    },
+    {
+      "n": "2",
+      "action": "El usuario selecciona el perfil Administrador - Liverpool Mexicali y da clic en el botón Aceptar"
+    },
+    {
+      "n": "3",
+      "action": "El usuario da clic en Facturación/Artículos"
+    },
+    {
+      "n": "4",
+      "action": "El usuario ingresa un RFC genérico en el campo RFC\nEjemplo: \nRFC:[XAXX ] [010101][000]"
+    },
+    {
+      "n": "5",
+      "action": "El usuario ingresa en el campo \nCorreo electronico: NO.CORREO@GMAIL.COM"
+    },
+    {
+      "n": "6",
+      "action": "El usuario coloca en los campos: \nNombre : Publico\nPaterno: en\nMaterno: General"
+    },
+    {
+      "n": "7",
+      "action": "El usuario coloca en el campo \nDomicilio Fiscal:50180"
+    },
+    {
+      "n": "8",
+      "action": "El usuario se posiciona en la sección Consultar Boleta y coloca en el campo\nTienda: 0103- Liverpool Interlomas"
+    },
+    {
+      "n": "9",
+      "action": "El usuario se posiciona en la sección Consultar Boleta y coloca en el campo\nFecha: 260817"
+    },
+    {
+      "n": "10",
+      "action": "El usuario se posiciona en la sección Consultar Boleta y coloca en el campo\nTerminal: 1"
+    },
+    {
+      "n": "11",
+      "action": "El usuario se posiciona en la sección Consultar Boleta y coloca en el campo\nBoleta: 71"
+    },
+    {
+      "n": "12",
+      "action": "El usuario da clic en el botón Agregar"
+    },
+    {
+      "n": "13",
+      "action": "El usuario valida que se muestre una línea con los campos SKU, Clave producto, Cantidad, Unidad Medida,etc."
+    },
+    {
+      "n": "14",
+      "action": "El usuario se posiciona en la sección Medio de pago y coloca en el campo\nMedio de pago: PAGO EN UNA SOLA EXHIBICION"
+    },
+    {
+      "n": "15",
+      "action": "El usuario se posiciona en la sección Medio de pago y selecciona en el campo\nForma de pago:  EFECTIVO \nEl usuario da clic en Facturar"
+    },
+    {
+      "n": "16",
+      "action": "El usuario da clic en Sí"
+    },
+    {
+      "n": "17",
+      "action": "El usuario guarda en una ruta la factura agregando un nombre al archivo\nEjemplo: FACT_0001_Emision_Menu_Articulos_Administrador"
+    },
+    {
+      "n": "18",
+      "action": "El usuario abre la factura (archivo PDF) y copia el dato de UUID"
+    },
+    {
+      "n": "19",
+      "action": "Para sus validaciones el usuario toma captura del mensaje anterior(paso 15) , PDF y del XML , así mismo valida los datos del PDF: Fecha , de las secciones RECEPTOR , INFORMACIÓN DE PAGO. y CONCEPTOS (Deben de coincidir con la información ingresada)"
+    }
+  ],
+  "expected": [
+    {
+      "text": "El sistema muestra pantalla principal Selección de Perfil/Ubicación"
+    },
+    {
+      "text": "El sistema muestra las diferentes opciones que tiene el perfil administrador"
+    },
+    {
+      "text": "El sistema muestra la pantalla Facturación de Artículos"
+    },
+    {
+      "text": "El sistema captura el dato ingresado"
+    },
+    {
+      "text": "El sistema captura el dato ingresado"
+    },
+    {
+      "text": "El sistema captura el dato ingresado"
+    },
+    {
+      "text": "El sistema captura el dato ingresado"
+    },
+    {
+      "text": "El sistema captura el dato ingresado"
+    },
+    {
+      "text": "El sistema captura el dato ingresado"
+    },
+    {
+      "text": "El sistema captura el dato ingresado"
+    },
+    {
+      "text": "El sistema captura el dato ingresado"
+    },
+    {
+      "text": "El sistema muestra la tabla Artículos agregados para facturar"
+    },
+    {
+      "text": "El sistema captura el dato ingresado"
+    },
+    {
+      "text": "Validación importante: El sistema muestra pantalla ¿Los datos a facturar son correctos? \nNota: Este mensaje es importante y se deberá de guardar una evidencia del mismo"
+    },
+    {
+      "text": "El sistema abre el explorador de archivos para que el usuario pueda guardar la factura"
+    },
+    {
+      "text": "El sistema guarda la factura en la ruta asignada"
+    }
+  ],
+  "notes": ""
+}

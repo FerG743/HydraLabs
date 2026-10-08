@@ -1,0 +1,11 @@
+{
+  "_doc": "Which Jira projects the pipeline automates. Registration is explicit: a Jira token sees dozens of projects and must never turn each into a repo. Each app gets its own repo, Hydra-<app>, next to the others.",
+  "reposRoot": "~/Documents/GitHub",
+  "template": "templates/framework",
+  "projects": {
+    "DWQ": {
+      "app": "CobroOrdenes",
+      "profile": "profiles/cobro-ordenes.json"
+    }
+  }
+}

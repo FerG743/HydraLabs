@@ -1,0 +1,59 @@
+{
+  "id": "DWQ-132-es",
+  "name": "TC-3 – Entrada inválida y falla del backend bajo envío duplicado (Negativo / Resiliencia)",
+  "language": "es",
+  "meta": {
+    "type": "Test Case",
+    "priority": "Highest",
+    "labels": [
+      "e2e",
+      "negative",
+      "resilience",
+      "idempotency",
+      "cobro-ordenes"
+    ],
+    "gate": "Blocker",
+    "parent": "DWQ-129"
+  },
+  "precondition": "El endpoint POST está simulado para responder HTTP 500 después de 1.5 s. Hay un contador de peticiones adjunto.",
+  "steps": [
+    {
+      "n": "1",
+      "action": "Navegar a `/cobro_ordenes`."
+    },
+    {
+      "n": "2",
+      "action": "Subir `evil.csv.exe` (contenido binario, `application/octet-stream`)."
+    },
+    {
+      "n": "3",
+      "action": "Subir `junk.csv` que contiene: un número de orden vacío; una tienda desconocida (`XXXX`); un número de orden de 10,000 caracteres; una cadena de inyección SQL (`'; DROP TABLE x;--`)."
+    },
+    {
+      "n": "4",
+      "action": "Hacer doble clic en \"Subir y Procesar\"."
+    },
+    {
+      "n": "5",
+      "action": "Esperar la respuesta."
+    }
+  ],
+  "expected": [
+    {
+      "text": "El archivo que no es CSV se rechaza en el cliente y \"Subir y Procesar\" permanece deshabilitado."
+    },
+    {
+      "text": "El doble clic envía como máximo una petición POST (sin cobro duplicado)."
+    },
+    {
+      "text": "Se muestra un aviso o alerta de error al usuario."
+    },
+    {
+      "text": "El botón vuelve al estado habilitado sin spinner atascado."
+    },
+    {
+      "text": "No aparece la pantalla de falla \"Application error\" de Next.js."
+    }
+  ],
+  "notes": "Un POST duplicado es un posible defecto de doble cobro. Levantarlo como Severidad 1."
+}

@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# pipeline secrets (Jira token, chat webhook): never commit
+.hydra.env
+testengine/agent/runs/

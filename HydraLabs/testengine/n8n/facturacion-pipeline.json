@@ -1,0 +1,506 @@
+{
+  "name": "Matrix → Gherkin (facturacion)",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "manual-trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "binDir",
+              "name": "binDir",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/bin",
+              "type": "string"
+            },
+            {
+              "id": "outDir",
+              "name": "outDir",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/out",
+              "type": "string"
+            },
+            {
+              "id": "tagCols",
+              "name": "tagCols",
+              "value": "prioridad,ciclo,nivel_de_prueba,parent",
+              "type": "string"
+            },
+            {
+              "id": "useLm",
+              "name": "useLm",
+              "value": "auto",
+              "type": "string"
+            },
+            {
+              "id": "lmUrl",
+              "name": "lmUrl",
+              "value": "http://127.0.0.1:1234/v1",
+              "type": "string"
+            },
+            {
+              "id": "lmModel",
+              "name": "lmModel",
+              "value": "qwen/qwen3.5-9b",
+              "type": "string"
+            },
+            {
+              "id": "reasoningEffort",
+              "name": "reasoningEffort",
+              "value": "none",
+              "type": "string"
+            },
+            {
+              "id": "onlyIds",
+              "name": "onlyIds",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "mapPrompt",
+              "name": "mapPrompt",
+              "value": "Recibes los pasos de un caso de prueba y una lista de \"fields\": campos de datos que ningún paso usa todavía.\nPara cada campo, busca en los pasos el texto literal que representa ese dato (copiado EXACTAMENTE como aparece en el paso).\nResponde SOLO un objeto JSON: {\"<n del paso>\": [{\"field\": \"<campo>\", \"literal\": \"<texto exacto del paso>\"}]}.\nSi un campo no aparece en ningún paso, omítelo. No inventes campos ni texto.",
+              "type": "string"
+            },
+            {
+              "id": "matrixCsv",
+              "name": "matrixCsv",
+              "value": "/Users/fergomez/Downloads/EPL TI FO 048 Test Matrix.csv",
+              "type": "string"
+            },
+            {
+              "id": "suiteCsv",
+              "name": "suiteCsv",
+              "value": "/Users/fergomez/Downloads/Suite Facturación Hoja 1.csv",
+              "type": "string"
+            },
+            {
+              "id": "nameCol",
+              "name": "nameCol",
+              "value": "NOMBRE DE CASO",
+              "type": "string"
+            },
+            {
+              "id": "stepCol",
+              "name": "stepCol",
+              "value": "PASOS",
+              "type": "string"
+            },
+            {
+              "id": "expectedCol",
+              "name": "expectedCol",
+              "value": "RESULTADOS ESPERADOS",
+              "type": "string"
+            },
+            {
+              "id": "numCol",
+              "name": "numCol",
+              "value": "No. de Pasos",
+              "type": "string"
+            },
+            {
+              "id": "keyCol",
+              "name": "keyCol",
+              "value": "Boleta",
+              "type": "string"
+            },
+            {
+              "id": "blockedRegex",
+              "name": "blockedRegex",
+              "value": "Dependencia de insumos",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "id": "config"
+    },
+    {
+      "parameters": {
+        "command": "=set -o pipefail; mkdir -p \"{{ $('Config').first().json.outDir }}\" && cd \"{{ $('Config').first().json.binDir }}\" && ./matrix -name \"{{ $('Config').first().json.nameCol }}\" -step \"{{ $('Config').first().json.stepCol }}\" -expected \"{{ $('Config').first().json.expectedCol }}\" -num \"{{ $('Config').first().json.numCol }}\" \"{{ $('Config').first().json.matrixCsv }}\" > \"{{ $('Config').first().json.outDir }}/matrix.json\" && ./suite -key \"{{ $('Config').first().json.keyCol }}\" \"{{ $('Config').first().json.suiteCsv }}\" > \"{{ $('Config').first().json.outDir }}/suite.json\" && ./join -blocked \"{{ $('Config').first().json.blockedRegex }}\" \"{{ $('Config').first().json.outDir }}/matrix.json\" \"{{ $('Config').first().json.outDir }}/suite.json\" | ./casecheck"
+      },
+      "name": "Prepare",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ],
+      "id": "prepare"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst out = JSON.parse($input.first().json.stdout);\nconst cfg = $('Config').first().json;\nconst only = cfg.onlyIds ? cfg.onlyIds.split(',').map(s => s.trim()) : null;\nconst b64 = s => Buffer.from(s).toString('base64');\nconst skipped = {};\nfor (const c of out.cases) if (c.status !== 'ready') skipped[c.status] = (skipped[c.status] || 0) + 1;\nreturn out.cases\n  .filter(c => c.status === 'ready' && (!only || only.includes(String(c.id))))\n  .map(c => ({ json: { id: c.id, name: c.name, caseB64: b64(JSON.stringify(c)),\n    minThen: c.steps.filter(s => s.expected).length,   // lint: one Entonces per expected result\n    mapB64: b64('{}'), lmTried: false, skipped } }));\n"
+      },
+      "name": "Pick Ready Cases",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "id": "pick-ready-cases"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return { json: $json };"
+      },
+      "name": "Skeleton Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "id": "skeleton-input"
+    },
+    {
+      "parameters": {
+        "command": "={{ \"echo \" + $json.caseB64 + \" | base64 -d | \\\"\" + $('Config').first().json.binDir + \"/skeleton\\\" -tags \\\"\" + $('Config').first().json.tagCols + \"\\\" -map-b64 \\\"\" + $json.mapB64 + \"\\\"\" }}",
+        "executeOnce": false
+      },
+      "name": "Skeleton",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        0
+      ],
+      "id": "skeleton"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst st = $('Skeleton Input').item.json;\nlet r;\ntry { r = JSON.parse($json.stdout); } catch (e) { r = { feature: '', warnings: ['skeleton failed: ' + $json.stderr] }; }\nconst dropped = [...r.warnings.join('\\n').matchAll(/data column \"([^\"]+)\" is not used/g)].map(m => m[1]);\nreturn { json: { ...st, feature: r.feature, warnings: r.warnings, dropped,\n  b64: Buffer.from(r.feature).toString('base64') } };\n"
+      },
+      "name": "Parse Skeleton",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
+      ],
+      "id": "parse-skeleton"
+    },
+    {
+      "parameters": {
+        "command": "={{ \"echo \" + $json.b64 + \" | base64 -d | \\\"\" + $('Config').first().json.binDir + \"/lint\\\" -min-then \" + $json.minThen + \" -max-scenarios 1\" }}",
+        "executeOnce": false
+      },
+      "name": "Lint",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        0
+      ],
+      "id": "lint"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst st = $('Parse Skeleton').item.json, cfg = $('Config').first().json;\nlet r;\ntry { r = JSON.parse($json.stdout); } catch (e) { r = { ok: false, errors: ['lint output was not JSON: ' + $json.stderr], needs_input: [] }; }\n// the model is only worth calling when data would otherwise be dropped (or when forced)\nconst ask = !st.lmTried && (cfg.useLm === 'always' || (cfg.useLm === 'auto' && st.dropped.length > 0));\nconst notes = [...r.errors.map(e => 'LINT: ' + e), ...st.warnings, ...r.needs_input].join('\\n');\n// clean = lint passes AND no data column was dropped; anything else goes to features/review/\nreturn { json: { ...st, ok: r.ok, clean: r.ok && st.dropped.length === 0, errors: r.errors, ask,\n  file: st.name.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^\\w.-]+/g, '_') + '.feature',\n  notesB64: notes ? Buffer.from(notes + '\\n').toString('base64') : '' } };\n"
+      },
+      "name": "Parse Lint",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        0
+      ],
+      "id": "parse-lint"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "ask",
+              "leftValue": "={{ $json.ask }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "name": "Ask LM?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        0
+      ],
+      "id": "ask-lm"
+    },
+    {
+      "parameters": {
+        "command": "={{ \"echo \" + $json.caseB64 + \" | base64 -d | \\\"\" + $('Config').first().json.binDir + \"/skeleton\\\" -plan -tags \\\"\" + $('Config').first().json.tagCols + \"\\\" -map-b64 \\\"\" + $json.mapB64 + \"\\\"\" }}",
+        "executeOnce": false
+      },
+      "name": "Plan",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        120
+      ],
+      "id": "plan"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst st = $('Parse Lint').item.json, cfg = $('Config').first().json;\nconst body = { model: cfg.lmModel || undefined, reasoning_effort: cfg.reasoningEffort || undefined, temperature: 0.1,\n  messages: [{ role: 'system', content: cfg.mapPrompt }, { role: 'user', content: $json.stdout }],\n  response_format: { type: 'json_schema', json_schema: { name: 'map', schema: {\"type\": \"object\", \"additionalProperties\": {\"type\": \"array\", \"items\": {\"type\": \"object\", \"properties\": {\"field\": {\"type\": \"string\"}, \"literal\": {\"type\": \"string\"}}, \"required\": [\"field\", \"literal\"]}}} } } };\nreturn { json: { ...st, body: JSON.stringify(body) } };\n"
+      },
+      "name": "Build LM Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        120
+      ],
+      "id": "build-lm-prompt"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.lmUrl }}/chat/completions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "name": "LM Studio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        120
+      ],
+      "id": "lm-studio"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst st = $('Build LM Prompt').item.json;\nlet t = $json.choices[0].message.content.replace(/<think>[\\s\\S]*?<\\/think>/g, '').trim();\nt = t.replace(/^```[a-z]*\\n?/i, '').replace(/\\n?```$/, '');\nlet m = {};\ntry { const p = JSON.parse(t); if (p && typeof p === 'object' && !Array.isArray(p)) m = p; } catch (e) {}  // bad JSON = no extra mapping\nreturn { json: { ...st, mapB64: Buffer.from(JSON.stringify(m)).toString('base64'), lmTried: true } };\n"
+      },
+      "name": "Extract Map",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        120
+      ],
+      "id": "extract-map"
+    },
+    {
+      "parameters": {
+        "command": "={{ \"d=\\\"\" + $('Config').first().json.outDir + \"/features\" + ($json.clean ? \"\" : \"/review\") + \"\\\"; mkdir -p \\\"$d\\\" && echo \" + $json.b64 + \" | base64 -d > \\\"$d/\" + $json.file + \"\\\"\" + ($json.notesB64 ? \" && echo \" + $json.notesB64 + \" | base64 -d > \\\"$d/\" + $json.file + \".notes.txt\\\"\" : \"\") + \" && echo \\\"$d/\" + $json.file + \"\\\"\" }}",
+        "executeOnce": false
+      },
+      "name": "Save",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        -120
+      ],
+      "id": "save"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare": {
+      "main": [
+        [
+          {
+            "node": "Pick Ready Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Ready Cases": {
+      "main": [
+        [
+          {
+            "node": "Skeleton Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skeleton Input": {
+      "main": [
+        [
+          {
+            "node": "Skeleton",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skeleton": {
+      "main": [
+        [
+          {
+            "node": "Parse Skeleton",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Skeleton": {
+      "main": [
+        [
+          {
+            "node": "Lint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lint": {
+      "main": [
+        [
+          {
+            "node": "Parse Lint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Lint": {
+      "main": [
+        [
+          {
+            "node": "Ask LM?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan": {
+      "main": [
+        [
+          {
+            "node": "Build LM Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LM Prompt": {
+      "main": [
+        [
+          {
+            "node": "LM Studio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LM Studio": {
+      "main": [
+        [
+          {
+            "node": "Extract Map",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Map": {
+      "main": [
+        [
+          {
+            "node": "Skeleton Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask LM?": {
+      "main": [
+        [
+          {
+            "node": "Plan",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

@@ -1,0 +1,28 @@
+{
+  "page": "cobro_ordenes",
+  "locators": {
+    "INPUT_ARCHIVO": "#file-upload",
+    "BOTON_SUBIR_Y_PROCESAR": "role=button[name=\"Subir y Procesar\"]",
+    "MENSAJE_ERROR": {"selector": "li[role=\"status\"]", "dynamic": true},
+    "SPINNER": {"selector": ".animate-spin", "dynamic": true}
+  },
+  "data": {"valid_order": "9800074297", "valid_store": "LIVR"},
+  "mock": {"pattern": "**/uploadFile", "status": 500, "delay_ms": 1500},
+  "steps": [
+    {"n": 1, "do": {"action": "goto", "path": "/cobro_ordenes"}},
+    {"n": 2, "do": {"action": "upload_binary", "locator": "INPUT_ARCHIVO", "filename": "evil.csv.exe", "mime": "application/octet-stream"}},
+    {"n": 3, "do": {"action": "upload_csv", "locator": "INPUT_ARCHIVO", "filename": "junk.csv", "header": ["ORDEN", "TIENDA"],
+                    "rows": [["", {"data": "valid_store"}], [{"data": "valid_order"}, "XXXX"],
+                             [{"repeat": {"char": "9", "times": 10000}}, {"data": "valid_store"}],
+                             ["'; DROP TABLE x;--", {"data": "valid_store"}]]}},
+    {"n": 4, "do": {"action": "dblclick", "locator": "BOTON_SUBIR_Y_PROCESAR"}},
+    {"n": 5, "do": {"action": "wait_response"}}
+  ],
+  "checks": [
+    {"n": 1, "after_step": 2, "check": [{"kind": "disabled", "locator": "BOTON_SUBIR_Y_PROCESAR"}, {"kind": "no_requests"}]},
+    {"n": 2, "check": {"kind": "max_requests", "n": 1}},
+    {"n": 3, "check": {"kind": "visible", "locator": "MENSAJE_ERROR"}},
+    {"n": 4, "check": [{"kind": "enabled", "locator": "BOTON_SUBIR_Y_PROCESAR"}, {"kind": "hidden", "locator": "SPINNER"}]},
+    {"n": 5, "check": {"kind": "hidden", "text": "Application error"}}
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "id": "DWQ-131",
+  "name": "TC-2 - Fixture",
+  "language": "en",
+  "meta": {
+    "parent": "DWQ-129",
+    "type": "Test Case",
+    "priority": "High",
+    "labels": [
+      "e2e",
+      "smoke",
+      "cobro-ordenes",
+      "file-upload"
+    ],
+    "gate": "Blocker."
+  },
+  "precondition": "Same as TC-1.",
+  "steps": [
+    {
+      "n": "1",
+      "action": "Navigate to `/cobro_ordenes`."
+    },
+    {
+      "n": "2",
+      "action": "Click \"Descargar CSV\" and capture the downloaded file."
+    },
+    {
+      "n": "3",
+      "action": "Upload that file via the drop zone."
+    },
+    {
+      "n": "4",
+      "action": "Verify \"Subir y Procesar\" is enabled."
+    },
+    {
+      "n": "5",
+      "action": "Click \"Subir y Procesar\"."
+    }
+  ],
+  "expected": [
+    {
+      "text": "The download succeeds."
+    },
+    {
+      "text": "Orders `9800074297` (LIVR) and `9800074362` (SBB) appear in the results table."
+    },
+    {
+      "text": "The sample file round-trips through the upload without errors."
+    }
+  ],
+  "precondition_ref": "TC-1",
+  "warnings": [
+    "precondition refers to TC-1: resolve it from that case",
+    "priority conflict: description says High, Jira field says Medium"
+  ]
+}

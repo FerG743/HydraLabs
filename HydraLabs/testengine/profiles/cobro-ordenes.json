@@ -1,0 +1,20 @@
+{
+  "_doc": "One file per web app. A new tool = a new file like this one; nothing in code changes. Omit 'agent' to run without a model.",
+  "app": "CobroOrdenes",
+  "baseUrl": "http://127.0.0.1:3000",
+  "jql": "parent = DWQ-129 AND labels in (\"automate\", \"execute\") ORDER BY key ASC",
+  "agent": "agent/agent.py",
+  "model": "prism-ml/bonsai-27b",
+  "maxTurns": 20,
+  "allowWrites": true,
+  "paths": [
+    "/cobro_ordenes"
+  ],
+  "maxPages": 8,
+  "safeClicks": true,
+  "jiraComments": false,
+  "chatWebhookEnv": "HYDRA_CHAT_WEBHOOK",
+  "_auth": "No login on this portal. For apps that need one: loginFile = steps whose values are ENV:NAME tokens, envFile = the framework's .env.",
+  "_environment": "QA = the portal run locally with ./dev.sh in MAC mode (frontend 127.0.0.1:3000, backends 127.0.0.1:8000-8002). 172.22.64.228 is PROD: never point a profile at it with allowWrites.",
+  "maxTokens": 100000
+}

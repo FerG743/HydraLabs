@@ -1,0 +1,23 @@
+{
+  "page": "cobro_ordenes",
+  "locators": {
+    "BOTON_PROCESAR": "role=button[name=\"Procesar\"]",
+    "INPUT_ORDER_NUMBER": "#orderNumber",
+    "SELECT_STORE": "role=combobox[name=\"Ingresa la tienda\"]",
+    "BOTON_AGREGAR": "role=button[name=\"Agregar\"]"
+  },
+  "data": {"order_number": "9800074297", "store": "LIVR"},
+  "steps": [
+    {"n": 1, "do": {"action": "goto", "path": "/cobro_ordenes"}},
+    {"n": 2, "do": {"action": "verify", "kind": "disabled", "locator": "BOTON_PROCESAR"}},
+    {"n": 3, "do": {"action": "fill", "locator": "INPUT_ORDER_NUMBER", "data": "order_number"}},
+    {"n": 4, "do": {"action": "select", "locator": "SELECT_STORE", "data": "store", "widget": "combobox"}},
+    {"n": 5, "do": {"action": "click", "locator": "BOTON_AGREGAR"}},
+    {"n": 6, "do": {"action": "click", "locator": "BOTON_PROCESAR"}}
+  ],
+  "checks": [
+    {"n": 1, "skip": "compuesto: 'deshabilitado antes y habilitado después' mezcla dos momentos del flujo"},
+    {"n": 2, "check": {"kind": "visible", "text": "Un vistazo a tus ordenes"}},
+    {"n": 3, "check": {"kind": "hidden", "text": "No hay resultados disponibles"}}
+  ]
+}

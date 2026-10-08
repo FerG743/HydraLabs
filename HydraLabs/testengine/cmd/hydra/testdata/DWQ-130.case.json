@@ -1,0 +1,48 @@
+{
+  "id": "DWQ-130",
+  "name": "TC-1 - Fixture",
+  "language": "en",
+  "meta": {
+    "parent": "DWQ-129",
+    "gate": "Blocker. A failure here fails the build"
+  },
+  "precondition": "Portal is deployed and reachable. The \"Un vistazo a tus ordenes\" table is empty.",
+  "steps": [
+    {
+      "n": "1",
+      "action": "Navigate to `/cobro_ordenes`."
+    },
+    {
+      "n": "2",
+      "action": "Verify \"Procesar\" is disabled."
+    },
+    {
+      "n": "3",
+      "action": "Enter order number `9800074297`."
+    },
+    {
+      "n": "4",
+      "action": "Select store `LIVR`."
+    },
+    {
+      "n": "5",
+      "action": "Click \"Agregar\"."
+    },
+    {
+      "n": "6",
+      "action": "Click \"Procesar\"."
+    }
+  ],
+  "expected": [
+    {
+      "text": "\"Procesar\" is disabled before the order is added and enabled after."
+    },
+    {
+      "text": "After processing, the order appears in \"Un vistazo a tus ordenes\"."
+    },
+    {
+      "text": "The \"No hay resultados disponibles\" empty state disappears."
+    }
+  ],
+  "warnings": []
+}

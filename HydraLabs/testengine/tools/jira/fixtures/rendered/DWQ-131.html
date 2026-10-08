@@ -1,0 +1,29 @@
+<ul>
+	<li><b>Type:</b> Test Case | <b>Priority:</b> High | <b>Labels:</b> <tt>e2e</tt>, <tt>smoke</tt>, <tt>cobro-ordenes</tt>, <tt>file-upload</tt></li>
+	<li><b>Preconditions:</b> Same as 
+    <span class="jira-issue-macro" data-jira-key="TC-1" >
+                <a href="https://liverpooldigital.atlassian.net/browse/TC-1" class="jira-issue-macro-key issue-link"  title="Test 1" >
+            <img class="icon" src="https://liverpooldigital.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10303?size=medium" />
+            TC-1
+        </a>
+                                                    <span class="aui-lozenge aui-lozenge-subtle aui-lozenge-complete jira-macro-single-issue-export-pdf">Backlog</span>
+            </span>
+.</li>
+	<li><b>Steps:</b>
+	<ol>
+		<li>Navigate to <tt>/cobro_ordenes</tt>.</li>
+		<li>Click "Descargar CSV" and capture the downloaded file.</li>
+		<li>Upload that file via the drop zone.</li>
+		<li>Verify "Subir y Procesar" is enabled.</li>
+		<li>Click "Subir y Procesar".</li>
+	</ol>
+	</li>
+	<li><b>Expected Result:</b>
+	<ul>
+		<li>The download succeeds.</li>
+		<li>Orders <tt>9800074297</tt> (LIVR) and <tt>9800074362</tt> (SBB) appear in the results table.</li>
+		<li>The sample file round-trips through the upload without errors.</li>
+	</ul>
+	</li>
+	<li><b>Pipeline gate:</b> Blocker.</li>
+</ul>

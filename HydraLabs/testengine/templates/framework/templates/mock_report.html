@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="nexus-project" content="MiApp">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Framework Automatización</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-primary: #38bdf8;
+            --accent-success: #10b981;
+            --accent-danger: #f43f5e;
+            --border: rgba(255, 255, 255, 0.1);
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --step-bg: rgba(0, 0, 0, 0.2);
+        }
+
+        [data-theme="light"] {
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --accent-primary: #78256f;
+            --accent-success: #28a745;
+            --accent-danger: #dc3545;
+            --border: #e9ecef;
+            --glass-bg: rgba(255, 255, 255, 0.9);
+            --step-bg: #fdfdfd;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            align-items: flex-start;
+            margin-bottom: 2rem;
+            background: var(--glass-bg);
+            padding: 1.5rem 2rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+        }
+
+        .header-top {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            color: var(--text-primary);
+            font-size: 1.8rem;
+            margin: 0;
+            font-weight: 700;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        [data-theme="light"] .logo-container {
+            background: #ffffff;
+            border-color: #eeeeee;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] header {
+            background: #78256f;
+            margin: 0rem -2rem 2rem -2rem;
+            padding: 2.5rem 2rem;
+            border-radius: 0 0 1.5rem 1.5rem;
+            box-shadow: 0 10px 30px rgba(120, 37, 111, 0.25);
+            border: none;
+        }
+
+        [data-theme="light"] header h1,
+        [data-theme="light"] header .test-meta {
+            color: #ffffff !important;
+        }
+
+        [data-theme="light"] .theme-toggle {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        [data-theme="light"] .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .logo-img {
+            height: 50px;
+            width: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.2));
+        }
+
+        .divider {
+            width: 2px;
+            height: 35px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo svg {
+            fill: var(--accent-primary);
+            width: 35px;
+            height: 35px;
+        }
+
+        .logo h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .card {
+            padding: 1.5rem;
+            background: var(--card-bg);
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card .label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        .card .value {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-top: 0.25rem;
+        }
+
+        .card.success {
+            border-left: 4px solid var(--accent-success);
+        }
+
+        .card.danger {
+            border-left: 4px solid var(--accent-danger);
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 1.5rem;
+        }
+
+        .donut-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+        }
+
+        .donut-svg {
+            transform: rotate(-90deg);
+        }
+
+        .donut-bg {
+            fill: none;
+            stroke: var(--border);
+            stroke-width: 12;
+        }
+
+        .donut-fill {
+            fill: none;
+            stroke: var(--accent-success);
+            stroke-width: 12;
+            stroke-dasharray: 440;
+            stroke-dashoffset: 66;
+            stroke-linecap: round;
+        }
+
+        .donut-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .filters {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-chip {
+            padding: 0.5rem 1.25rem;
+            border-radius: 2rem;
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .filter-chip.active {
+            background: var(--accent-primary);
+            color: white;
+            border-color: var(--accent-primary);
+        }
+
+        .test-list {
+            background: var(--glass-bg);
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        details {
+            border-bottom: 1px solid var(--border);
+        }
+
+        summary {
+            padding: 1.25rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            list-style: none;
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .test-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .test-info p {
+            color: var(--text-primary);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .dot-passed {
+            background: var(--accent-success);
+            box-shadow: 0 0 10px var(--accent-success);
+        }
+
+        .dot-failed {
+            background: var(--accent-danger);
+            box-shadow: 0 0 10px var(--accent-danger);
+        }
+
+        .evidence-body {
+            padding: 2rem 4rem;
+            background: var(--step-bg);
+            border-top: 1px solid var(--border);
+        }
+
+        .step-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-left: 2px solid var(--border);
+            padding-left: 1.5rem;
+        }
+
+        .step-item {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .step-item::before {
+            content: '';
+            position: absolute;
+            left: -1.95rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--border);
+        }
+
+        .step-passed::before {
+            background: var(--accent-success);
+            box-shadow: 0 0 8px var(--accent-success);
+        }
+
+        .step-failed::before {
+            background: var(--accent-danger);
+            box-shadow: 0 0 8px var(--accent-danger);
+        }
+
+        .copy-btn {
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            float: right;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .theme-toggle {
+            cursor: pointer;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 0.5rem;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-primary);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body data-theme="light">
+    <div class="container">
+        <header>
+            <div class="header-top">
+                <div class="logo-container">
+                    <img src="Logo/Logoliver.png" alt="Liverpool" class="logo-img">
+                    <div class="divider"></div>
+                    <img src="Logo/centro_excelencia.png" alt="COE" class="logo-img">
+                </div>
+                <div style="display: flex; gap: 1.5rem; align-items: center;">
+                    <div class="test-meta" style="font-size: 0.9rem; font-weight: 500;">Sesión: 2026-03-25 • Chrome 122 • QA</div>
+                    <button class="theme-toggle" onclick="toggleTheme()" title="Ver Modo Oscuro">
+                        <svg id="theme-icon" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path id="theme-path" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <h1>Reporte Automatizado QA</h1>
+        </header>
+
+        <div class="dashboard">
+            <div class="stats-grid">
+                <div class="card success">
+                    <span class="label">Tests Exitosos</span>
+                    <span class="value">0 / 0</span>
+                </div>
+                <div class="card danger">
+                    <span class="label">Tests Fallidos</span>
+                    <span class="value">0 / 0</span>
+                </div>
+                <div class="card">
+                    <span class="label">Tiempo de Ejecución</span>
+                    <span class="value">0s</span>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="donut-container">
+                    <svg class="donut-svg" width="150" height="150">
+                        <circle class="donut-bg" cx="75" cy="75" r="70"></circle>
+                        <circle class="donut-fill" cx="75" cy="75" r="70"></circle>
+                    </svg>
+                    <div class="donut-text">0%<br><span
+                            style="font-size: 0.65rem; color: var(--text-secondary); font-weight: 500;">SUCCESS</span>
+                    </div>
+                </div>
+                <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">VISIÓN
+                    GENERAL</p>
+            </div>
+        </div>
+
+        <div class="filters">
+            <button class="filter-chip active" onclick="filterTests('all', this)">Todos</button>
+            <button class="filter-chip" onclick="filterTests('failed', this)">Solo Fallidos</button>
+            <button class="filter-chip" onclick="filterTests('passed', this)">Solo Exitosos</button>
+        </div>
+
+        <div class="test-list">
+        </div>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            const body = document.body;
+            const current = body.getAttribute('data-theme');
+            const target = current === 'dark' ? 'light' : 'dark';
+            const iconPath = document.getElementById('theme-path');
+            const toggleBtn = document.querySelector('.theme-toggle');
+
+            body.setAttribute('data-theme', target);
+            document.documentElement.setAttribute('data-theme', target);
+
+            if (target === 'light') {
+                iconPath.setAttribute('d', 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z');
+                toggleBtn.title = "Ver Modo Oscuro";
+            } else {
+                iconPath.setAttribute('d', 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M16.95 16.95l.707.707M7.05 7.05l-.707.707M12 8a4 4 0 100 8 4 4 0 000-8z');
+                toggleBtn.title = "Ver Modo Claro";
+            }
+        }
+
+        function filterTests(status, btn) {
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.test-item').forEach(item => {
+                if (status === 'all' || item.getAttribute('data-status') === status) item.classList.remove('hidden');
+                else item.classList.add('hidden');
+            });
+        }
+
+        function copyToClipboard(element, id) {
+            const text = document.getElementById(id).innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const original = element.innerText;
+                element.innerText = '¡Copiado!';
+                setTimeout(() => element.innerText = original, 2000);
+            });
+        }
+    </script>
+</body>
+
+</html>

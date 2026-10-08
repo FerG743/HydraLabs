@@ -1,0 +1,52 @@
+{
+  "id": "DWQ-131-es",
+  "name": "TC-2 – Carga masiva de CSV con el archivo de muestra del portal (Flujo feliz)",
+  "language": "es",
+  "meta": {
+    "type": "Test Case",
+    "priority": "High",
+    "labels": [
+      "e2e",
+      "smoke",
+      "cobro-ordenes",
+      "file-upload"
+    ],
+    "gate": "Blocker",
+    "parent": "DWQ-129"
+  },
+  "precondition": "Igual que TC-1: El portal está desplegado y accesible. La tabla \"Un vistazo a tus ordenes\" está vacía.",
+  "steps": [
+    {
+      "n": "1",
+      "action": "Navegar a `/cobro_ordenes`."
+    },
+    {
+      "n": "2",
+      "action": "Hacer clic en \"Descargar CSV\" y capturar el archivo descargado."
+    },
+    {
+      "n": "3",
+      "action": "Subir ese archivo mediante la zona de arrastre."
+    },
+    {
+      "n": "4",
+      "action": "Verificar que \"Subir y Procesar\" está habilitado."
+    },
+    {
+      "n": "5",
+      "action": "Hacer clic en \"Subir y Procesar\"."
+    }
+  ],
+  "expected": [
+    {
+      "text": "La descarga es exitosa."
+    },
+    {
+      "text": "Las órdenes `9800074297` (LIVR) y `9800074362` (SBB) aparecen en la tabla de resultados."
+    },
+    {
+      "text": "El archivo de muestra se sube sin errores."
+    }
+  ],
+  "notes": ""
+}

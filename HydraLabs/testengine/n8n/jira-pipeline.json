@@ -1,0 +1,495 @@
+{
+  "name": "Jira → Gherkin",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        120
+      ],
+      "id": "schedule"
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -80
+      ],
+      "id": "manual-trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "jiraBaseUrl",
+              "name": "jiraBaseUrl",
+              "value": "https://liverpooldigital.atlassian.net",
+              "type": "string"
+            },
+            {
+              "id": "jql",
+              "name": "jql",
+              "value": "parent = DWQ-129 ORDER BY key ASC",
+              "type": "string"
+            },
+            {
+              "id": "lang",
+              "name": "lang",
+              "value": "en",
+              "type": "string"
+            },
+            {
+              "id": "pollMinutes",
+              "name": "pollMinutes",
+              "value": "5",
+              "type": "string"
+            },
+            {
+              "id": "toolsDir",
+              "name": "toolsDir",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/tools/jira",
+              "type": "string"
+            },
+            {
+              "id": "binDir",
+              "name": "binDir",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/bin",
+              "type": "string"
+            },
+            {
+              "id": "outDir",
+              "name": "outDir",
+              "value": "/Users/fergomez/Documents/GitHub/HydraLabs/HydraLabs/testengine/out/jira",
+              "type": "string"
+            },
+            {
+              "id": "python",
+              "name": "python",
+              "value": "python3",
+              "type": "string"
+            },
+            {
+              "id": "version",
+              "name": "version",
+              "value": "4",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "id": "config"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.jiraBaseUrl }}/rest/api/3/search/jql",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "jiraSoftwareCloudApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "jql",
+              "value": "={{ $('Config').first().json.jql }}"
+            },
+            {
+              "name": "fields",
+              "value": "updated"
+            },
+            {
+              "name": "maxResults",
+              "value": "100"
+            }
+          ]
+        }
+      },
+      "name": "Search Jira",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "search-jira"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "issues",
+        "options": {}
+      },
+      "name": "Split Issues",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ],
+      "id": "split-issues"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\n// remember (key -> updated) in workflow static data: process each issue once per edit\nconst seen = $getWorkflowStaticData('global').seen || {};\nconst v = $('Config').first().json.version;\nreturn $input.all().filter(i => seen[i.json.key] !== i.json.fields.updated + '|' + v);\n"
+      },
+      "name": "New Or Changed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "id": "new-or-changed"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.jiraBaseUrl }}/rest/api/3/issue/{{ $json.key }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "jiraSoftwareCloudApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "expand",
+              "value": "renderedFields"
+            },
+            {
+              "name": "fields",
+              "value": "summary,description,priority,parent,updated"
+            }
+          ]
+        }
+      },
+      "name": "Get Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        0
+      ],
+      "id": "get-issue"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst cfg = $('Config').first().json, f = $json.fields;\nconst input = { key: $json.key, summary: f.summary, html: ($json.renderedFields || {}).description || '',\n  lang: cfg.lang, parent: f.parent && f.parent.key, jira_priority: f.priority && f.priority.name };\nreturn { json: { key: $json.key, summary: f.summary, updated: f.updated,\n  inputB64: Buffer.from(JSON.stringify(input)).toString('base64') } };\n"
+      },
+      "name": "Build Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
+      ],
+      "id": "build-input"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "={{ \"echo \" + $json.inputB64 + \" | base64 -d | \" + $('Config').first().json.python + \" \\\"\" + $('Config').first().json.toolsDir + \"/jira2feature.py\\\"\" }}"
+      },
+      "name": "Convert",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        0
+      ],
+      "id": "convert"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst st = $('Build Input').item.json;\nlet r;\ntry { r = JSON.parse($json.stdout); } catch (e) { r = { feature: '', case: {}, warnings: ['convert failed: ' + ($json.stderr || e.message)] }; }\nreturn { json: { ...st, feature: r.feature, caseJson: JSON.stringify(r.case), warnings: r.warnings,\n  featureB64: Buffer.from(r.feature).toString('base64') } };\n"
+      },
+      "name": "Parse Convert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        0
+      ],
+      "id": "parse-convert"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "={{ \"echo \" + $json.featureB64 + \" | base64 -d | \\\"\" + $('Config').first().json.binDir + \"/lint\\\" -lang \" + $('Config').first().json.lang + \" -max-scenarios 1\" }}"
+      },
+      "name": "Lint",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        0
+      ],
+      "id": "lint"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst st = $('Parse Convert').item.json;\nlet r;\ntry { r = JSON.parse($json.stdout); } catch (e) { r = { ok: false, errors: ['lint output was not JSON'], needs_input: [] }; }\n// clean = parses, and nothing is missing or unresolved; otherwise a human looks at it in review/.\n// A priority mismatch is reported in the notes but does not block.\nconst blocking = st.warnings.filter(w => !/^priority conflict/.test(w));\nconst clean = r.ok && r.needs_input.length === 0 && blocking.length === 0;\nconst notes = [...r.errors.map(e => 'LINT: ' + e), ...r.needs_input, ...st.warnings].join('\\n');\nconst base = st.key + '_' + st.summary.normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^\\w.-]+/g, '_').slice(0, 60);\nconst b64 = s => Buffer.from(s).toString('base64');\nreturn { json: { key: st.key, updated: st.updated, clean, base, featureB64: st.featureB64,\n  caseB64: b64(st.caseJson), notesB64: notes ? b64(notes + '\\n') : '' } };\n"
+      },
+      "name": "Decide",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        0
+      ],
+      "id": "decide"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "={{ \"d=\\\"\" + $('Config').first().json.outDir + ($json.clean ? \"\" : \"/review\") + \"\\\"; mkdir -p \\\"$d\\\" && echo \" + $json.featureB64 + \" | base64 -d > \\\"$d/\" + $json.base + \".feature\\\" && echo \" + $json.caseB64 + \" | base64 -d > \\\"$d/\" + $json.base + \".case.json\\\"\" + ($json.notesB64 ? \" && echo \" + $json.notesB64 + \" | base64 -d > \\\"$d/\" + $json.base + \".notes.txt\\\"\" : \"\") + \" && echo \\\"$d/\" + $json.base + \".feature\\\"\" }}"
+      },
+      "name": "Save",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2420,
+        0
+      ],
+      "id": "save"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\n// only after a successful Save: a failed run is retried on the next poll\nconst sd = $getWorkflowStaticData('global');\nsd.seen = sd.seen || {};\nconst v = $('Config').first().json.version;\nfor (const d of $('Decide').all()) sd.seen[d.json.key] = d.json.updated + '|' + v;\nreturn $input.all();\n"
+      },
+      "name": "Remember",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        0
+      ],
+      "id": "remember"
+    },
+    {
+      "parameters": {
+        "executeOnce": true,
+        "command": "={{ $('Config').first().json.python + \" \\\"\" + $('Config').first().json.toolsDir + \"/resolve_refs.py\\\" --dir \\\"\" + $('Config').first().json.outDir + \"\\\" --lint \\\"\" + $('Config').first().json.binDir + \"/lint\\\" --lang \" + $('Config').first().json.lang }}"
+      },
+      "name": "Resolve References",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2860,
+        160
+      ],
+      "id": "resolve-references"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.jiraBaseUrl }}/rest/api/3/issue/{{ $('Decide').item.json.key }}/comment",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "jiraSoftwareCloudApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Gherkin generated: ' + ($('Decide').item.json.clean ? 'clean' : 'needs review') }] }] } }) }}"
+      },
+      "name": "Comment on Jira (off)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        0
+      ],
+      "id": "comment-on-jira-(off)",
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Search Jira",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Jira": {
+      "main": [
+        [
+          {
+            "node": "Split Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Issues": {
+      "main": [
+        [
+          {
+            "node": "New Or Changed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Or Changed": {
+      "main": [
+        [
+          {
+            "node": "Get Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Issue": {
+      "main": [
+        [
+          {
+            "node": "Build Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Input": {
+      "main": [
+        [
+          {
+            "node": "Convert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert": {
+      "main": [
+        [
+          {
+            "node": "Parse Convert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Convert": {
+      "main": [
+        [
+          {
+            "node": "Lint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lint": {
+      "main": [
+        [
+          {
+            "node": "Decide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide": {
+      "main": [
+        [
+          {
+            "node": "Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save": {
+      "main": [
+        [
+          {
+            "node": "Remember",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remember": {
+      "main": [
+        [
+          {
+            "node": "Resolve References",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Comment on Jira (off)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "id": "jira-gherkin"
+}

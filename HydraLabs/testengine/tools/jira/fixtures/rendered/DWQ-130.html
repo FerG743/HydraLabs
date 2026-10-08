@@ -1,0 +1,21 @@
+<ul>
+	<li><b>Preconditions:</b> Portal is deployed and reachable. The "Un vistazo a tus ordenes" table is empty.</li>
+	<li><b>Steps:</b>
+	<ol>
+		<li>Navigate to <tt>/cobro_ordenes</tt>.</li>
+		<li>Verify "Procesar" is disabled.</li>
+		<li>Enter order number <tt>9800074297</tt>.</li>
+		<li>Select store <tt>LIVR</tt>.</li>
+		<li>Click "Agregar".</li>
+		<li>Click "Procesar".</li>
+	</ol>
+	</li>
+	<li><b>Expected Result:</b>
+	<ul>
+		<li>"Procesar" is disabled before the order is added and enabled after.</li>
+		<li>After processing, the order appears in "Un vistazo a tus ordenes".</li>
+		<li>The "No hay resultados disponibles" empty state disappears.</li>
+	</ul>
+	</li>
+	<li><b>Pipeline gate:</b> Blocker. A failure here fails the build</li>
+</ul>

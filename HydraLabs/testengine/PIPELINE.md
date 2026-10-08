@@ -203,9 +203,9 @@ Source of truth is requirements, not code. If no requirements exist for a featur
 5. ~~Stability gate~~ **Done**: delivery runs the suite `stabilityRuns` times (default 3) in the real framework; a case is delivered only if it passes every run. A mix of pass and fail is reported as `flaky` and never reaches the repo.
 6. **Stage 0 design** from requirements; then **Loop B** and the mutation score.
 
-## Parked (not deleted)
+## Parked (not deleted; the retired ones live in `/deprecated`, see its README)
 
-The Tauri desktop app (a possible future HydraPloy/HydraLabs dashboard), Go block engine (`engine/`, `cmd/demo`), `uiagent` (vision planner), Gherkin output (`cmd/skeleton`, `cmd/lint`: valid, tested, optional spec only). Revisit when the slices above are done.
+The Tauri desktop app (a possible future HydraPloy/HydraLabs dashboard), `uiagent` (vision planner), Gherkin output (`cmd/skeleton`, `cmd/lint`: valid, tested, optional spec only). Revisit when the slices above are done.
 
 ## Open decisions
 

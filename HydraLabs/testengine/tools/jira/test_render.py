@@ -57,6 +57,35 @@ class OnlyTest(unittest.TestCase):
         self.assertTrue(report[0]["pending"])
 
 
+class ButtonStateTest(unittest.TestCase):
+    """DWQ-132's last expected result said the button returns to ENABLED; the portal clears the file after a failed upload, so
+    it is DISABLED until the user adds something again. Both wordings must map (the author decides which is right)."""
+
+    def render_with(self, text):
+        case = case_from_fixture("DWQ-132")
+        case["expected"][3]["text"] = text
+        with tempfile.TemporaryDirectory() as d:
+            for k, c in (("DWQ-130", case_from_fixture("DWQ-130")), ("DWQ-132", case)):
+                with open(os.path.join(d, k + ".case.json"), "w", encoding="utf-8") as f:
+                    json.dump(c, f)
+            out = os.path.join(d, "out")
+            r = subprocess.run([sys.executable, os.path.join(HERE, "render_pytest.py"), "--cases", d, "--only", "DWQ-132", "--app", "App", "--out", out],
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            return json.loads(r.stdout)[0], open(os.path.join(out, "tests", "App", "test_dwq_132.py"), encoding="utf-8").read()
+
+    def test_enabled_wording_still_maps_to_enabled(self):
+        rep, test = self.render_with("The button returns to the enabled state with no stuck spinner.")
+        self.assertEqual(rep["pending"], [])
+        self.assertIn("verificar_subir_y_procesar_enabled_flujo", test)
+
+    def test_disabled_wording_maps_to_disabled(self):
+        rep, test = self.render_with("The button returns to the disabled state with no stuck spinner.")
+        self.assertEqual(rep["pending"], [])
+        self.assertIn("verificar_subir_y_procesar_disabled_flujo", test)
+        self.assertNotIn("verificar_subir_y_procesar_enabled_flujo", test.split("def test_")[1])  # the check itself changed
+
+
 class RenderTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

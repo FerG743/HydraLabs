@@ -45,7 +45,7 @@ EXPECTED = [
     (r'^.*non-CSV file is rejected client-side and "(.+?)" stays (enabled|disabled)\.?$', "rejected_client"),
     (r'^.*\bat most (one|\d+) POST request.*$', "max_posts"),
     (r'^An error (?:toast|message|alert).* shown to the user\.?$', "error_shown"),
-    (r'^The button returns to the enabled state with no stuck spinner\.?$', "button_ready"),
+    (r'^The button returns to the (enabled|disabled) state with no stuck spinner\.?$', "button_ready"),
     (r'^Orders? .*\bappears?\b.*$', "numbers_visible"),
     (r'^No .*"(.+?)".* appears\.?$', "text_hidden"),
     (r'^The "(.+?)" .*disappears\.?$', "text_hidden"),
@@ -320,7 +320,7 @@ def build_expected(app, a, ctx):
     """Verifica que no quede un indicador de carga atascado."""
     expect(driver.page.locator(L.SPINNER).first).to_be_hidden()
     add_step("No hay indicador de carga atascado.", "Exitoso")''')
-            line = f"co.{state_flujo(app, ctx['last_button'], 'enabled')}(driver)\n    co.{m}(driver)"
+            line = f"co.{state_flujo(app, ctx['last_button'], g[0])}(driver)\n    co.{m}(driver)"  # g[0]: enabled | disabled, as the case says
         anchor = ctx["anchor_index"].get(ANCHORS.get(op)) if op in ANCHORS else None
         out.append((e, line, anchor))
     return out

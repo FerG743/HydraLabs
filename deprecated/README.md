@@ -13,12 +13,11 @@ Everything here is **not part of the HydraLabs pipeline** (`HydraLabs/testengine
 | Path | What it was | Why retired | Replaced by |
 |---|---|---|---|
 | `testengine/engine/`, `testengine/cmd/demo/` | A Go block-graph engine (blocks, rules, an interpreter) and its demo runner (`login_then_buy.json`) | Never part of the Jira → test pipeline; the pipeline needed no engine | `cmd/hydra` (the router) and the tiers in PIPELINE.md |
+| `testengine/web/` (`testengine-canvas`), `testengine/examples/` | A React Flow canvas for drawing block graphs for that engine (its catalog mirrored the engine's `BlockMeta` and it exported the JSON the engine consumed), and the sample graph the demo used (a byte-identical copy of the demo's) | Only existed to serve the engine; nothing referenced them | n/a |
 
 Code here is **not built** with the pipeline: it lives outside the `testengine` Go module, so its imports (e.g. `testengine/engine`) do not resolve from this folder. To revive something, move it back with `git mv` first.
 
 ## Candidates (not moved; dependencies checked)
-
-PIPELINE.md lists these as "parked". Also worth a look, related to the block engine but not moved: `testengine/examples/login_then_buy.json` (the same sample the demo used) and `testengine/web/` (a small Vite UI; I did not check what it shows).
 
 PIPELINE.md lists these as "parked". Moving each one needs the dependency on the right resolved first.
 

@@ -86,6 +86,34 @@ class ButtonStateTest(unittest.TestCase):
         self.assertNotIn("verificar_subir_y_procesar_enabled_flujo", test.split("def test_")[1])  # the check itself changed
 
 
+class AppSlugTest(unittest.TestCase):
+    def test_matches_the_go_side(self):  # Go names the files it reads back; a mismatch loses the locators file
+        import render_pytest
+        self.assertEqual([render_pytest.app_slug(a) for a in ("CobroOrdenes", "PortalQA", "Toolshop", "QAPortal2Go")],
+                         ["cobro_ordenes", "portal_qa", "toolshop", "qaportal2_go"])
+
+
+class StateAfterWithoutClickTest(unittest.TestCase):
+    """"X is disabled before ... and enabled after" when the case never clicks X: the "after" check ends the test."""
+
+    def test_after_is_checked_at_the_end(self):
+        case = {"id": "DEMO-1", "name": "TC-1 - Add only", "language": "en", "precondition": "",
+                "steps": [{"n": "1", "action": "Navigate to `/cobro_ordenes`."}, {"n": "2", "action": "Enter order number `98`."},
+                          {"n": "3", "action": 'Click "Agregar".'}],
+                "expected": [{"text": '"Procesar" is disabled before the order is added and enabled after.'}]}
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "cases"))
+            with open(os.path.join(d, "cases", "DEMO-1.case.json"), "w") as f:
+                json.dump(case, f)
+            report = json.loads(subprocess.check_output([sys.executable, os.path.join(HERE, "render_pytest.py"),
+                                                         "--cases", os.path.join(d, "cases"), "--app", "App", "--out", d]))
+            test = open(os.path.join(d, "tests", "App", "test_demo_1.py"), encoding="utf-8").read()
+        self.assertEqual((report[0]["expected_asserted"], report[0]["expected"]), (1, 1))
+        body = test.split("def test_")[1]
+        self.assertLess(body.index("verificar_procesar_disabled_flujo"), body.index("capturar_order_number_flujo"))
+        self.assertGreater(body.index("verificar_procesar_enabled_flujo"), body.index("hacer_clic_agregar_flujo"))
+
+
 class RenderTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -135,6 +163,7 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(by["DWQ-131"]["steps_mapped"], 5)
         self.assertEqual((by["DWQ-132"]["steps_mapped"], by["DWQ-132"]["pending"]), (5, []))
         self.assertEqual((by["DWQ-132"]["expected_asserted"], by["DWQ-132"]["expected"]), (5, 5))
+        self.assertEqual((by["DWQ-130"]["expected_asserted"], by["DWQ-130"]["expected"]), (3, 3))
         for rel in ("apps/CobroOrdenes/data/dwq_130_data.csv", "apps/CobroOrdenes/data/expected_result.csv",
                     "apps/CobroOrdenes/locators/cobro_ordenes_locators.py", "apps/CobroOrdenes/modules/cobro_ordenes_module.py",
                     "tests/CobroOrdenes/test_dwq_130.py", "utils/test_files.py", "utils/network_mock.py"):
@@ -154,6 +183,15 @@ class RenderTest(unittest.TestCase):
                          ['role=button[name="Agregar"]', 'role=button[name="Procesar"]'])
         page.locator.assert_any_call('role=button[name="Procesar"]')  # the is_disabled check on step 2
         driver.delete_all_cookies.assert_called_once()
+
+        # "disabled before ... and enabled after": is_enabled is checked after Agregar and before Procesar is clicked;
+        # "the order appears in <section>": the order number is looked up after the section title, not page-wide
+        # (the portal's sample-CSV card shows the same numbers, so a page-wide check always passes)
+        seq = [c[0] for c in page.mock_calls if c[0] in ("click", "locator().is_enabled", "locator().is_disabled")]
+        self.assertEqual(seq, ["locator().is_disabled", "locator().is_disabled", "click", "locator().is_enabled", "click"])
+        xp = [c.args[0] for c in page.locator.call_args_list if "following::" in c.args[0]]
+        self.assertEqual(xp, ['xpath=//*[normalize-space(text())="Un vistazo a tus ordenes"]'
+                              '/following::*[normalize-space(text())="9800074297"]'])
 
     def test_dwq_131_downloads_then_uploads_that_file(self):
         driver = mock.MagicMock()

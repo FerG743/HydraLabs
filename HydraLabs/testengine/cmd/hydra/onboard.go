@@ -23,8 +23,9 @@ type ProjectEntry struct {
 }
 
 type Registry struct {
-	ReposRoot string                  `json:"reposRoot"` // where repos live; default: the folder that holds this one
-	Template  string                  `json:"template"`  // the framework template, relative to the registry file
+	ReposRoot string                  `json:"reposRoot"`         // where repos live; default: the folder that holds this one
+	Template  string                  `json:"template"`          // the framework template, relative to the registry file
+	Model     int                     `json:"modelCasesPerPoll"` // cases that need the model per poll (default 1); the rest wait
 	Projects  map[string]ProjectEntry `json:"projects"`
 	dir       string
 }
@@ -42,6 +43,13 @@ func LoadRegistry(path string) (*Registry, error) {
 		r.ReposRoot = "~/Documents/GitHub"
 	}
 	return r, nil
+}
+
+func (r *Registry) ModelCases() int {
+	if r.Model < 1 {
+		return 1
+	}
+	return r.Model
 }
 
 func (r *Registry) abs(p string) string {
@@ -98,12 +106,13 @@ func (r *Registry) Onboard(project string, c *Config) (Onboarding, error) {
 		if entries, _ := os.ReadDir(o.Repo); len(entries) > 0 && !fileExists(filepath.Join(o.Repo, ".git")) {
 			return o, fmt.Errorf("%s exists and is not a Hydra repo: refusing to write into it", o.Repo)
 		}
-		if err := r.scaffold(o.Repo, e.App); err != nil {
+		if err := r.scaffold(o.Repo, e.App, c.BaseBranch); err != nil {
 			return o, err
 		}
 		o.Created = true
 	}
 
+	ensureIgnored(o.Repo)
 	profile := r.abs(e.Profile)
 	if !fileExists(profile) {
 		if err := writeJSON(profile, defaultProfile(project, e.App)); err != nil {
@@ -115,16 +124,23 @@ func (r *Registry) Onboard(project string, c *Config) (Onboarding, error) {
 	switch {
 	case c.PortalURL == "":
 		o.Gate = "set baseUrl in " + profile + " (the URL of the app under test)"
-	case !fileExists(c.crawlPath()):
+	case !fileExists(c.crawlPath()) && c.hasAddon("labs"):
 		if err := c.Crawl("", false); err != nil { // stage 2, once per app
 			o.Gate = "the first crawl of " + c.PortalURL + " failed (is the app up, VPN on?): " + err.Error()
+		} else if c.StoreCrawl {
+			if _, err := c.SaveCrawl(); err != nil {
+				o.Gate = "the crawl worked but could not be stored in " + o.Repo + ": " + err.Error()
+			}
 		}
 	}
 	return o, nil
 }
 
 // scaffold: framework template -> new repo, app placeholders replaced, one baseline commit.
-func (r *Registry) scaffold(repo, app string) error {
+func (r *Registry) scaffold(repo, app, base string) error {
+	if base == "" {
+		base = "main"
+	}
 	tpl := r.abs(r.Template)
 	if !fileExists(filepath.Join(tpl, "conftest.py")) {
 		return fmt.Errorf("framework template not found at %s", tpl)
@@ -146,7 +162,7 @@ func (r *Registry) scaffold(repo, app string) error {
 			return err
 		}
 	}
-	if out, err := exec.Command("git", "-C", repo, "init", "-q", "-b", "main").CombinedOutput(); err != nil {
+	if out, err := exec.Command("git", "-C", repo, "init", "-q", "-b", base).CombinedOutput(); err != nil {
 		return fmt.Errorf("git init: %v: %s", err, out)
 	}
 	if _, err := git(repo, "add", "-A"); err != nil {

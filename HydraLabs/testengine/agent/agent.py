@@ -250,6 +250,7 @@ if __name__ == "__main__":
     ap.add_argument("--max-turns", type=int, default=40)
     ap.add_argument("--effort", default="none")
     ap.add_argument("--map", default="", help="appmap/<App>.crawl.json: the crawl, given to the model so it does not re-explore")
+    ap.add_argument("--log-dir", default="", help="where the transcript of this run goes (default: agent/runs); hydra points it into the app's repo")
     ap.add_argument("--max-tokens", type=int, default=0, help="hard cap on tokens for this case (0 = none)")
     ap.add_argument("--notes", default="", help="knowledge/<App>.md: peculiarities of the app, given to the model")
     a = ap.parse_args()
@@ -258,8 +259,9 @@ if __name__ == "__main__":
         sys.exit(f"{a.model} está cargado con contexto {ctx}: el agente necesita al menos 24000 (recomendado 32768). Recárgalo en LM Studio.")
     with open(a.case, encoding="utf-8") as f:
         case = json.load(f)
-    os.makedirs(os.path.join(HERE, "runs"), exist_ok=True)
-    log = os.path.join(HERE, "runs", f"{case['id']}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl")
+    log_dir = a.log_dir or os.path.join(HERE, "runs")
+    os.makedirs(log_dir, exist_ok=True)
+    log = os.path.join(log_dir, f"{case['id']}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl")
     res = run(case, os.path.expanduser(a.repo), a.app, a.base_url, a.model, a.lm_url, a.max_turns, a.effort, ctx_tokens=ctx or 32000, log_path=log,
               notes=open(a.notes, encoding="utf-8").read() if a.notes else "",
               app_map=map_summary(a.map) if a.map else "", max_tokens=a.max_tokens)

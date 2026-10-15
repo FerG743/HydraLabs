@@ -19,3 +19,6 @@ allure-results/
 .DS_Store
 .playwright-mcp/
 x/
+
+# HydraPloy working files (run records, bundles, crawl screenshots/video, state): never committed
+hydra/out/

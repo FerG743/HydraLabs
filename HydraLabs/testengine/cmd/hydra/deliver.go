@@ -51,6 +51,17 @@ func expand(p string) string {
 	return p
 }
 
+// uniqueBranch: branch names carry a timestamp, but two runs in the same second must not collide.
+func uniqueBranch(repo, name string) string {
+	candidate := name
+	for i := 2; ; i++ {
+		if _, err := git(repo, "rev-parse", "--verify", "-q", "refs/heads/"+candidate); err != nil {
+			return candidate
+		}
+		candidate = fmt.Sprintf("%s-%d", name, i)
+	}
+}
+
 func git(repo string, args ...string) (string, error) {
 	cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
 	var out, errb bytes.Buffer
@@ -189,6 +200,7 @@ func (c Config) Deliver(only []string, exclude map[string]bool) (d Delivery, err
 	if !fileExists(filepath.Join(repo, ".git")) {
 		return d, fmt.Errorf("%s is not a repo yet: run hydra onboard --project <KEY> first", repo)
 	}
+	ensureIgnored(repo)
 	if st, e := git(repo, "status", "--porcelain"); e != nil || st != "" {
 		return d, fmt.Errorf("the delivery repo must be clean before delivering (git status --porcelain: %q %v)", st, e)
 	}
@@ -200,10 +212,16 @@ func (c Config) Deliver(only []string, exclude map[string]bool) (d Delivery, err
 		return d, fmt.Errorf("no passing cases to deliver (%v)", err)
 	}
 
+	// --only picks what is delivered, but the render needs every passing case: the shared module/locators are
+	// the union, and rendering a subset would drop functions the tests already on main still call.
+	all, err := c.passedKeys(nil, exclude)
+	if err != nil {
+		return d, err
+	}
 	stamp := time.Now().Format("20060102-150405")
 	work := filepath.Join(c.Out, "deliver", stamp)
 	stage, render := filepath.Join(work, "cases"), filepath.Join(work, "render")
-	for _, k := range keys {
+	for _, k := range all {
 		b, e := os.ReadFile(filepath.Join(c.caseDir(), k+".case.json"))
 		if e != nil {
 			return d, e
@@ -215,7 +233,7 @@ func (c Config) Deliver(only []string, exclude map[string]bool) (d Delivery, err
 		return d, err
 	}
 
-	d.Branch = fmt.Sprintf("hydra/%s-%s", appSlug(c.App), stamp)
+	d.Branch = uniqueBranch(repo, fmt.Sprintf("hydra/%s-%s", appSlug(c.App), stamp))
 	if _, err = git(repo, "checkout", "-q", "-b", d.Branch, base); err != nil {
 		return d, err
 	}
@@ -230,6 +248,11 @@ func (c Config) Deliver(only []string, exclude map[string]bool) (d Delivery, err
 			restore()
 			return d, err
 		}
+	}
+	durable, err := c.stageDurable(repo, keys) // learned locators + the Jira text of each case ride with the delivery
+	if err != nil {
+		restore()
+		return d, err
 	}
 	note, err := registerSuite(filepath.Join(repo, "runner_central.py"), c.App)
 	if err != nil {
@@ -253,6 +276,17 @@ func (c Config) Deliver(only []string, exclude map[string]bool) (d Delivery, err
 			break
 		}
 		results = append(results, got)
+		// every case the framework ran is an execution, not only the ones being delivered; the run used the branch
+		// tip plus the files being delivered
+		base, _ := git(repo, "rev-parse", "--short", "HEAD")
+		for k, o := range got {
+			e := Execution{Command: "deliver", Key: k, Status: o.Status, Attempt: i, Of: runs, TestVersion: base + "+delivery",
+				Artifacts: []string{logPath, filepath.Join(work, fmt.Sprintf("junit-%d.xml", i))}}
+			if o.Detail != "" {
+				e.Detail = []string{o.Detail}
+			}
+			c.logExecution(e)
+		}
 		if !allPassed(keys, got) {
 			break
 		}
@@ -280,7 +314,7 @@ func (c Config) Deliver(only []string, exclude map[string]bool) (d Delivery, err
 		d.Branch = ""
 		return d, c.recordDelivery(d, stamp)
 	}
-	if _, err = git(repo, "add", "apps", "tests", "utils", "runner_central.py"); err != nil {
+	if _, err = git(repo, append([]string{"add", "apps", "tests", "utils", "runner_central.py"}, durable...)...); err != nil {
 		restore()
 		return d, err
 	}
@@ -309,7 +343,9 @@ func tail(s string, n int) string {
 // runPytest runs the generated suite once in the real framework and returns each case's result.
 // pytest runs from inside the repo, so every path handed to it must be absolute.
 func (c Config) runPytest(repo, work string, n int) (map[string]CaseOutcome, string, error) {
-	agentDir, _ := filepath.Abs(filepath.Dir(expand(c.Agent)))
+	// the read-only guard (agent/hydra_guard.py) is pipeline code next to tools/, not part of the model tier: it must
+	// load whether or not a model is configured
+	agentDir, _ := filepath.Abs(filepath.Join(c.ToolsDir, "..", "..", "agent"))
 	junit, _ := filepath.Abs(filepath.Join(work, fmt.Sprintf("junit-%d.xml", n)))
 	logPath := filepath.Join(work, fmt.Sprintf("pytest-%d.log", n))
 	cmd := exec.Command(c.Python, "-m", "pytest", "tests/"+c.App, "-p", "hydra_guard", "-v", "--tb=short", "--junitxml="+junit)

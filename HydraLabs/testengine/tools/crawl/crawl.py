@@ -9,7 +9,7 @@ and clicks are limited to --safe-clicks (open a combobox/tab to record its optio
 login are never written to events or output (they come from ENV: tokens, same convention as the framework's CSVs).
 
     python3 crawl.py --base-url http://host:3000 --out appmap/App.crawl.json --events out/crawl/events.jsonl \
-        [--paths /cobro_ordenes,/ordenes] [--max-pages 25] [--safe-clicks] [--headed] [--slow 150] [--login login.json] [--env-file .env]
+        [--paths /cobro_ordenes,/ordenes] [--max-pages 25] [--safe-clicks] [--headed] [--slow 150] [--video DIR] [--login login.json] [--env-file .env]
 
 --slow MS reveals the found elements one at a time (boxes + locator labels, colored by quality) for showing people; the viewer is
 `hydra crawl --watch :8099`, and --headed also shows the real browser scrolling along.
@@ -22,6 +22,7 @@ from urllib.parse import urljoin, urlparse, urldefrag
 from playwright.sync_api import sync_playwright
 
 AVOID = re.compile(r"logout|log-out|signout|sign-out|salir|cerrar.?sesi|delete|eliminar|borrar|remove", re.I)
+GENERATED_PART = re.compile(r"[0-9A-Z]{20,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}|\d{5,}")  # ULID, UUID, db ids in a testid
 UNSTABLE_ID = re.compile(r"^(radix-|:r|react-|headlessui-|mui-|\d)|\d{4,}")  # generated ids change between loads
 
 EXTRACT = """() => {
@@ -56,12 +57,14 @@ EXTRACT = """() => {
 
 def best_locator(el):
     """Framework priority: data-testid, then a stable id, then role+accessible name, then a CSS fallback."""
-    if el["testid"]:
+    if el["testid"] and not GENERATED_PART.search(el["testid"]):
         return f'[data-testid="{el["testid"]}"]', "testid", True
     if el["id"] and not UNSTABLE_ID.search(el["id"]):
         return f'#{el["id"]}', "id", True
     if el["role"] and el["name"]:
         return f'role={el["role"]}[name="{el["name"].replace(chr(34), chr(92) + chr(34))}"]', "role+name", True
+    if el["testid"]:  # only a testid with a record id in it: works here, not after a data reset or in another environment
+        return f'[data-testid="{el["testid"]}"]', "testid", False
     css = el["tag"] + (f'[type="{el["type"]}"]' if el["type"] else "")
     return css, "css-fallback", False  # not unique and not meaningful: flagged so nobody trusts it blindly
 
@@ -153,10 +156,25 @@ def crawl(a):
     seen, pages = set(), []
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=not a.headed)
-        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        # --video: Playwright records the crawler's own browser (scrolling, boxes appearing with --slow); saved when the context closes
+        context = browser.new_context(viewport={"width": 1280, "height": 800},
+                                      **({"record_video_dir": a.video, "record_video_size": {"width": 1280, "height": 800}} if a.video else {}))
+        page = context.new_page()
         page.route("**/*", lambda route, req: route.continue_() if req.method == "GET" else route.abort())
+
+        def settle(url=None):
+            # DOM ready is required; network quiet is best effort: a third-party tracker that never answers
+            # (e.g. an analytics beacon blocked on this network) must not cost the whole page
+            if url:
+                page.goto(url, wait_until="domcontentloaded", timeout=20000)
+            try:
+                page.wait_for_load_state("networkidle", timeout=5000)
+                return True
+            except Exception:
+                return False  # mapped anyway, but the page says so: content loaded by those requests may be missing
+
         if a.login:
-            page.goto(base + (a.login_path or "/"), wait_until="networkidle")
+            settle(base + (a.login_path or "/"))
             for step in json.load(open(a.login, encoding="utf-8")):
                 if "fill" in step:
                     page.fill(step["fill"], resolve_env(step["value"]))
@@ -164,14 +182,14 @@ def crawl(a):
                 else:
                     page.click(step["click"])
                     ev.emit("login", action="click", selector=step["click"])
-            page.wait_for_load_state("networkidle")
+            settle()
         while queue and len(pages) < a.max_pages:
             url = urldefrag(queue.pop(0))[0]
             if url in seen:
                 continue
             seen.add(url)
             try:
-                page.goto(url, wait_until="networkidle", timeout=20000)
+                settled = settle(url)
             except Exception as e:
                 ev.emit("error", url=url, text=f"{type(e).__name__}")
                 continue
@@ -198,12 +216,12 @@ def crawl(a):
             page.evaluate("() => document.querySelectorAll('.__hydra').forEach(e => e.remove())")
             for el in els:
                 el.pop("rect", None)  # positions are for the picture only; the map stays compact
-            pages.append({"url": page.url, "title": page.title(), "hash": sig, "shot": shot, "elements": els,
+            pages.append({"url": page.url, "title": page.title(), "hash": sig, "shot": shot, "settled": settled, "elements": els,
                           "headings": [h.strip() for h in page.locator("h1,h2,h3").all_inner_texts() if h.strip()][:10]})
             by = {}
             for el in els:
                 by[el["strategy"]] = by.get(el["strategy"], 0) + 1
-            ev.emit("page", url=page.url, title=page.title(), elements=len(els), strategies=by, shot=shot)
+            ev.emit("page", url=page.url, title=page.title(), elements=len(els), strategies=by, shot=shot, settled=settled)
             for el in els:
                 if el["href"] and not AVOID.search(el["href"] + " " + el["name"]):
                     nxt = urldefrag(urljoin(page.url, el["href"]))[0]
@@ -211,7 +229,14 @@ def crawl(a):
                         queue.append(nxt)
                 elif el["href"]:
                     ev.emit("skip", url=el["href"], text="looks destructive or leaves the session; not followed")
+        video = page.video.path() if a.video else None
+        context.close()  # flushes the recording
         browser.close()
+    if video:
+        os.makedirs(a.video, exist_ok=True)
+        final = os.path.join(a.video, time.strftime("crawl-%Y%m%d-%H%M%S.webm"))
+        os.replace(video, final)
+        ev.emit("video", path=final, mb=round(os.path.getsize(final) / 1e6, 1))
     out = {"baseUrl": base, "crawledAt": time.strftime("%Y-%m-%dT%H:%M:%S"), "readOnly": True, "pages": pages}
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     json.dump(out, open(a.out, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
@@ -230,6 +255,7 @@ if __name__ == "__main__":
     ap.add_argument("--max-pages", type=int, default=25)
     ap.add_argument("--safe-clicks", action="store_true")
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument("--video", default="", metavar="DIR", help="record the crawl as a .webm video into DIR")
     ap.add_argument("--slow", type=int, default=0, metavar="MS", help="reveal elements one at a time, MS apart (for showing people)")
     ap.add_argument("--login", default="")
     ap.add_argument("--login-path", default="")

@@ -311,8 +311,10 @@ def driver(request, _shared_playwright_session):
 
     # ── Limpieza entre tests (sin cerrar browser/context) ──
     try:
+        # la página es compartida: un job id u otro estado en storage del test anterior cambiaría la UI del siguiente
+        page.evaluate("() => { try { localStorage.clear(); sessionStorage.clear(); } catch (e) {} }")
         context.clear_cookies()
-        logger.info("[*] Cookies del contexto de Playwright eliminadas con éxito al finalizar el test.")
+        logger.info("[*] Cookies y storage del contexto de Playwright eliminados con éxito al finalizar el test.")
     except Exception as e:
         logger.error(f"[-] Error al eliminar cookies al finalizar el test: {e}")
 

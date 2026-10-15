@@ -42,20 +42,29 @@ type Config struct {
 	Crawler       string              `json:"crawler"` // path to tools/crawl/crawl.py
 	Paths         []string            `json:"paths"`   // entry paths for the crawl
 	MaxPages      int                 `json:"maxPages"`
+	Home          string              `json:"-"` // the app's own repo (Hydra-<App>); its hydra/ folder holds everything produced for the app
 	Project       string              `json:"-"` // the registered Jira project this run is for
 	Registry      *Registry           `json:"-"`
 	StabilityRuns int                 `json:"stabilityRuns"` // consecutive real-framework passes a case needs before it is delivered (default 3)
 	DeliverRepo   string              `json:"deliverRepo"`   // the framework repo that receives verified tests on review branches
 	BaseBranch    string              `json:"baseBranch"`
-	SlowMS        int                 `json:"slowMs"`     // crawl: reveal elements one at a time, this many ms apart (0 = as fast as possible)
-	SafeClicks    bool                `json:"safeClicks"` // open comboboxes/tabs to record their options (never selects or submits)
-	LoginFile     string              `json:"loginFile"`  // steps whose values are ENV: tokens, same convention as the framework CSVs
+	StoreCrawl    bool                `json:"storeCrawl"`  // crawl: also put the result in the app's own repo, on a review branch
+	RecordVideo   bool                `json:"recordVideo"` // crawl: save a .webm of the crawler's browser under out/crawl/videos
+	SlowMS        int                 `json:"slowMs"`      // crawl: reveal elements one at a time, this many ms apart (0 = as fast as possible)
+	SafeClicks    bool                `json:"safeClicks"`  // open comboboxes/tabs to record their options (never selects or submits)
+	LoginFile     string              `json:"loginFile"`   // steps whose values are ENV: tokens, same convention as the framework CSVs
 	LoginPath     string              `json:"loginPath"`
 	EnvFile       string              `json:"envFile"`        // the framework's .env; the pipeline reads it only to resolve ENV: tokens
 	Synonyms      map[string][]string `json:"synonyms"`       // extra word pairs for this app, e.g. {"order": ["remesa"]}
 	Knowledge     string              `json:"knowledge"`      // dir with <App>.md: what is peculiar about each application
 	JiraComments  bool                `json:"jiraComments"`   // post every outcome that needs a person (off until results are trusted)
 	ChatWebhook   string              `json:"chatWebhookEnv"` // NAME of the env var holding the Google Chat webhook URL
+	Command       string              `json:"-"`              // the hydra command running (run | poll | deliver), for the execution log
+	Trigger       string              `json:"-"`              // --trigger: why it ran (deploy, nightly...); default: the command
+	AppVersion    string              `json:"-"`              // --app-version: the build under test, if the caller knows it
+	Quiet         bool                `json:"-"`              // crawl without streaming every element (init's preview)
+	Addons        []string            `json:"addons"`         // enabled add-ons (ploy, labs...); empty = all, as before add-ons existed
+	Remote        string              `json:"remote"`         // the test repo's remote URL, when it has one
 }
 
 type Run struct {
@@ -132,8 +141,19 @@ func (c Config) Route(key, intent string) (r Run) {
 	defer func() {
 		r.Millis = time.Since(t0).Milliseconds()
 		writeJSON(filepath.Join(c.Out, "runs", key+".json"), r)
+		if r.Status != "deferred" { // a deferred case did not execute: the next poll records it
+			c.logExecution(Execution{Key: key, Intent: intent, Tier: r.Tier, Status: r.Status, Detail: r.Detail, Millis: r.Millis, Tokens: r.Tokens})
+		}
 	}()
 
+	if err := c.requireHome(); err != nil {
+		r.Tier, r.Status, r.Detail = "T0-onboarding", "needs-onboarding", []string{err.Error()}
+		return r
+	}
+	if intent == "automate" && !c.hasAddon("labs") { // building a test is Labs' job; Ploy alone only runs stored ones
+		r.Tier, r.Status, r.Detail = "T0-addons", "needs-review", []string{"automating a case needs the labs add-on, which is not enabled for " + c.App}
+		return r
+	}
 	if intent == "execute" {
 		if _, err := os.Stat(filepath.Join(c.bundleDir(key), "tests")); err == nil {
 			r.Tier = "T0-existing"
@@ -210,7 +230,8 @@ func (c Config) escalate(cs *Case, r Run) Run {
 	if c.MaxTokens > 0 {
 		args = append(args, "--max-tokens", fmt.Sprint(c.MaxTokens))
 	}
-	if notes := filepath.Join(c.Knowledge, c.App+".md"); fileExists(notes) {
+	args = append(args, "--log-dir", filepath.Join(c.Out, "agent-runs"))
+	if notes := c.notesPath(); fileExists(notes) {
 		args = append(args, "--notes", notes) // the app's known quirks go to the model; they are never rediscovered
 	}
 	if c.LMURL != "" {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -31,6 +33,7 @@ h1{font-size:16px;margin:0 0 8px}img{max-width:100%;border:1px solid #8884;borde
 function row(e){const d=document.createElement('div');d.className='e '+e.kind;
 if(e.kind=='page'){pages++;els+=e.elements;d.innerHTML='<b>'+e.title+'</b> <small>'+e.url+'</small><br>'+e.elements+' elements '+JSON.stringify(e.strategies);
 im.src='/shots/'+e.shot+'?'+n;cap.innerHTML='<b>'+e.url+'</b>';live.innerHTML='';pb.style.width='0'}
+else if(e.kind=='video'){d.innerHTML='Video saved: <a href="/videos/'+e.path.split('/').pop()+'" target=_blank>'+e.path.split('/').pop()+'</a> ('+e.mb+' MB)'}
 else if(e.kind=='done'){d.textContent='Done: '+e.pages+' pages, '+e.elements+' elements, '+e.weak+' weak locators'}
 else d.textContent=e.kind+': '+(e.text||e.url||e.action||'');return d}
 async function tick(){try{const t=await (await fetch('/events?from='+n)).text();
@@ -59,9 +62,12 @@ func Serve(addr, eventsFile string) error {
 			}
 		}
 	})
+	mux.Handle("/videos/", http.StripPrefix("/videos/", http.FileServer(http.Dir(filepath.Join(filepath.Dir(eventsFile), "videos")))))
 	mux.Handle("/shots/", http.StripPrefix("/shots/", http.FileServer(http.Dir(filepath.Join(filepath.Dir(eventsFile), "shots")))))
 	return http.ListenAndServe(addr, mux)
 }
+
+func (c Config) videoDir() string { return filepath.Join(c.Out, "crawl", "videos") }
 
 func (c Config) crawlArgs(events, out string, headed bool) []string {
 	args := []string{c.Crawler, "--base-url", c.PortalURL, "--out", out, "--events", events, "--max-pages", strconv.Itoa(c.MaxPages)}
@@ -73,6 +79,9 @@ func (c Config) crawlArgs(events, out string, headed bool) []string {
 	}
 	if headed {
 		args = append(args, "--headed")
+	}
+	if c.RecordVideo {
+		args = append(args, "--video", c.videoDir())
 	}
 	if c.SlowMS > 0 {
 		args = append(args, "--slow", strconv.Itoa(c.SlowMS))
@@ -99,6 +108,9 @@ func join(s []string) string {
 
 // Crawl runs the read-only crawler; the result is appmap/<App>.crawl.json.
 func (c Config) Crawl(watch string, headed bool) error {
+	if err := c.requireHome(); err != nil {
+		return err
+	}
 	dir := filepath.Join(c.Out, "crawl")
 	os.MkdirAll(filepath.Join(dir, "shots"), 0o755)
 	events, out := filepath.Join(dir, "events.jsonl"), filepath.Join(c.AppMap, c.App+".crawl.json")
@@ -111,10 +123,20 @@ func (c Config) Crawl(watch string, headed bool) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	cmd := exec.CommandContext(ctx, c.Python, c.crawlArgs(events, out, headed)...)
+	var quiet bytes.Buffer
 	cmd.Stderr = os.Stderr
+	if c.Quiet { // the live element stream is noise here; kept only to explain a failure
+		cmd.Stderr = &quiet
+	}
 	if err := cmd.Run(); err != nil {
+		if tail := strings.TrimSpace(quiet.String()); tail != "" {
+			lines := strings.Split(tail, "\n")
+			return fmt.Errorf("crawl failed: %w: %s", err, lines[len(lines)-1])
+		}
 		return fmt.Errorf("crawl failed: %w", err)
 	}
-	fmt.Println("app map:", out)
+	if !c.Quiet {
+		fmt.Println("app map:", out)
+	}
 	return nil
 }

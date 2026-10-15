@@ -11,10 +11,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"sort"
 	"strings"
 	"syscall"
 )
@@ -22,8 +20,9 @@ import (
 // cfgFlags: defaults, then the --profile file, then explicit flags. A new web app is a new profile file, not new code.
 func cfgFlags(fs *flag.FlagSet, args []string) (*Config, error) {
 	here, _ := os.Getwd()
-	c := &Config{Out: filepath.Join(here, "out", "hydra"), ToolsDir: filepath.Join(here, "tools", "jira"),
-		AppMap: filepath.Join(here, "tools", "jira", "appmap"), Python: "python3", Lang: "en", MaxTurns: 25,
+	defOut, defAppMap := filepath.Join(here, "out", "hydra"), filepath.Join(here, "tools", "jira", "appmap")
+	c := &Config{Out: defOut, ToolsDir: filepath.Join(here, "tools", "jira"),
+		AppMap: defAppMap, Python: "python3", Lang: "en", MaxTurns: 25,
 		LMURL: "http://127.0.0.1:1234/v1", MaxPages: 25, BaseBranch: "main", StabilityRuns: 3, Crawler: filepath.Join(here, "tools", "crawl", "crawl.py"), Knowledge: filepath.Join(here, "knowledge"), JQL: `labels in ("automate", "execute") ORDER BY key ASC`} // "execute" is a reserved JQL word: it must be quoted
 	profilePath, project := argValue(args, "profile"), argValue(args, "project")
 	regPath := argValue(args, "registry")
@@ -63,6 +62,11 @@ func cfgFlags(fs *flag.FlagSet, args []string) (*Config, error) {
 	if c.DeliverRepo == "" && c.Registry != nil && c.App != "" {
 		c.DeliverRepo = c.Registry.RepoPath(c.App) // every app delivers to its own Hydra-<App> repo
 	}
+	if c.Registry != nil && c.App != "" {
+		c.Home = expand(c.DeliverRepo) // ...and keeps everything it produces there too
+		c.applyHome(defOut, defAppMap)
+		c.seedWorking()
+	}
 	fs.String("profile", "", "project profile JSON (profiles/<name>.json)")
 	fs.String("project", "", "registered Jira project key (projects.json): the profile and the repo follow from it")
 	fs.String("registry", "", "projects.json (default: next to the binary's working dir)")
@@ -80,6 +84,8 @@ func cfgFlags(fs *flag.FlagSet, args []string) (*Config, error) {
 	fs.StringVar(&c.EnvFile, "env-file", c.EnvFile, "the framework's .env, to resolve ENV: tokens")
 	fs.BoolVar(&c.SafeClicks, "safe-clicks", c.SafeClicks, "crawl: open comboboxes/tabs to record options")
 	fs.BoolVar(&c.AllowWrites, "allow-writes", c.AllowWrites, "let tests send real writes (default: read-only safety net)")
+	fs.StringVar(&c.Trigger, "trigger", "", "why this run happens, kept in the execution log (deploy, nightly...; default: the command)")
+	fs.StringVar(&c.AppVersion, "app-version", "", "the build under test (commit, tag, deploy id), kept in the execution log")
 	return c, nil
 }
 
@@ -97,9 +103,9 @@ func argValue(args []string, name string) string {
 	return ""
 }
 
-// pollAll: with a registry and no --project, poll every registered project (or the one a --only key belongs to),
-// each in its own process so a failing project cannot stop the others.
-func pollAll(args []string) (handled bool, code int) {
+// pollMulti: with a registry and no --project/--profile, one pass over every registered project (or the one a
+// --only key belongs to) through a single queue, so the cheap work of every project goes first.
+func pollMulti(args []string) (handled bool, code int) {
 	if argValue(args, "project") != "" || argValue(args, "profile") != "" {
 		return false, 0
 	}
@@ -112,20 +118,44 @@ func pollAll(args []string) (handled bool, code int) {
 	if err != nil {
 		return false, 0
 	}
+	fs := flag.NewFlagSet("poll", flag.ExitOnError)
+	fs.String("registry", "", "")
+	only, intent := fs.String("only", "", ""), fs.String("intent", "", "")
+	force, asJSON := fs.Bool("force", false, ""), fs.Bool("json", false, "")
+	modelCases := fs.Int("model-cases", reg.ModelCases(), "")
+	trigger, appVersion := fs.String("trigger", "", ""), fs.String("app-version", "", "")
+	fs.Parse(args)
+	jsonOut = *asJSON
 	keys := reg.Keys()
-	if only := argValue(args, "only"); only != "" {
-		keys = []string{strings.SplitN(only, "-", 2)[0]}
+	if *only != "" {
+		keys = []string{strings.SplitN(*only, "-", 2)[0]}
 		if _, ok := reg.Projects[keys[0]]; !ok {
-			fmt.Fprintf(os.Stderr, "hydra: %s belongs to project %s, which is not in the registry (%s)\n", only, keys[0], strings.Join(reg.Keys(), ", "))
+			fmt.Fprintf(os.Stderr, "hydra: %s belongs to project %s, which is not in the registry (%s)\n", *only, keys[0], strings.Join(reg.Keys(), ", "))
 			return true, 1
 		}
 	}
+	var cfgs []*Config
 	for _, k := range keys {
-		cmd := exec.Command(os.Args[0], append([]string{"poll", "--project", k}, args...)...)
-		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-		if err := cmd.Run(); err != nil {
+		cfg, err := cfgFlags(flag.NewFlagSet("poll-"+k, flag.ContinueOnError), []string{"--project", k, "--registry", regPath})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "hydra: %s: %v\n", k, err)
 			code = 1
+			continue
 		}
+		cfg.Command, cfg.Trigger, cfg.AppVersion = "poll", *trigger, *appVersion
+		if !cfg.hasAddon("ploy") { // a Labs-only team has no case source for the pipeline to poll
+			fmt.Fprintf(os.Stderr, "hydra: %s: skipped, the ploy add-on is not enabled\n", k)
+			continue
+		}
+		cfgs = append(cfgs, cfg)
+	}
+	gated, err := Poll(cfgs, PollOpts{Only: *only, Force: *force, Intent: *intent, ModelCases: *modelCases})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "hydra:", err)
+		code = 1
+	}
+	if gated && code == 0 {
+		code = 3
 	}
 	return true, code
 }
@@ -150,7 +180,7 @@ func main() {
 		os.Exit(2)
 	}
 	if os.Args[1] == "poll" {
-		if handled, code := pollAll(os.Args[2:]); handled {
+		if handled, code := pollMulti(os.Args[2:]); handled {
 			os.Exit(code)
 		}
 	}
@@ -160,6 +190,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "hydra:", err)
 		os.Exit(1)
 	}
+	cfg.Command = os.Args[1]
 	switch os.Args[1] {
 	case "run":
 		key, intent, htmlPath, summary := fs.String("key", "", ""), fs.String("intent", "automate", "automate|execute"), fs.String("html", "", "rendered description"), fs.String("summary", "", "")
@@ -181,13 +212,55 @@ func main() {
 		}
 	case "crawl":
 		watch, headed := fs.String("watch", "", "serve a live view of the crawl, e.g. :8099"), fs.Bool("headed", false, "show the real browser")
+		fs.BoolVar(&cfg.StoreCrawl, "store", cfg.StoreCrawl, "after the crawl, store it in the app's repo (apps/<App>/crawl/) on a review branch")
+		fs.BoolVar(&cfg.RecordVideo, "video", cfg.RecordVideo, "record the crawl as a .webm video (out/hydra/crawl/videos)")
 		fs.IntVar(&cfg.SlowMS, "slow", cfg.SlowMS, "reveal elements one at a time, this many ms apart (for demos)")
 		fs.Parse(os.Args[2:])
-		if err = cfg.Crawl(*watch, *headed); err == nil && *watch != "" {
+		if !cfg.hasAddon("labs") {
+			err = fmt.Errorf("crawling is part of the labs add-on, which is not enabled for %s (profile: addons)", cfg.App)
+			break
+		}
+		err = cfg.Crawl(*watch, *headed)
+		if err == nil && cfg.StoreCrawl {
+			var st Stored
+			if st, err = cfg.SaveCrawl(); err == nil {
+				b, _ := json.MarshalIndent(st, "", "  ")
+				fmt.Println(string(b))
+			}
+		}
+		if err == nil && *watch != "" {
 			fmt.Println("viewer still up; Ctrl-C to stop")
 			sig := make(chan os.Signal, 1)
 			signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 			<-sig
+		}
+	case "history": // read-only: every recorded execution of a project, or of one case
+		key, last, asJSON := fs.String("key", "", "only this case"), fs.Int("last", 30, "newest N (0 = all)"), fs.Bool("json", false, "machine-readable")
+		fs.Parse(os.Args[2:])
+		printHistory(cfg.executions(*key), *last, *asJSON)
+	case "init": // onboard a team by asking; nothing is written before the final yes
+		answersPath, yes := fs.String("answers", "", "answers file {core, ploy, labs}: no questions for what it covers"), fs.Bool("yes", false, "no prompts: missing answers take their defaults, no confirmation")
+		noPreview := fs.Bool("no-preview", false, "skip the one-page preview crawl")
+		fs.Parse(os.Args[2:])
+		err = runInit(cfg, *answersPath, *yes, *noPreview)
+	case "status": // read-only, no Jira: what every tracked project looks like right now
+		asJSON := fs.Bool("json", false, "machine-readable")
+		fs.Parse(os.Args[2:])
+		if cfg.Registry == nil {
+			err = fmt.Errorf("status needs the registry (projects.json)")
+			break
+		}
+		var all []ProjectStatus
+		for _, k := range cfg.Registry.Keys() {
+			pc, e := cfgFlags(flag.NewFlagSet("status-"+k, flag.ContinueOnError), []string{"--project", k, "--registry", filepath.Join(cfg.Registry.dir, "projects.json")})
+			if e != nil {
+				err = e
+				break
+			}
+			all = append(all, pc.Status())
+		}
+		if err == nil {
+			printStatus(all, *asJSON)
 		}
 	case "onboard":
 		fs.Parse(os.Args[2:])
@@ -203,6 +276,14 @@ func main() {
 				os.Exit(3)
 			}
 		}
+	case "announce": // backfill: comment on cases that were delivered before write-back existed
+		post, keys := fs.Bool("post", false, "actually post (default: only print what would be posted)"), fs.String("keys", "", "comma-separated keys (default: every passing case)")
+		fs.Parse(os.Args[2:])
+		var on []string
+		if *keys != "" {
+			on = strings.Split(*keys, ",")
+		}
+		err = cfg.Announce(on, *post)
 	case "deliver":
 		only, exclude := fs.String("only", "", "comma-separated keys to deliver (default: every passing case)"), fs.String("exclude", "", "comma-separated keys to leave out")
 		fs.StringVar(&cfg.DeliverRepo, "repo", cfg.DeliverRepo, "framework repo that receives the tests")
@@ -220,6 +301,7 @@ func main() {
 		if d, err = cfg.Deliver(on, ex); err == nil {
 			b, _ := json.MarshalIndent(d, "", "  ")
 			fmt.Println(string(b))
+			cfg.writeBack(d)
 			if d.Gate != "" {
 				os.Exit(3) // distinct from 1 (error): the pipeline worked and is asking a person
 			}
@@ -228,23 +310,17 @@ func main() {
 		jql := fs.String("jql", cfg.JQL, "which issues to look at (profile: jql)")
 		comment := fs.Bool("comment", cfg.JiraComments, "post outcomes that need a person to the issue (off until results are trusted)")
 		intent, only, force, asJSON := fs.String("intent", "", "with --only: treat the issue as automate|execute even without the label"), fs.String("only", "", "process just this issue key (for a manual trigger)"), fs.Bool("force", false, "ignore the seen-state: run it again"), fs.Bool("json", false, "one JSON object per run (for n8n)")
+		modelCases := fs.Int("model-cases", 1, "cases that need the model allowed per poll; the rest wait for the next one")
+		if cfg.Registry != nil {
+			*modelCases = cfg.Registry.ModelCases()
+		}
 		fs.Parse(os.Args[2:])
 		jsonOut = *asJSON
-		if cfg.Registry != nil && cfg.Project != "" { // a registered project is onboarded before anything else happens
-			o, e := cfg.Registry.Onboard(cfg.Project, cfg)
-			if e != nil {
-				err = e
-				break
-			}
-			if o.Created {
-				report(Run{Key: cfg.Project, Intent: "onboard", Tier: "T0-onboarding", Status: "onboarded", Detail: []string{"created " + o.Repo}})
-			}
-			if o.Gate != "" {
-				report(Run{Key: cfg.Project, Intent: "onboard", Tier: "T0-onboarding", Status: "needs-onboarding", Detail: []string{o.Gate}})
-				os.Exit(3)
-			}
+		gated, perr := Poll([]*Config{cfg}, PollOpts{JQL: *jql, Comment: *comment, Only: *only, Force: *force, Intent: *intent, ModelCases: *modelCases})
+		err = perr
+		if gated && err == nil {
+			os.Exit(3)
 		}
-		err = poll(*cfg, *jql, *comment, *only, *force, *intent)
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}
@@ -252,66 +328,4 @@ func main() {
 		fmt.Fprintln(os.Stderr, "hydra:", err)
 		os.Exit(1)
 	}
-}
-
-// poll: one pass. An issue is handled once per (Jira edit, intent); changing the label or the text re-runs it.
-func poll(cfg Config, jql string, comment bool, only string, force bool, forceIntent string) error {
-	j, err := JiraFromEnv()
-	if err != nil {
-		return err
-	}
-	var issues []Issue
-	if only != "" { // a person asked for exactly this issue: no JQL, no seen-state
-		is, e := j.Get(only)
-		if e != nil {
-			return e
-		}
-		issues, force = []Issue{*is}, true
-	} else if issues, err = j.Search(jql); err != nil {
-		return err
-	}
-	statePath := filepath.Join(cfg.Out, "state.json")
-	seen := map[string]string{}
-	if b, e := os.ReadFile(statePath); e == nil {
-		json.Unmarshal(b, &seen)
-	}
-	type job struct{ key, intent, stamp string }
-	var jobs []job
-	for _, is := range issues { // phase 1: store every new case so "Same as TC-1" can resolve
-		intent := Intent(is.Labels)
-		if only != "" && forceIntent != "" {
-			intent = forceIntent
-		}
-		stamp := is.Updated + "|" + intent
-		if intent == "" || (seen[is.Key] == stamp && !force) {
-			continue
-		}
-		if _, err := cfg.Ingest(is); err != nil {
-			return fmt.Errorf("%s: %w", is.Key, err)
-		}
-		jobs = append(jobs, job{is.Key, intent, stamp})
-	}
-	if len(jobs) == 0 {
-		if !jsonOut {
-			fmt.Println("nothing new")
-		}
-		return nil
-	}
-	sort.Slice(jobs, func(a, b int) bool { return jobs[a].key < jobs[b].key })
-	for _, jb := range jobs { // phase 2: route
-		r := cfg.Route(jb.key, jb.intent)
-		report(r)
-		seen[jb.key] = jb.stamp
-		if needsPerson(r) {
-			if comment {
-				if e := j.Comment(jb.key, Message(r)); e != nil {
-					fmt.Fprintln(os.Stderr, "comment failed:", e)
-				}
-			}
-			if e := ChatNotify(cfg.ChatWebhook, r); e != nil {
-				fmt.Fprintln(os.Stderr, "chat notify failed:", e)
-			}
-		}
-	}
-	return writeJSON(statePath, seen)
 }

@@ -1,0 +1,22 @@
+{
+  "_doc": "Created by hydra init. Edit by hand or run init again for a new project; a person owns this file.",
+  "addons": [
+    "ploy",
+    "labs"
+  ],
+  "agent": "agent/agent.py",
+  "allowWrites": true,
+  "app": "PortalQA",
+  "baseBranch": "Pro",
+  "baseUrl": "http://127.0.0.1:3000",
+  "maxPages": 25,
+  "maxTokens": 100000,
+  "maxTurns": 20,
+  "model": "prism-ml/bonsai-27b",
+  "paths": [
+    "/cobro_ordenes"
+  ],
+  "safeClicks": true,
+  "stabilityRuns": 3,
+  "storeCrawl": true
+}

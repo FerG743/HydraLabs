@@ -1,0 +1,6 @@
+# dependencies and build output of retired projects are never worth keeping in git
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.DS_Store

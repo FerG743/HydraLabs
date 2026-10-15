@@ -25,7 +25,7 @@ func TestOnboardingCreatesTheAppsOwnRepo(t *testing.T) {
 	if o.Repo != repo {
 		t.Errorf("repo is named Hydra-<app>: got %s", o.Repo)
 	}
-	for _, f := range []string{"conftest.py", "utils/driver_wrapper.py", "apps/MiApp/data/expected_result.csv", "tests/MiApp/.gitkeep", ".gitignore"} {
+	for _, f := range []string{"conftest.py", "utils/driver_wrapper.py", "apps/MiApp/data/expected_result.csv", "tests/MiApp/.gitkeep", ".gitignore", "hydra/README.md"} {
 		if !fileExists(filepath.Join(repo, f)) {
 			t.Errorf("missing %s", f)
 		}
@@ -36,6 +36,9 @@ func TestOnboardingCreatesTheAppsOwnRepo(t *testing.T) {
 	}
 	if n, _ := git(repo, "rev-list", "--count", "HEAD"); n != "1" {
 		t.Errorf("want exactly one baseline commit, got %s", n)
+	}
+	if _, err := git(repo, "check-ignore", "-q", "hydra/out/runs/x.json"); err != nil {
+		t.Error("the working folder hydra/out/ must be git-ignored from the first commit")
 	}
 	if b, _ := git(repo, "branch", "--show-current"); b != "main" {
 		t.Errorf("branch %s", b)
@@ -85,5 +88,15 @@ func TestUnregisteredProjectIsRefused(t *testing.T) {
 	}
 	if entries, _ := os.ReadDir(root); len(entries) != 0 {
 		t.Errorf("created %d entries", len(entries))
+	}
+}
+
+func TestTheRepoIsCreatedOnTheBaseBranchTheProfileNames(t *testing.T) {
+	reg, root := newRegistry(t)
+	if _, err := reg.Onboard("ABC", &Config{BaseBranch: "develop"}); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := git(filepath.Join(root, "Hydra-MiApp"), "branch", "--show-current"); b != "develop" {
+		t.Errorf("init asked for develop, the repo is on %q: delivery would fail on a branch that does not exist", b)
 	}
 }

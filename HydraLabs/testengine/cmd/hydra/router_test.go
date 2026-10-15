@@ -117,3 +117,22 @@ func TestAppDownIsNotSentToTheModel(t *testing.T) {
 		t.Error("someone has to be told the app is down")
 	}
 }
+
+func TestCrawlArgsRecordVideoOnlyWhenAsked(t *testing.T) {
+	c := Config{Crawler: "crawl.py", PortalURL: "http://x", Out: "/o", MaxPages: 5}
+	if strings.Contains(strings.Join(c.crawlArgs("e", "o", false), " "), "--video") {
+		t.Error("no video unless asked")
+	}
+	c.RecordVideo = true
+	if a := strings.Join(c.crawlArgs("e", "o", false), " "); !strings.Contains(a, "--video /o/crawl/videos") {
+		t.Errorf("video dir: %s", a)
+	}
+}
+
+func TestAppSlugMatchesTheRenderer(t *testing.T) { // same table as AppSlugTest in tools/jira/test_render.py
+	for in, want := range map[string]string{"CobroOrdenes": "cobro_ordenes", "PortalQA": "portal_qa", "Toolshop": "toolshop", "QAPortal2Go": "qaportal2_go"} {
+		if got := appSlug(in); got != want {
+			t.Errorf("appSlug(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

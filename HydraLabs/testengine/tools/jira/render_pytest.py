@@ -45,7 +45,9 @@ EXPECTED = [
     (r'^.*non-CSV file is rejected client-side and "(.+?)" stays (enabled|disabled)\.?$', "rejected_client"),
     (r'^.*\bat most (one|\d+) POST request.*$', "max_posts"),
     (r'^An error (?:toast|message|alert).* shown to the user\.?$', "error_shown"),
-    (r'^The button returns to the enabled state with no stuck spinner\.?$', "button_ready"),
+    (r'^The button returns to the (enabled|disabled) state with no stuck spinner\.?$', "button_ready"),
+    (r'^"(.+?)" is (enabled|disabled) before .+? and (enabled|disabled) after\.?$', "state_before_after"),
+    (r'^After .*\bthe order appears in "(.+?)"\.?$', "order_in_section"),
     (r'^Orders? .*\bappears?\b.*$', "numbers_visible"),
     (r'^No .*"(.+?)".* appears\.?$', "text_hidden"),
     (r'^The "(.+?)" .*disappears\.?$', "text_hidden"),
@@ -69,8 +71,8 @@ def slug(s):
     return re.sub(r"[^a-z0-9]+", "_", s).strip("_")
 
 
-def app_slug(name):  # CobroOrdenes -> cobro_ordenes
-    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
+def app_slug(name):  # CobroOrdenes -> cobro_ordenes, PortalQA -> portal_qa; must match appSlug in cmd/hydra/router.go
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name).lower()
 
 
 def parse(rules, text, search=False):
@@ -158,7 +160,8 @@ def csv_rows(items_text, defaults):
 
 def build_calls(app, a, defaults):
     """-> (calls, ctx). calls = [(step dict, python call line or None)]. Registers locators/functions on the way."""
-    ctx = {"has_download": False, "has_mock": False, "last_button": None, "pre_line": None, "anchor_index": {}}
+    ctx = {"has_download": False, "has_mock": False, "last_button": None, "pre_line": None, "anchor_index": {},
+           "first_input": None, "click_index": {}}
     pre = a["pre"]
     if pre["op"] == "mock_post":
         app.loc("API_POST_PATRON", "**/*", "por defecto se simulan TODOS los POST (seguro); acotar al endpoint real")
@@ -183,6 +186,7 @@ def build_calls(app, a, defaults):
             L, base = button(app, g[0]), slug(g[0])
             if op in ("click", "dblclick"):
                 ctx["last_button"] = g[0]
+                ctx["click_index"].setdefault(g[0], i)
             if op == "click":
                 n = app.flujo(f"hacer_clic_{base}_flujo", f'''def hacer_clic_{base}_flujo(driver):
     """Clic en el botón {g[0]}."""
@@ -210,6 +214,7 @@ def build_calls(app, a, defaults):
     return path''')
                 line = f"archivo_descargado = co.{n}(driver, DOWNLOADS_DIR, CASO_ID)"
         elif op == "fill":
+            ctx["first_input"] = i if ctx["first_input"] is None else ctx["first_input"]
             f = slug(g[0])
             L = app.loc(f"INPUT_{f.upper()}", f"role=textbox[name=\"{q(g[0])}\" i]", f"confirmar el selector del campo '{g[0]}'")
             n = app.flujo(f"capturar_{f}_flujo", f'''def capturar_{f}_flujo(driver, {f}):
@@ -217,6 +222,7 @@ def build_calls(app, a, defaults):
     DriverWrapper(driver).send_keys(L.{L}, {f}, description="el campo {g[0]}")''')
             line = f"co.{n}(driver, {f})"
         elif op == "select":
+            ctx["first_input"] = i if ctx["first_input"] is None else ctx["first_input"]
             f = slug(g[0])
             L = app.loc(f"SELECT_{f.upper()}", f"role=combobox[name=\"{q(g[0])}\" i]", f"confirmar el selector de '{g[0]}' y si la opción va por value o por label")
             if app.widgets.get(f) == "combobox":  # custom (non-<select>) widget: open the list, pick the option
@@ -277,6 +283,13 @@ TEXT_CHECKS = {  # shared by every case: identical source whichever case registe
     """Verifica que el texto esté visible."""
     expect(driver.page.get_by_text(texto).first).to_be_visible()
     add_step(f"El texto '{texto}' está visible.", "Exitoso")''',
+    # shortcut: "in the section" = after its title in document order; enough while no later section repeats the
+    # value. Waits as long as the backend may take to answer (JMeter is cut at 180 s).
+    "in_section": '''def verificar_valor_en_seccion_flujo(driver, seccion, valor, timeout_ms=180000):
+    """Verifica que el valor aparezca en la sección (después de su título, no en otra parte de la página)."""
+    xp = f'xpath=//*[normalize-space(text())="{seccion}"]/following::*[normalize-space(text())="{valor}"]'
+    expect(driver.page.locator(xp).first).to_be_visible(timeout=timeout_ms)
+    add_step(f"'{valor}' aparece en '{seccion}'.", "Exitoso")''',
     "hidden": '''def verificar_texto_oculto_flujo(driver, texto):
     """Verifica que el texto esté oculto."""
     expect(driver.page.get_by_text(texto).first).to_be_hidden()
@@ -293,6 +306,16 @@ def build_expected(app, a, ctx):
             kind = "visible" if op == "text_visible" else "hidden"
             n = app.flujo(f"verificar_texto_{'visible' if kind == 'visible' else 'oculto'}_flujo", TEXT_CHECKS[kind])
             line = f"co.{n}(driver, {g[0]!r})"
+        elif op == "state_before_after":  # two checks at two moments: before any input, and right before clicking it
+            before, after = ctx["first_input"], ctx["click_index"].get(g[0])
+            if before and after != 0:  # both need a step before them to anchor to (index 0 has none)
+                out.append((e, f"co.{state_flujo(app, g[0], g[1])}(driver)", before - 1))
+                # never clicked in this case: "after" is the end of the test
+                out.append((e, f"co.{state_flujo(app, g[0], g[2])}(driver)", None if after is None else after - 1))
+                continue
+        elif op == "order_in_section" and a["data"].get("order_number"):
+            n = app.flujo("verificar_valor_en_seccion_flujo", TEXT_CHECKS["in_section"])
+            line = f"co.{n}(driver, {g[0]!r}, order_number)"
         elif op == "numbers_visible":
             nums = re.findall(r"\b\d{6,}\b", e["text"])
             n = app.flujo("verificar_texto_visible_flujo", TEXT_CHECKS["visible"])
@@ -320,7 +343,7 @@ def build_expected(app, a, ctx):
     """Verifica que no quede un indicador de carga atascado."""
     expect(driver.page.locator(L.SPINNER).first).to_be_hidden()
     add_step("No hay indicador de carga atascado.", "Exitoso")''')
-            line = f"co.{state_flujo(app, ctx['last_button'], 'enabled')}(driver)\n    co.{m}(driver)"
+            line = f"co.{state_flujo(app, ctx['last_button'], g[0])}(driver)\n    co.{m}(driver)"  # g[0]: enabled | disabled, as the case says
         anchor = ctx["anchor_index"].get(ANCHORS.get(op)) if op in ANCHORS else None
         out.append((e, line, anchor))
     return out
@@ -450,7 +473,8 @@ def main():
                   "caso_id," + ",".join(an["data"]) + "\n" + ",".join([case["id"]] + [v for v in an["data"].values()]) + "\n")
         expected_rows.append((case["id"], " ".join(e["text"] for e in an["expected"])))
         report.append({"case": case["id"], "steps_mapped": sum(1 for s, _ in calls if s["op"]), "steps": len(calls),
-                       "expected_asserted": sum(1 for _, l, _ in exp if l), "expected": len(exp), "pending": an["pending"]})
+                       "expected_asserted": len({id(e) for e, l, _ in exp if l}), "expected": len(an["expected"]),
+                       "pending": an["pending"]})
 
     write(os.path.join(app_dir, "locators", f"{app_slug(a.app)}_locators.py"), render_locators(a.app, app))
     write(os.path.join(app_dir, "modules", f"{app_slug(a.app)}_module.py"), render_module(a.app, app))

@@ -74,7 +74,7 @@ A **human writes and documents every case in Jira first.** The pipeline starts f
 | 5 | **Verify** | Ploy | bundle → pass/fail in the real app, read-only unless allowed | no | done (harness, not yet the real framework repo) | `tools/jira/run_generated.py`, `router.go` |
 | 6 | **Deliver** | Ploy | verified bundle → branch/PR, Jira comment + status | no | Jira/Chat notify only (off by default); no PR yet | `notify.go` |
 
-Cross-cutting: **profile** (one JSON per web app), **knowledge** (`knowledge/<App>.md`, the app's quirks), **run record** (`out/hydra/runs/<KEY>.json`: tier, status, tokens, ms).
+Cross-cutting: **profile** (one JSON per web app), **knowledge** (`hydra/knowledge.md` in the app's repo: the app's quirks), **run record** (`Hydra-<App>/hydra/out/runs/<KEY>.json`: tier, status, tokens, ms).
 
 ### Contracts
 
@@ -89,8 +89,21 @@ Cross-cutting: **profile** (one JSON per web app), **knowledge** (`knowledge/<Ap
 One Jira project (board) = one application under test. Humans write and document the cases there; the pipeline starts from that.
 
 - **Registry** (`projects.json`): the Jira projects the pipeline automates, each with its app name and profile (`"DWQ": {"app": "CobroOrdenes", ...}`). Registration is explicit on purpose: a Jira token sees dozens of projects and must never turn each one into a repo.
+- **`hydra init`** (interactive, or `--answers team.json --yes` for CI): asks the core questions (project id, app name, QA URL, is it production, may tests write, base branch, test repo remote) and then one set per enabled add-on (`ploy`: case source, JQL, write-back, stability runs; `labs`: crawl paths, model tier). Each answer is checked as it is given (URL reachable, Jira query, remote readable; a temporary failure is a warning, not a stop), one page is crawled as a preview, and nothing is written until the person confirms. It then writes `profiles/<app>.json` (with `"addons"`) and the registry entry, and runs the onboarding below. A profile without `addons` keeps everything, as before. `poll` skips projects without `ploy`; `crawl` needs `labs`; `automate` needs `labs` (Ploy alone only runs stored tests).
 - **Onboarding** (`hydra onboard --project KEY`, and automatically before every poll): the first time a registered project is seen, the pipeline creates **`Hydra-<App>`** next to the other repos on the machine that runs n8n (`reposRoot`, default `~/Documents/GitHub`). It is built from the framework template (`templates/framework/`), with the suite registered in `runner_central.py` and one baseline commit, so every later review branch shows only generated tests. It never writes into a folder that is not already a Hydra repo, and a second run changes nothing.
 - **Onboarding gate**: Jira cannot know where the app runs. A new project gets a read-only default profile with an empty `baseUrl` and stops with `needs-onboarding` until a person sets it (and `allowWrites` only for a QA environment that may be changed). With a URL set, the first crawl runs automatically.
+- **Everything an app produces lives in its own repo**, in a `hydra/` folder (the pipeline repo keeps only code, the registry, profiles and the template, nothing app-specific):
+
+  | In `Hydra-<App>/hydra/` | Kind | How it changes |
+  |---|---|---|
+  | `crawl/` (`crawl.json`, `CRAWL.md`) | durable, committed | `hydra crawl --store`, on a review branch |
+  | `locators/learned.json` | durable | rides with a delivery |
+  | `locators/confirmed.json` | durable, written by a person | a person; always wins over learned |
+  | `knowledge.md` | durable, written by a person | a person; read by the model tier |
+  | `cases/` | durable | rides with a delivery: the Jira text each test came from (`<KEY>.case.json`) and the same case as step-by-step Gherkin (`<KEY>.feature`, deterministic, no model) |
+  | `out/` | working, **git-ignored** | run records, bundles, crawl screenshots/video/events, agent logs, state; never dirties the repo |
+
+  Durable files change only on a review branch that a person merges. A fresh clone is seeded from the committed crawl and learned locators, so nothing is re-crawled or re-asked of the model. (`--profile` without a registry keeps the old pipeline-local layout.)
 - **Delivery** goes to that app's repo: `hydra deliver --project KEY [--runs N]`. The cases are run N times in a row in the real framework (stability gate, default 3; repeating stops at the first failure). Only a case that passes every run is committed, on a local review branch; a flaky or failing case blocks the whole delivery (exit 3) until a person decides. Re-delivering identical files reports "already delivered" instead of failing. Nothing is pushed or merged. Note: a case that writes (e.g. DWQ-130) writes N times per delivery, so a QA environment must tolerate that.
 - n8n polls the whole registry (`hydra poll`); "Manual: run one issue" finds the project from the key's prefix.
 
@@ -110,11 +123,23 @@ automate -> T1 render     parse + render from the case, bridge confirms locators
             T4 review     a person, with the bundle and the exact reason; never a retry loop
 ```
 
+### The queue (`hydra poll`)
+
+One pass over **every registered project** goes through a single queue, cheapest work first. Cost is known before it is paid, because a dry render is deterministic and says which steps are unmappable:
+
+| Class | Work | Cost |
+|---|---|---|
+| 0 free | execute a case that has a stored test; a case that will be sent back to its author; a project that is not onboarded | no tool, 0 tokens |
+| 1 render | automate a case the rules map cleanly (T1) | 0 tokens, seconds |
+| 2 model | automate a case with steps only the model can map (T3) | minutes, tens of thousands of tokens |
+
+Within a class the projects take turns, so one busy app cannot starve another. Class 2 is **capped per poll** (`modelCasesPerPoll` in `projects.json`, default 1, or `--model-cases N`): the rest are reported as `deferred` and are not recorded as seen, so the next poll takes them. An `execute` label on a case with no stored test is classified as what it really is, an automate. `hydra status` is a read-only table over all tracked projects (cases, passing, needing a person, tokens, tests on main, branches awaiting review), built from each app's run records and git state; it keeps no file of its own.
+
 Rules of the router:
 - A test that fails only because the read-only guard blocked a real write is `needs-writes`. It never escalates; no model can fix it.
 - The agent is called at most once per case, and its output is judged by the same verify as everything else.
 - A case is *automated* only if its test passes. "Rendered" is not automated.
-- Resolved mappings are cached (`appmap/<App>.learned.json`), so cost falls with every run. A human-written `appmap/<App>.json` always wins.
+- Resolved mappings are cached (`hydra/locators/learned.json` in the app's repo), so cost falls with every run. A human-written `hydra/locators/confirmed.json` always wins.
 - Per-run tokens are logged in the run record; the number to improve is successes per token, per tier.
 
 ## Environment, secrets, data (the framework's own convention)
@@ -147,7 +172,7 @@ Lessons that shaped the rules: running the model on this case four times cost ab
 ## Profiles and per-app knowledge
 
 - `profiles/<app>.json`: base URL, Jira query, model, turn budget, crawl entry paths, safe-clicks, login file, synonyms, notification settings. A new web app is a new profile file, not new code.
-- `knowledge/<App>.md`: what is peculiar about the app (UI language, custom widgets, which actions are real writes, unstable ids). Read by the model tier on every run; people add a line whenever a failure teaches something. Facts only: how to find things belongs in the app map, what should happen belongs in the case.
+- `Hydra-<App>/hydra/knowledge.md`: what is peculiar about the app (UI language, custom widgets, which actions are real writes, unstable ids). Read by the model tier on every run; people add a line whenever a failure teaches something. Facts only: how to find things belongs in the app map, what should happen belongs in the case.
 - Model requirements: LM Studio context of at least **24000** tokens (the agent refuses to start below that). The model is only used at T2/T3.
 
 ## Stage 0: Design (requirements → cases)
@@ -164,7 +189,7 @@ Source of truth is requirements, not code. If no requirements exist for a featur
 
 `hydra crawl` (read-only) visits every reachable page of an app and records, per element: role, accessible name, id, `data-testid`, the best locator by framework priority (`data-testid`, then a stable id, then role + name, CSS last), whether that locator is stable and **unique**, and the options of comboboxes/tabs (`--safe-clicks`: opens them to read, never selects or submits). Non-GET requests are aborted; links that look like logout/delete are never followed.
 
-- Output: `appmap/<App>.crawl.json`. Watch it live with `hydra crawl --watch :8099` (add `--headed` to see the real browser, and `--slow 150` to reveal elements one at a time: boxes and locator labels colored green = stable id/testid, blue = role + name, orange = weak or not unique).
+- Output: the working copy `Hydra-<App>/hydra/out/appmap/<App>.crawl.json` (git-ignored). With `storeCrawl` in the profile (or `hydra crawl --store`) the crawl is also put in the app's own repo, `Hydra-<App>/hydra/crawl/` (`crawl.json` + a readable `CRAWL.md` with the weak locators listed), on a review branch like every other delivery; each stored crawl is a commit whose message says what changed (`locators +3 -2; new pages: ...`), so `git log` of that folder is the history of how the app's UI moved. A crawl identical to the last stored one (merged or still awaiting review) is not stored again. `--video` records the crawler's browser as a `.webm` under the app repo's `hydra/out/crawl/videos/` (git-ignored). Watch it live with `hydra crawl --watch :8099` (add `--headed` to see the real browser, and `--slow 150` to reveal elements one at a time: boxes and locator labels colored green = stable id/testid, blue = role + name, orange = weak or not unique).
 - Plan and Build **look up the map first**; the model is only asked for elements the map cannot resolve.
 - Flags worth acting on: non-unique locators (seven carousel dots share one `data-testid`), generated ids (`radix-:R19...`), and "weak" CSS fallbacks.
 - Limit: a read-only crawl sees only what is on screen after load. Results tables, dialogs and error messages appear after an action; the agent adds those when a case first exercises them, and they are remembered.
@@ -198,14 +223,14 @@ Source of truth is requirements, not code. If no requirements exist for a featur
 
 1. **Portal, Jira → passing test, locally.** Built: gate, intake, crawl, bridge, renderer, verify, router, n8n manual triggers. Proven on the real portal: DWQ-131 passes at 0 tokens; DWQ-130 reaches `needs-writes`. Not yet: live Jira polling, the model tier on a real case, a reviewed branch/PR in `portal-qa-automation`, and a passing mutating case (needs a test environment decision).
 2. **Regeneration check**: facturación FACT_0001-0004 regenerate and match the hand-written tests.
-3. **Auto-learn from failures**: failures that teach something become a line in `knowledge/<App>.md`.
+3. **Auto-learn from failures**: failures that teach something become a line in the app's `hydra/knowledge.md`.
 4. **Jira write-back** (comment + status) and the Google Chat space, enabled only after 1-3 are trusted (`jiraComments`, `HYDRA_CHAT_WEBHOOK`).
 5. ~~Stability gate~~ **Done**: delivery runs the suite `stabilityRuns` times (default 3) in the real framework; a case is delivered only if it passes every run. A mix of pass and fail is reported as `flaky` and never reaches the repo.
 6. **Stage 0 design** from requirements; then **Loop B** and the mutation score.
 
-## Parked (not deleted)
+## Parked (not deleted; the retired ones live in `/deprecated`, see its README)
 
-The Tauri desktop app (a possible future HydraPloy/HydraLabs dashboard), Go block engine (`engine/`, `cmd/demo`), `uiagent` (vision planner), Gherkin output (`cmd/skeleton`, `cmd/lint`: valid, tested, optional spec only). Revisit when the slices above are done.
+The Tauri desktop app (a possible future HydraPloy/HydraLabs dashboard), `uiagent` (vision planner), Gherkin output (`cmd/skeleton`, `cmd/lint`: valid, tested, optional spec only). Revisit when the slices above are done.
 
 ## Open decisions
 

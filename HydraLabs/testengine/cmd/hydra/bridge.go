@@ -230,7 +230,12 @@ func (a Confirmed) merge(b Confirmed) Confirmed { // b wins
 
 func (c Config) crawlPath() string   { return filepath.Join(c.AppMap, c.App+".crawl.json") }
 func (c Config) learnedPath() string { return filepath.Join(c.AppMap, c.App+".learned.json") }
-func (c Config) handPath() string    { return filepath.Join(c.AppMap, c.App+".json") }
+func (c Config) handPath() string {
+	if c.Home != "" { // written by a person, committed in the app's repo
+		return c.durable("locators", "confirmed.json")
+	}
+	return filepath.Join(c.AppMap, c.App+".json")
+}
 
 // confirmed = learned, overridden by what a human wrote.
 func (c Config) confirmed() Confirmed {

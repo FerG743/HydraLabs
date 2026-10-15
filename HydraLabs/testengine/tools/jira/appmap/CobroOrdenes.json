@@ -1,4 +1,0 @@
-{
-  "locators": {"INPUT_ORDER_NUMBER": "#orderNumber", "SELECT_STORE": "#name"},
-  "widgets": {"store": "combobox"}
-}

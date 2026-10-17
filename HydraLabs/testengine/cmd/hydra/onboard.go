@@ -172,3 +172,21 @@ func (r *Registry) scaffold(repo, app, base string) error {
 		"framework baseline: Playwright + Pytest template for "+app+", no test cases yet\n\nCreated by HydraPloy onboarding. Generated tests arrive on review branches on top of this commit.")...)
 	return err
 }
+
+// ProjectFor: which registered project an issue key belongs to. The registry key when it is the key's prefix,
+// otherwise the project whose profile names that Jira project (registered as PQA, cases from DWQ).
+func (r *Registry) ProjectFor(issue string) (string, bool) {
+	prefix := strings.SplitN(issue, "-", 2)[0]
+	if _, ok := r.Projects[prefix]; ok {
+		return prefix, true
+	}
+	for _, k := range r.Keys() {
+		var p struct {
+			JiraProject string `json:"jiraProject"`
+		}
+		if b, err := os.ReadFile(r.abs(r.Projects[k].Profile)); err == nil && json.Unmarshal(b, &p) == nil && p.JiraProject == prefix {
+			return k, true
+		}
+	}
+	return "", false
+}

@@ -329,7 +329,7 @@ func (a answers) profile() map[string]any {
 		n, _ := strconv.Atoi(a["ploy.stabilityRuns"])
 		p["stabilityRuns"] = n
 		if a["ploy.source"] == "jira" {
-			p["jql"], p["jiraComments"] = a["ploy.jql"], a.yes("ploy.comments")
+			p["jql"], p["jiraComments"], p["jiraProject"] = a["ploy.jql"], a.yes("ploy.comments"), a["ploy.jiraKey"]
 		}
 	}
 	if contains(addons, "labs") {
@@ -510,7 +510,6 @@ func runInit(cfg *Config, answersPath string, yes, noPreview bool) error {
 		return fmt.Errorf("init needs the registry (projects.json) in the working directory")
 	}
 	regPath := filepath.Join(cfg.Registry.dir, "projects.json")
-	loadHydraEnv("~/.hydra.env", filepath.Join(cfg.Registry.dir, "..", ".hydra.env"))
 	given, err := loadAnswers(answersPath)
 	if err != nil {
 		return err

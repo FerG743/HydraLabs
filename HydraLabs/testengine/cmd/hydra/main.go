@@ -143,15 +143,17 @@ func pollMulti(args []string) (handled bool, code int) {
 	force, asJSON := fs.Bool("force", false, ""), fs.Bool("json", false, "")
 	modelCases := fs.Int("model-cases", reg.ModelCases(), "")
 	trigger, appVersion := fs.String("trigger", "", ""), fs.String("app-version", "", "")
+	show := fs.Bool("show", false, "")
 	fs.Parse(args)
 	jsonOut = *asJSON
 	keys := reg.Keys()
 	if *only != "" {
-		keys = []string{strings.SplitN(*only, "-", 2)[0]}
-		if _, ok := reg.Projects[keys[0]]; !ok {
-			fmt.Fprintf(os.Stderr, "hydra: %s belongs to project %s, which is not in the registry (%s)\n", *only, keys[0], strings.Join(reg.Keys(), ", "))
+		k, ok := reg.ProjectFor(*only)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "hydra: no registered project takes %s (registry key or profile jiraProject; registered: %s)\n", *only, strings.Join(reg.Keys(), ", "))
 			return true, 1
 		}
+		keys = []string{k}
 	}
 	var cfgs []*Config
 	for _, k := range keys {
@@ -161,7 +163,7 @@ func pollMulti(args []string) (handled bool, code int) {
 			code = 1
 			continue
 		}
-		cfg.Command, cfg.Trigger, cfg.AppVersion = "poll", *trigger, *appVersion
+		cfg.Command, cfg.Trigger, cfg.AppVersion, cfg.Show = "poll", *trigger, *appVersion, *show
 		if !cfg.hasAddon("ploy") { // a Labs-only team has no case source for the pipeline to poll
 			fmt.Fprintf(os.Stderr, "hydra: %s: skipped, the ploy add-on is not enabled\n", k)
 			continue
@@ -198,6 +200,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: hydra poll|run [flags]")
 		os.Exit(2)
 	}
+	// the pipeline's secrets (Jira, chat), as n8n/start.sh loads them, so a plain terminal works the same
+	loadHydraEnv("~/.hydra.env", filepath.Join(engineDir(), "..", ".hydra.env"))
 	if os.Args[1] == "poll" {
 		if handled, code := pollMulti(os.Args[2:]); handled {
 			os.Exit(code)

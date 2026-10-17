@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -38,8 +39,9 @@ type Delivery struct {
 	Commit    string        `json:"commit,omitempty"`
 	Runs      int           `json:"runs"` // consecutive real-framework runs actually executed
 	Delivered []string      `json:"delivered,omitempty"`
-	Gate      string        `json:"gate,omitempty"` // why nothing was committed
-	Note      string        `json:"note,omitempty"` // an outcome that needs no person (e.g. already delivered)
+	Gate      string        `json:"gate,omitempty"`   // why nothing was committed
+	Note      string        `json:"note,omitempty"`   // an outcome that needs no person (e.g. already delivered)
+	Report    string        `json:"report,omitempty"` // --show: the framework's HTML report of the watched run
 	Outcomes  []CaseOutcome `json:"outcomes"`
 }
 
@@ -229,7 +231,7 @@ func (c Config) Deliver(only []string, exclude map[string]bool) (d Delivery, err
 		os.MkdirAll(stage, 0o755)
 		os.WriteFile(filepath.Join(stage, k+".case.json"), b, 0o644)
 	}
-	if _, err = c.renderOnce(stage, render, ""); err != nil { // all together: shared files are the union
+	if _, _, err = c.renderOnce(stage, render, ""); err != nil { // all together: shared files are the union
 		return d, err
 	}
 
@@ -276,6 +278,9 @@ func (c Config) Deliver(only []string, exclude map[string]bool) (d Delivery, err
 			break
 		}
 		results = append(results, got)
+		for _, k := range keys {
+			c.live("stability", k, map[string]any{"run": i, "of": runs, "status": got[k].Status})
+		}
 		// every case the framework ran is an execution, not only the ones being delivered; the run used the branch
 		// tip plus the files being delivered
 		base, _ := git(repo, "rev-parse", "--short", "HEAD")
@@ -292,6 +297,11 @@ func (c Config) Deliver(only []string, exclude map[string]bool) (d Delivery, err
 		}
 	}
 	d.Runs = len(results)
+	if c.Show {
+		if rs, _ := filepath.Glob(filepath.Join(work, "report_*.html")); len(rs) > 0 {
+			d.Report, _ = filepath.Abs(rs[len(rs)-1])
+		}
+	}
 	d.Outcomes = judgeRuns(keys, results, runs)
 	allGreen := d.Gate == "" && len(results) == runs
 	for _, o := range d.Outcomes {
@@ -330,6 +340,9 @@ func (c Config) Deliver(only []string, exclude map[string]bool) (d Delivery, err
 }
 
 func (c Config) recordDelivery(d Delivery, stamp string) error {
+	for _, o := range d.Outcomes {
+		c.live("delivered", o.Key, map[string]any{"branch": d.Branch, "report": d.Report, "gate": d.Gate, "note": d.Note})
+	}
 	return writeJSON(filepath.Join(c.Out, "deliveries", stamp+".json"), d)
 }
 
@@ -348,14 +361,24 @@ func (c Config) runPytest(repo, work string, n int) (map[string]CaseOutcome, str
 	agentDir, _ := filepath.Abs(filepath.Join(c.ToolsDir, "..", "..", "agent"))
 	junit, _ := filepath.Abs(filepath.Join(work, fmt.Sprintf("junit-%d.xml", n)))
 	logPath := filepath.Join(work, fmt.Sprintf("pytest-%d.log", n))
-	cmd := exec.Command(c.Python, "-m", "pytest", "tests/"+c.App, "-p", "hydra_guard", "-v", "--tb=short", "--junitxml="+junit)
+	args := []string{"-m", "pytest", "tests/" + c.App, "-p", "hydra_guard", "-v", "--tb=short", "--junitxml=" + junit}
+	headless, slow := "true", "0"
+	if c.Show && n == 1 { // the first stability run is the one people watch; the repeats stay headless and fast
+		headless, slow = "false", strconv.Itoa(c.showSlow())
+		report, _ := filepath.Abs(filepath.Join(work, "report.html")) // the framework stamps it: report_<time>.html
+		args = append(args, "--html="+report, "--self-contained-html")
+	}
+	cmd := exec.Command(c.Python, args...)
 	cmd.Dir = repo
 	allow := "0"
 	if c.AllowWrites {
 		allow = "1"
 	}
+	// AUTO_ACC empty: with an HTML report the framework would post to the team's chat and upload the report and
+	// video to an external host. A pre-review gate run must never publish anything.
 	cmd.Env = append(os.Environ(), "PYTHONPATH="+repo+string(os.PathListSeparator)+agentDir,
-		"BASE_URL="+c.PortalURL, "HEADLESS=true", "HYDRA_ALLOW_WRITES="+allow, "PYTHONDONTWRITEBYTECODE=1")
+		"BASE_URL="+c.PortalURL, "HEADLESS="+headless, "SLOW_MO="+slow, "AUTO_ACC=", "HYDRA_ALLOW_WRITES="+allow,
+		"PYTHONDONTWRITEBYTECODE=1")
 	var logb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &logb, &logb
 	cmd.Run() // a failing test is a result, not an error; judged from the junit file

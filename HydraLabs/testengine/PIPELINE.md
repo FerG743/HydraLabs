@@ -203,6 +203,12 @@ Source of truth is requirements, not code. If no requirements exist for a featur
 
 **Portal QA** (`~/Documents/GitHub/Oms_Automation`, runs locally via `./dev.sh`; VPN required for the backends) is the test dummy for every stage. Its automation lives in `~/Documents/GitHub/portal-qa-automation`, created from the framework template.
 
+## Showing it to people
+
+- `hydra watch --project KEY` serves a live page (default `http://localhost:8099`): one card per case, its stages lighting up as they happen (case in, gate, map, build, verify, 3× stable, review branch), each step with the element it was mapped to (same colors as the crawl), the final screen, and the HTML report when there is one. It follows `Hydra-<App>/hydra/out/live/events.jsonl`, which `run`, `poll` and `deliver` append to; it only reads, and serves no file but delivery reports.
+- `--show` on `hydra run` / `hydra deliver`: a visible browser slowed down (`slowMs` in the profile, default 300 ms). Deliver shows only the first stability run (the repeats stay headless), writes the framework's HTML report with video into the delivery folder and opens it.
+- Hydra's runs never publish: `AUTO_ACC` is always blanked, so the framework does not post to a team's chat or upload reports and video, whatever the app's `.env` says.
+
 ## Model roles (all bounded, all validated)
 
 | Where | Job | Validated by | On failure |

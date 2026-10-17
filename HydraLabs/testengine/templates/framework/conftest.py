@@ -79,6 +79,7 @@ def _shared_playwright_session(request):
 
     browser = pw.chromium.launch(
         headless=headless_mode,
+        slow_mo=int(os.getenv("SLOW_MO", "0") or 0),  # ms between actions, so people can follow a demo run
         args=[
             "--disable-save-password-bubble",
             "--disable-translate",

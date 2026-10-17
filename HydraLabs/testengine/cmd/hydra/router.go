@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -63,6 +64,7 @@ type Config struct {
 	Trigger       string              `json:"-"`              // --trigger: why it ran (deploy, nightly...); default: the command
 	AppVersion    string              `json:"-"`              // --app-version: the build under test, if the caller knows it
 	Quiet         bool                `json:"-"`              // crawl without streaming every element (init's preview)
+	Show          bool                `json:"-"`              // --show: a visible, slowed-down browser (and deliver's HTML report) for people watching
 	Addons        []string            `json:"addons"`         // enabled add-ons (ploy, labs...); empty = all, as before add-ons existed
 	Remote        string              `json:"remote"`         // the test repo's remote URL, when it has one
 }
@@ -141,6 +143,7 @@ func (c Config) Route(key, intent string) (r Run) {
 	defer func() {
 		r.Millis = time.Since(t0).Milliseconds()
 		writeJSON(filepath.Join(c.Out, "runs", key+".json"), r)
+		c.live("done", key, map[string]any{"status": r.Status, "tier": r.Tier, "tokens": r.Tokens, "ms": r.Millis})
 		if r.Status != "deferred" { // a deferred case did not execute: the next poll records it
 			c.logExecution(Execution{Key: key, Intent: intent, Tier: r.Tier, Status: r.Status, Detail: r.Detail, Millis: r.Millis, Tokens: r.Tokens})
 		}
@@ -154,6 +157,7 @@ func (c Config) Route(key, intent string) (r Run) {
 		r.Tier, r.Status, r.Detail = "T0-addons", "needs-review", []string{"automating a case needs the labs add-on, which is not enabled for " + c.App}
 		return r
 	}
+	c.live("case", key, map[string]any{"intent": intent, "title": c.caseTitle(key)})
 	if intent == "execute" {
 		if _, err := os.Stat(filepath.Join(c.bundleDir(key), "tests")); err == nil {
 			r.Tier = "T0-existing"
@@ -182,6 +186,7 @@ func (c Config) Route(key, intent string) (r Run) {
 		return r
 	}
 	bad, advice := Maturity(cs)
+	c.live("gate", key, map[string]any{"ok": len(bad) == 0, "questions": bad})
 	if len(bad) > 0 { // before any tokens: send the author specific questions
 		r.Tier, r.Status, r.Detail = "T0-gate", "needs-clarification", append(r.Detail, bad...)
 		return r
@@ -189,8 +194,9 @@ func (c Config) Route(key, intent string) (r Run) {
 	r.Detail = append(r.Detail, advice...)
 
 	r.Tier = "T1-render"
-	pending, spent, err := c.render(cs, cases)
+	pending, spent, steps, err := c.render(cs, cases)
 	r.Tokens += spent // T2 (the bridge's closed-list pick), if it was needed
+	c.live("map", key, map[string]any{"steps": steps, "tokens": spent, "pending": pending})
 	if err != nil {
 		r.Tier, r.Status, r.Detail = "T4-review", "needs-review", append(r.Detail, err.Error())
 		return r
@@ -211,6 +217,7 @@ func (c Config) Route(key, intent string) (r Run) {
 		}
 		return r
 	}
+	c.live("T3 agent: exploring the page for what the rules could not map", key, nil)
 	return c.escalate(cs, r)
 }
 
@@ -269,46 +276,46 @@ func (c Config) escalate(cs *Case, r Run) Run {
 
 // render runs the renderer on this one case; returns the steps it could not map and the tokens the bridge's model spent.
 // With a crawl available it renders, lets the bridge confirm the guessed locators against the real page, and renders again.
-func (c Config) render(cs *Case, all []*Case) (pending []string, tokens int, err error) {
+func (c Config) render(cs *Case, all []*Case) (pending []string, tokens int, steps []StepMap, err error) {
 	stage := filepath.Join(c.Out, "stage", cs.ID)
 	os.RemoveAll(stage)
 	for _, x := range all { // every stored case: the renderer learns default values (a valid order, a valid store) from the others
 		if err := writeJSON(filepath.Join(stage, x.ID+".case.json"), x); err != nil {
-			return nil, 0, err
+			return nil, 0, nil, err
 		}
 	}
 	bundle := c.bundleDir(cs.ID)
-	pending, err = c.renderOnce(stage, bundle, cs.ID)
+	pending, steps, err = c.renderOnce(stage, bundle, cs.ID)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 	changed, spent, left, err := c.bridge(filepath.Join(bundle, "apps", c.App, "locators", appSlug(c.App)+"_locators.py"))
 	if err != nil {
-		return nil, spent, err
+		return nil, spent, nil, err
 	}
 	if changed {
-		if pending, err = c.renderOnce(stage, bundle, cs.ID); err != nil {
-			return nil, spent, err
+		if pending, steps, err = c.renderOnce(stage, bundle, cs.ID); err != nil {
+			return nil, spent, nil, err
 		}
 	}
 	if len(left) > 0 {
 		pending = append(pending, "locators not found on the crawled app: "+strings.Join(left, "; "))
 	}
-	return pending, spent, nil
+	return pending, spent, steps, nil
 }
 
 var camel = regexp.MustCompile(`([a-z0-9])([A-Z])`)
 
 func appSlug(app string) string { return strings.ToLower(camel.ReplaceAllString(app, "${1}_${2}")) } // CobroOrdenes -> cobro_ordenes
 
-func (c Config) renderOnce(stage, bundle, only string) ([]string, error) {
+func (c Config) renderOnce(stage, bundle, only string) ([]string, []StepMap, error) {
 	os.RemoveAll(bundle)
 	// the app map: locators confirmed on the real page (learned from the crawl, or written by a human) replace the guesses
 	if conf := c.confirmed(); len(conf.Locators) > 0 || len(conf.Widgets) > 0 {
 		dst := filepath.Join(bundle, "apps", c.App)
 		os.MkdirAll(dst, 0o755)
 		if err := writeJSON(filepath.Join(dst, "locators.confirmed.json"), conf); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	// ponytail: renderer is still Python (golden-tested); port when it changes next.
@@ -316,17 +323,28 @@ func (c Config) renderOnce(stage, bundle, only string) ([]string, error) {
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("render failed: %v: %.300s", err, errb.String())
+		return nil, nil, fmt.Errorf("render failed: %v: %.300s", err, errb.String())
 	}
-	var rep []struct{ Pending []string }
+	var rep []struct {
+		Case    string
+		Pending []string
+		Map     []StepMap
+	}
 	if err := json.Unmarshal(out.Bytes(), &rep); err != nil {
-		return nil, fmt.Errorf("render report unreadable: %v", err)
+		return nil, nil, fmt.Errorf("render report unreadable: %v", err)
 	}
 	var pending []string
+	var steps []StepMap
 	for _, x := range rep {
 		pending = append(pending, x.Pending...)
+		if x.Case == only {
+			steps = x.Map
+		}
 	}
-	return pending, nil
+	for i := range steps {
+		steps[i].Color = colorOf(steps[i].Locator, steps[i].Confirmed)
+	}
+	return pending, steps, nil
 }
 
 type Verdict struct {
@@ -336,13 +354,25 @@ type Verdict struct {
 }
 
 // verify runs the generated test (read-only unless AllowWrites). Without a base URL it stays "rendered".
+// verify runs the test and tells the live view before and after (with the final screen).
 func (c Config) verify(key string) Verdict {
+	c.live("verify", key, map[string]any{"show": c.Show})
+	v := c.verifyRun(key)
+	c.live("verified", key, map[string]any{"status": v.Status, "detail": v.Detail, "shot": token(key) + ".png"})
+	return v
+}
+
+func (c Config) verifyRun(key string) Verdict {
 	if c.PortalURL == "" {
 		return Verdict{Status: "rendered", Detail: []string{"no baseUrl: bundle written, not verified (not counted as automated)"}}
 	}
-	args := []string{filepath.Join(c.ToolsDir, "run_generated.py"), "--out", c.bundleDir(key), "--test", token(key), "--base-url", c.PortalURL}
+	args := []string{filepath.Join(c.ToolsDir, "run_generated.py"), "--out", c.bundleDir(key), "--test", token(key), "--base-url", c.PortalURL,
+		"--shots", filepath.Join(c.liveDir(), "shots")}
 	if c.AllowWrites {
 		args = append(args, "--allow-writes")
+	}
+	if c.Show {
+		args = append(args, "--headed", "--slow", strconv.Itoa(c.showSlow()))
 	}
 	var out, errb bytes.Buffer
 	cmd := exec.Command(c.Python, args...)

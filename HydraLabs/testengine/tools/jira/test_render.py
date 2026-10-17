@@ -164,6 +164,8 @@ class RenderTest(unittest.TestCase):
         self.assertEqual((by["DWQ-132"]["steps_mapped"], by["DWQ-132"]["pending"]), (5, []))
         self.assertEqual((by["DWQ-132"]["expected_asserted"], by["DWQ-132"]["expected"]), (5, 5))
         self.assertEqual((by["DWQ-130"]["expected_asserted"], by["DWQ-130"]["expected"]), (3, 3))
+        m = {x["n"]: x for x in by["DWQ-130"]["map"]}  # what the live view shows: each step and its locator
+        self.assertEqual((m["1"]["locator"], m["5"]["locator"], m["5"]["confirmed"]), (None, 'role=button[name="Agregar"]', False))
         for rel in ("apps/CobroOrdenes/data/dwq_130_data.csv", "apps/CobroOrdenes/data/expected_result.csv",
                     "apps/CobroOrdenes/locators/cobro_ordenes_locators.py", "apps/CobroOrdenes/modules/cobro_ordenes_module.py",
                     "tests/CobroOrdenes/test_dwq_130.py", "utils/test_files.py", "utils/network_mock.py"):

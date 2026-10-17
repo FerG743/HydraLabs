@@ -140,3 +140,11 @@ func (c Config) Crawl(watch string, headed bool) error {
 	}
 	return nil
 }
+
+// showSlow: how far --show slows the browser down; the profile's slowMs wins, otherwise slow enough to follow.
+func (c Config) showSlow() int {
+	if c.SlowMS > 0 {
+		return c.SlowMS
+	}
+	return 300
+}

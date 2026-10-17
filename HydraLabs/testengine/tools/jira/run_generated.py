@@ -2,7 +2,7 @@
 """Run one generated test against a real URL.  Read-only by default: every non-GET request the test does not
 deliberately mock is aborted and reported.  --allow-writes lets real requests through (they can change data).
 
-    python3 run_generated.py --out automation --test dwq_132 --base-url http://host:3000 [--allow-writes] [--headed]
+    python3 run_generated.py --out automation --test dwq_132 --base-url http://host:3000 [--allow-writes] [--headed [--slow MS]]
 """
 import argparse, json, os, sys
 
@@ -16,8 +16,9 @@ if __name__ == "__main__":
     ap.add_argument("--base-url", required=True)
     ap.add_argument("--allow-writes", action="store_true")
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument("--slow", type=int, default=0, help="ms between browser actions (for showing people)")
     ap.add_argument("--shots", default="")
     a = ap.parse_args()
-    r = harness.run(a.out, a.test, a.base_url, a.allow_writes, a.headed, a.shots or None)
+    r = harness.run(a.out, a.test, a.base_url, a.allow_writes, a.headed, a.shots or None, a.slow)
     print(json.dumps(r, indent=2, ensure_ascii=False))
     sys.exit(0 if r["status"] == "passed" else 1)

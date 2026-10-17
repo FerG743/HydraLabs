@@ -11,15 +11,33 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
 )
 
+// engineDir: where projects.json, tools/ and templates/ are. The working directory when it has the registry,
+// otherwise the folder above the binary (testengine/bin/hydra, also through a symlink), so hydra works from any folder.
+func engineDir() string {
+	here, _ := os.Getwd()
+	if fileExists(filepath.Join(here, "projects.json")) {
+		return here
+	}
+	if exe, err := os.Executable(); err == nil {
+		if exe, err = filepath.EvalSymlinks(exe); err == nil {
+			if dir := filepath.Dir(filepath.Dir(exe)); fileExists(filepath.Join(dir, "projects.json")) {
+				return dir
+			}
+		}
+	}
+	return here
+}
+
 // cfgFlags: defaults, then the --profile file, then explicit flags. A new web app is a new profile file, not new code.
 func cfgFlags(fs *flag.FlagSet, args []string) (*Config, error) {
-	here, _ := os.Getwd()
+	here := engineDir()
 	defOut, defAppMap := filepath.Join(here, "out", "hydra"), filepath.Join(here, "tools", "jira", "appmap")
 	c := &Config{Out: defOut, ToolsDir: filepath.Join(here, "tools", "jira"),
 		AppMap: defAppMap, Python: "python3", Lang: "en", MaxTurns: 25,
@@ -86,6 +104,7 @@ func cfgFlags(fs *flag.FlagSet, args []string) (*Config, error) {
 	fs.BoolVar(&c.AllowWrites, "allow-writes", c.AllowWrites, "let tests send real writes (default: read-only safety net)")
 	fs.StringVar(&c.Trigger, "trigger", "", "why this run happens, kept in the execution log (deploy, nightly...; default: the command)")
 	fs.StringVar(&c.AppVersion, "app-version", "", "the build under test (commit, tag, deploy id), kept in the execution log")
+	fs.BoolVar(&c.Show, "show", false, "for people watching: a visible, slowed-down browser; deliver also writes and opens the HTML report")
 	return c, nil
 }
 
@@ -109,7 +128,7 @@ func pollMulti(args []string) (handled bool, code int) {
 	if argValue(args, "project") != "" || argValue(args, "profile") != "" {
 		return false, 0
 	}
-	here, _ := os.Getwd()
+	here := engineDir()
 	regPath := argValue(args, "registry")
 	if regPath == "" {
 		regPath = filepath.Join(here, "projects.json")
@@ -234,6 +253,10 @@ func main() {
 			signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 			<-sig
 		}
+	case "watch": // read-only: the live view of every stage this app's runs go through
+		addr := fs.String("addr", ":8099", "where to serve the page")
+		fs.Parse(os.Args[2:])
+		err = cfg.Watch(*addr)
 	case "history": // read-only: every recorded execution of a project, or of one case
 		key, last, asJSON := fs.String("key", "", "only this case"), fs.Int("last", 30, "newest N (0 = all)"), fs.Bool("json", false, "machine-readable")
 		fs.Parse(os.Args[2:])
@@ -301,6 +324,9 @@ func main() {
 		if d, err = cfg.Deliver(on, ex); err == nil {
 			b, _ := json.MarshalIndent(d, "", "  ")
 			fmt.Println(string(b))
+			if d.Report != "" {
+				exec.Command("open", d.Report).Start() // macOS; elsewhere the path above is enough
+			}
 			cfg.writeBack(d)
 			if d.Gate != "" {
 				os.Exit(3) // distinct from 1 (error): the pipeline worked and is asking a person

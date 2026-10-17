@@ -38,7 +38,7 @@ class Driver:  # the surface the framework's `driver` fixture exposes
         self.page.context.clear_cookies()
 
 
-def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=None):
+def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=None, slow_ms=0):
     from playwright.sync_api import sync_playwright
     work = tempfile.mkdtemp(prefix="hydra_run_")
     shutil.copytree(out_dir, work, dirs_exist_ok=True)
@@ -61,7 +61,7 @@ def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=No
         fn = next(getattr(mod, n) for n in dir(mod) if n.startswith("test_"))
         from _pytest.outcomes import Skipped
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=not headed)
+            browser = p.chromium.launch(headless=not headed, slow_mo=slow_ms)
             page = browser.new_context(viewport={"width": 1280, "height": 900}).new_page()
             extra = [h for h in os.environ.get("HYDRA_WRITE_HOSTS", "").split(",") if h]
 
@@ -80,10 +80,13 @@ def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=No
             except Exception as e:  # AssertionError, playwright timeouts, ...
                 result["status"], result["error"] = "failed", f"{type(e).__name__}: {str(e).strip()[:600]}"
                 result["trace"] = "".join(traceback.format_exception_only(type(e), e))[:300]
-                if shots_dir:
-                    os.makedirs(shots_dir, exist_ok=True)
-                    page.screenshot(path=os.path.join(shots_dir, f"{token}.png"), full_page=True)
             finally:
+                if shots_dir:  # the final state, pass or fail: evidence for a person and for the live view
+                    try:
+                        os.makedirs(shots_dir, exist_ok=True)
+                        page.screenshot(path=os.path.join(shots_dir, f"{token}.png"), full_page=True)
+                    except Exception:
+                        pass
                 import utils.templete_report as tr
                 result["steps"] = list(getattr(tr, "STEPS", []))
                 browser.close()

@@ -73,7 +73,7 @@ func classify(c *Config, key, intent string) (int, string) {
 	if bad, _ := Maturity(cs); len(bad) > 0 {
 		return classFree, "incomplete: goes back to its author"
 	}
-	pending, _, err := c.render(cs, cases) // dry: deterministic, no browser, no model for the rules (the bridge may settle a tie)
+	pending, _, _, err := c.render(cs, cases) // dry: deterministic, no browser, no model for the rules (the bridge may settle a tie)
 	switch {
 	case err != nil:
 		return classRender, "render failed: reported by the router"

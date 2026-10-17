@@ -117,6 +117,13 @@ class App:
         self.locators.setdefault(name, (value, todo))
         return name
 
+    def located(self, name):  # -> (selector in force, confirmed on the real app?)
+        if not name:
+            return None, False
+        if name in self.confirmed:
+            return self.confirmed[name], True
+        return self.locators[name][0], False
+
     def flujo(self, name, src):
         self.flujos.setdefault(name, src)
         return name
@@ -184,6 +191,7 @@ def build_calls(app, a, defaults):
             line = f"co.{n}(driver)"
         elif op in ("click", "dblclick", "state", "download"):
             L, base = button(app, g[0]), slug(g[0])
+            st["loc"] = L
             if op in ("click", "dblclick"):
                 ctx["last_button"] = g[0]
                 ctx["click_index"].setdefault(g[0], i)
@@ -216,7 +224,7 @@ def build_calls(app, a, defaults):
         elif op == "fill":
             ctx["first_input"] = i if ctx["first_input"] is None else ctx["first_input"]
             f = slug(g[0])
-            L = app.loc(f"INPUT_{f.upper()}", f"role=textbox[name=\"{q(g[0])}\" i]", f"confirmar el selector del campo '{g[0]}'")
+            L = st["loc"] = app.loc(f"INPUT_{f.upper()}", f"role=textbox[name=\"{q(g[0])}\" i]", f"confirmar el selector del campo '{g[0]}'")
             n = app.flujo(f"capturar_{f}_flujo", f'''def capturar_{f}_flujo(driver, {f}):
     """Captura el campo {g[0]}."""
     DriverWrapper(driver).send_keys(L.{L}, {f}, description="el campo {g[0]}")''')
@@ -224,7 +232,7 @@ def build_calls(app, a, defaults):
         elif op == "select":
             ctx["first_input"] = i if ctx["first_input"] is None else ctx["first_input"]
             f = slug(g[0])
-            L = app.loc(f"SELECT_{f.upper()}", f"role=combobox[name=\"{q(g[0])}\" i]", f"confirmar el selector de '{g[0]}' y si la opción va por value o por label")
+            L = st["loc"] = app.loc(f"SELECT_{f.upper()}", f"role=combobox[name=\"{q(g[0])}\" i]", f"confirmar el selector de '{g[0]}' y si la opción va por value o por label")
             if app.widgets.get(f) == "combobox":  # custom (non-<select>) widget: open the list, pick the option
                 n = app.flujo(f"seleccionar_{f}_flujo", f'''def seleccionar_{f}_flujo(driver, {f}):
     """Selecciona {g[0]} (combobox personalizado: abre la lista y elige la opción)."""
@@ -238,7 +246,7 @@ def build_calls(app, a, defaults):
     driver.page.select_option(L.{L}, value={f})''')
             line = f"co.{n}(driver, {f})"
         elif op in ("upload_prev", "upload_binary", "upload_csv"):
-            app.loc("INPUT_ARCHIVO", "input[type='file']", "confirmar el selector de la zona de carga (drop zone)")
+            st["loc"] = app.loc("INPUT_ARCHIVO", "input[type='file']", "confirmar el selector de la zona de carga (drop zone)")
             if op == "upload_prev":
                 n = app.flujo("subir_archivo_flujo", '''def subir_archivo_flujo(driver, ruta_archivo):
     """Sube un archivo mediante la zona de carga."""
@@ -472,7 +480,10 @@ def main():
             write(os.path.join(app_dir, "data", f"{an['token']}_data.csv"),
                   "caso_id," + ",".join(an["data"]) + "\n" + ",".join([case["id"]] + [v for v in an["data"].values()]) + "\n")
         expected_rows.append((case["id"], " ".join(e["text"] for e in an["expected"])))
-        report.append({"case": case["id"], "steps_mapped": sum(1 for s, _ in calls if s["op"]), "steps": len(calls),
+        # per step, what it was mapped to: the locator in force (confirmed on the real app, or still a guess)
+        step_map = [{"n": s["n"], "text": s["text"], "mapped": bool(s["op"]), "locator": app.located(s.get("loc"))[0],
+                     "confirmed": app.located(s.get("loc"))[1]} for s, _ in calls]
+        report.append({"case": case["id"], "map": step_map, "steps_mapped": sum(1 for s, _ in calls if s["op"]), "steps": len(calls),
                        "expected_asserted": len({id(e) for e, l, _ in exp if l}), "expected": len(an["expected"]),
                        "pending": an["pending"]})
 

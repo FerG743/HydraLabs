@@ -67,6 +67,7 @@ type Config struct {
 	Show          bool                `json:"-"`              // --show: a visible, slowed-down browser (and deliver's HTML report) for people watching
 	Addons        []string            `json:"addons"`         // enabled add-ons (ploy, labs...); empty = all, as before add-ons existed
 	Remote        string              `json:"remote"`         // the test repo's remote URL, when it has one
+	JiraProject   string              `json:"jiraProject"`    // the Jira project the cases come from, when it differs from the registry key
 }
 
 type Run struct {

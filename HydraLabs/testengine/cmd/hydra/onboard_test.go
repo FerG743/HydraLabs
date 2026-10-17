@@ -100,3 +100,14 @@ func TestTheRepoIsCreatedOnTheBaseBranchTheProfileNames(t *testing.T) {
 		t.Errorf("init asked for develop, the repo is on %q: delivery would fail on a branch that does not exist", b)
 	}
 }
+
+func TestAnIssueFindsItsProjectByKeyOrByJiraProject(t *testing.T) {
+	reg, _ := newRegistry(t)
+	reg.Projects["PQA"] = ProjectEntry{App: "PortalQA", Profile: "profiles/portal-qa.json"}
+	writeJSON(reg.abs("profiles/portal-qa.json"), map[string]string{"jiraProject": "DWQ"})
+	for issue, want := range map[string]string{"ABC-7": "ABC", "PQA-3": "PQA", "DWQ-139": "PQA", "ZZZ-1": ""} {
+		if got, ok := reg.ProjectFor(issue); got != want || ok != (want != "") {
+			t.Errorf("%s -> %q %v, want %q", issue, got, ok, want)
+		}
+	}
+}

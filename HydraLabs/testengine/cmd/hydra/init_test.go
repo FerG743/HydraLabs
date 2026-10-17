@@ -87,6 +87,9 @@ func TestInitAsksFixesATypoAndWritesOnlyAfterYes(t *testing.T) {
 	if p["baseUrl"] != "https://qa.shop.test" || p["allowWrites"] != false || p["baseBranch"] != "main" || p["stabilityRuns"] != 3.0 {
 		t.Errorf("profile: %v", p)
 	}
+	if p["jiraProject"] != "SHOP" {
+		t.Errorf("the Jira project must be saved, not only used in the default query: %v", p["jiraProject"])
+	}
 	if !strings.Contains(p["jql"].(string), "project = SHOP AND labels") || p["agent"] != nil || p["model"] != nil || p["storeCrawl"] != true {
 		t.Errorf("jql default from the key, no model tier, crawl stored: %v", p)
 	}

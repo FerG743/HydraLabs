@@ -18,5 +18,8 @@
   ],
   "safeClicks": true,
   "stabilityRuns": 3,
-  "storeCrawl": true
+  "storeCrawl": true,
+  "jql": "parent = DWQ-129 AND labels in (\"automate\", \"execute\") ORDER BY key ASC",
+  "jiraProject": "DWQ",
+  "jiraComments": true
 }

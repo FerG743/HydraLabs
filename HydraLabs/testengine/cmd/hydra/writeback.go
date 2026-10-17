@@ -35,6 +35,9 @@ func (c Config) writeBack(d Delivery) {
 	}
 	repoName := filepath.Base(expand(c.DeliverRepo))
 	for _, k := range d.Delivered {
+		if !c.inJira(k) {
+			continue
+		}
 		msg := DeliveredMessage(c.runOf(k), d, repoName, c.testFile(k), d.Runs)
 		if ok, e := c.PostOnce(j, k, shortID("delivered", d.Commit), msg); e != nil {
 			fmt.Fprintln(os.Stderr, "comment on", k, "failed:", e)
@@ -43,7 +46,7 @@ func (c Config) writeBack(d Delivery) {
 		}
 	}
 	for _, o := range d.Outcomes {
-		if d.Gate == "" || o.Status == "passed" {
+		if d.Gate == "" || o.Status == "passed" || !c.inJira(o.Key) {
 			continue // only the cases that blocked the delivery are news
 		}
 		msg := BlockedMessage(o, d.Runs)
@@ -90,4 +93,13 @@ func (c Config) Announce(only []string, post bool) error {
 		}
 	}
 	return nil
+}
+
+// inJira: only issues of the project's Jira project get comments; cases fed from files (PQA-1) are not Jira issues.
+func (c Config) inJira(key string) bool {
+	p := c.JiraProject
+	if p == "" {
+		p = c.Project
+	}
+	return p == "" || strings.HasPrefix(key, p+"-")
 }

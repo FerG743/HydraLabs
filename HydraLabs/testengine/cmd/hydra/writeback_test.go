@@ -87,3 +87,13 @@ func TestWriteBackIsOffUnlessAsked(t *testing.T) {
 		t.Error("jiraComments is false: nothing may be sent")
 	}
 }
+
+func TestOnlyIssuesOfTheJiraProjectGetComments(t *testing.T) {
+	c := Config{Project: "PQA", JiraProject: "DWQ"}
+	if !c.inJira("DWQ-139") || c.inJira("PQA-3") || c.inJira("DWQX-1") {
+		t.Error("cases from files (PQA-3) are not Jira issues; only DWQ-… get comments")
+	}
+	if !(Config{Project: "DWQ"}).inJira("DWQ-130") {
+		t.Error("without jiraProject the registry key is the Jira key, as before")
+	}
+}

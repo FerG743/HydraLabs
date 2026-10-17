@@ -1,11 +1,14 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // The poll queue: one pass over EVERY registered project, cheapest work first.
@@ -158,7 +161,7 @@ func collect(cfg *Config, j *Jira, o PollOpts) ([]*job, map[string]string, error
 		if o.Only != "" && o.Intent != "" {
 			intent = o.Intent
 		}
-		stamp := is.Updated + "|" + intent
+		stamp := caseStamp(is) + "|" + intent
 		if intent == "" || (seen[is.Key] == stamp && !force) {
 			continue
 		}
@@ -166,6 +169,9 @@ func collect(cfg *Config, j *Jira, o PollOpts) ([]*job, map[string]string, error
 			return nil, nil, fmt.Errorf("%s: %w", is.Key, err)
 		}
 		jobs = append(jobs, &job{cfg: cfg, key: is.Key, intent: intent, stamp: stamp})
+	}
+	if err := cfg.storeReferenced(j); err != nil {
+		return nil, nil, err
 	}
 	sort.Slice(jobs, func(a, b int) bool { return jobs[a].key < jobs[b].key })
 	return jobs, seen, nil
@@ -265,4 +271,13 @@ func Poll(cfgs []*Config, o PollOpts) (gated bool, err error) {
 		}
 	}
 	return gated, err
+}
+
+// caseStamp changes only when what a person wrote changes (summary, description, labels). Not the issue's updated
+// time: Hydra's own comments move that, and a delivered case must not run again (and write again) on the next poll.
+func caseStamp(is Issue) string {
+	labels := append([]string{}, is.Labels...)
+	sort.Strings(labels)
+	sum := sha256.Sum256([]byte(is.Summary + "\x00" + is.HTML + "\x00" + strings.Join(labels, ",")))
+	return hex.EncodeToString(sum[:8])
 }

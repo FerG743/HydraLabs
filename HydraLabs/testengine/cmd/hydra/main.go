@@ -257,6 +257,56 @@ func main() {
 			signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 			<-sig
 		}
+	case "design": // stage 0: a requirement in, drafted cases out; Jira only from a reviewed run, after a yes
+		from, story := fs.String("from", "", "requirement as a text file"), fs.String("story", "", "requirement as a Jira story key")
+		max := fs.Int("max", 3, "most cases to draft")
+		create := fs.String("create", "", "create in Jira the drafts that passed in a saved run: its folder, or \"last\"")
+		parent, issueType := fs.String("parent", "", "Jira issue the drafts go under (e.g. DWQ-129)"), fs.String("type", "Task", "Jira issue type of the drafts")
+		yes := fs.Bool("yes", false, "with --create: no confirmation prompt")
+		fs.Parse(os.Args[2:])
+		if err = cfg.requireHome(); err != nil {
+			break
+		}
+		var d Design
+		if *create == "" {
+			req, src, e := requirementText(*from, *story)
+			if e != nil {
+				err = e
+				break
+			}
+			if d, err = cfg.Design(req, src, *max); err == nil {
+				printDesign(d)
+				fmt.Println("Read the drafts; to put the good ones in Jira: hydra design --project " + cfg.Project + " --create last --parent <ISSUE>")
+			}
+			break
+		}
+		if d, err = cfg.LoadDesign(*create); err != nil {
+			break
+		}
+		printDesign(d)
+		ok := 0
+		for _, r := range d.Drafts {
+			if r.OK && r.Issue == "" {
+				ok++
+			}
+		}
+		if ok == 0 {
+			fmt.Println("nothing to create: no draft in that run passed, or all are already in Jira")
+			break
+		}
+		if !*yes {
+			fmt.Printf("Create %d draft(s) in Jira under %s, labeled hydra-draft? (y/N): ", ok, *parent)
+			var a string
+			fmt.Scanln(&a)
+			if !strings.HasPrefix(strings.ToLower(a), "y") {
+				fmt.Println("cancelled: nothing was created")
+				break
+			}
+		}
+		if err = cfg.createDrafts(&d, *parent, *issueType); err == nil {
+			fmt.Println()
+			printDesign(d)
+		}
 	case "watch": // read-only: the live view of every stage this app's runs go through
 		addr := fs.String("addr", ":8099", "where to serve the page")
 		fs.Parse(os.Args[2:])

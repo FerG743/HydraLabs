@@ -214,3 +214,22 @@ func TestStatusReadsTheAppsRepoAndRunRecords(t *testing.T) {
 		t.Error("an app with no repo is reported as not onboarded, not as an error")
 	}
 }
+
+func TestOnlyWhatAPersonWroteMakesACaseNew(t *testing.T) {
+	is := Issue{Key: "DWQ-1", Summary: "TC-1", HTML: "<p>steps</p>", Labels: []string{"automate", "hydra-draft"}, Updated: "2026-10-17T13:00"}
+	commented := is
+	commented.Updated = "2026-10-17T13:20" // Hydra's own comment moved it
+	if caseStamp(is) != caseStamp(commented) {
+		t.Error("a comment from Hydra must not make a delivered case run again")
+	}
+	reordered := is
+	reordered.Labels = []string{"hydra-draft", "automate"}
+	if caseStamp(is) != caseStamp(reordered) {
+		t.Error("label order is not a change")
+	}
+	for _, changed := range []Issue{{Summary: "TC-1 edited", HTML: is.HTML, Labels: is.Labels}, {Summary: is.Summary, HTML: "<p>new step</p>", Labels: is.Labels}, {Summary: is.Summary, HTML: is.HTML, Labels: []string{"automate"}}} {
+		if caseStamp(changed) == caseStamp(is) {
+			t.Errorf("an edit by a person must make it new: %+v", changed)
+		}
+	}
+}

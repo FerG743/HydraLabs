@@ -97,3 +97,42 @@ func ResolveRefs(cases []*Case) {
 		}
 	}
 }
+
+// storeReferenced fetches the siblings a stored case points at ("Same as TC-1") that are not stored yet: a fresh app
+// repo has none, and the sibling may carry no automate label of its own. They are only stored, never run. A few
+// rounds cover chains (TC-3 -> TC-2 -> TC-1).
+func (c Config) storeReferenced(j *Jira) error {
+	for round := 0; round < 3; round++ {
+		cases, err := c.loadCases()
+		if err != nil {
+			return err
+		}
+		added := false
+		for _, cs := range cases {
+			parent, _ := cs.Meta["parent"].(string)
+			if cs.PreconditionRef == "" || parent == "" {
+				continue
+			}
+			if _, e := findTarget(cs.PreconditionRef, cases, cs.ID); e != "not found" {
+				continue
+			}
+			name := regexp.MustCompile(`^` + regexp.QuoteMeta(cs.PreconditionRef) + `($|[^\w-])`)
+			issues, err := j.Search(fmt.Sprintf(`parent = %s AND summary ~ "\"%s\""`, parent, cs.PreconditionRef))
+			if err != nil {
+				return fmt.Errorf("fetching %s for %s: %w", cs.PreconditionRef, cs.ID, err)
+			}
+			for _, is := range issues {
+				if is.Key != cs.ID && name.MatchString(strings.TrimSpace(is.Summary)) {
+					if _, err := c.Ingest(is); err != nil {
+						return err
+					}
+					added = true
+				}
+			}
+		}
+		if !added {
+			return nil
+		}
+	}
+	return nil
+}

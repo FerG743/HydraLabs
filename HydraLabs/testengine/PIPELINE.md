@@ -66,7 +66,7 @@ A **human writes and documents every case in Jira first.** The pipeline starts f
 
 | # | Stage | Owner | In → Out | Model? | Status | Code |
 |---|---|---|---|---|---|---|
-| 0 | **Design** (optional source) | Labs | requirements → draft cases | yes | not started | - |
+| 0 | **Design** (optional source) | Labs | requirements → draft cases | yes | done (data from the requirement; enumerated boundaries not yet) | `cmd/hydra/design.go`, `hydra design` |
 | 1 | **Intake + maturity gate** | Ploy | Jira issue → normalized case, or specific questions back to the author | no | done (Jira polling untested live) | `cmd/hydra/intake.go`, `resolve.go`, `maturity.go` |
 | 2 | **Crawl** (once per app) | Labs | running app → every page, element, best locator, options | no | done | `tools/crawl/crawl.py`, `hydra crawl` |
 | 3 | **Plan / bridge** | Labs | case words ↔ crawled elements (confirmed locators, widget kinds) | rarely (closed list) | done | `cmd/hydra/bridge.go` |
@@ -176,6 +176,8 @@ Lessons that shaped the rules: running the model on this case four times cost ab
 - Model requirements: LM Studio context of at least **24000** tokens (the agent refuses to start below that). The model is only used at T2/T3.
 
 ## Stage 0: Design (requirements → cases)
+
+`hydra design --project KEY --from req.txt` (or `--story JIRA-KEY`) [`--max 3`] [`--create --parent DWQ-129`]: the model drafts cases from the requirement and the app's crawl (its real paths, fields, buttons, dropdown options), in the phrasings the renderer maps, through LM Studio's structured output. Each draft is written as the Jira description a person would write, read back by intake, and kept only if it passes the maturity gate, uses no value that is neither in the requirement nor in the app, and renders at T1 with every step mapped and every expected result asserted (a dry render in a throwaway folder). Drafts are saved under `hydra/out/design/<time>/`; nothing reaches Jira without `--create` and a yes, and created drafts carry only the `hydra-draft` label: a person adds `automate` to approve, and the next poll takes it.
 
 1. A story with acceptance criteria goes in (Jira story, or a document a human wrote).
 2. **Code** enumerates the data with standard techniques (valid, invalid, empty, boundaries).

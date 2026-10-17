@@ -22,7 +22,7 @@ The boundary is a contract, not a convention:
 ```
 
 - **Work order** (Ploy → Labs): a normalized case, the profile, and the framework catalog.
-- **Automation bundle** (Labs → Ploy): a plain folder of files in framework README layout, plus `bundle.json` (which framework functions were matched, which steps are unresolved, what the model was asked, warnings).
+- **Automation bundle** (Labs → Ploy): a plain folder of files in the output layout (below), plus `bundle.json` (which framework functions were matched, which steps are unresolved, what the model was asked, warnings).
 - **Ploy verifies every bundle. Labs never grades its own work.** This is the independent-oracle rule enforced by structure: the agents that build something are never the ones that decide whether it passed.
 - **Dividing rule:** if it touches a Jira issue, a gate, a run or a result, it is Ploy. If it produces test code or touches the app under test, it is Labs. A feature that fits neither waits.
 
@@ -70,7 +70,7 @@ A **human writes and documents every case in Jira first.** The pipeline starts f
 | 1 | **Intake + maturity gate** | Ploy | Jira issue → normalized case, or specific questions back to the author | no | done (Jira polling untested live) | `cmd/hydra/intake.go`, `resolve.go`, `maturity.go` |
 | 2 | **Crawl** (once per app) | Labs | running app → every page, element, best locator, options | no | done | `tools/crawl/crawl.py`, `hydra crawl` |
 | 3 | **Plan / bridge** | Labs | case words ↔ crawled elements (confirmed locators, widget kinds) | rarely (closed list) | done | `cmd/hydra/bridge.go` |
-| 4 | **Build** | Labs | plan → bundle in the framework README layout | only for gaps (agent) | rules done · agent untested live | `tools/jira/render_pytest.py`, `agent/` |
+| 4 | **Build** | Labs | plan → bundle in the output layout | only for gaps (agent) | rules done · agent untested live | `tools/jira/render_pytest.py`, `agent/` |
 | 5 | **Verify** | Ploy | bundle → pass/fail in the real app, read-only unless allowed | no | done (harness, not yet the real framework repo) | `tools/jira/run_generated.py`, `router.go` |
 | 6 | **Deliver** | Ploy | verified bundle → branch/PR, Jira comment + status | no | Jira/Chat notify only (off by default); no PR yet | `notify.go` |
 
@@ -82,7 +82,7 @@ Cross-cutting: **profile** (one JSON per web app), **knowledge** (`hydra/knowled
   **Known gap:** the CSV adapters produce this shape, but the Jira adapter (`cmd/hydra/intake.go`) produces its own (`steps[].n/action`, `expected[].text`, `precondition`, no `status`), which is what the renderer and agent consume. Reconcile (map Jira cases to this schema, or version the schema) before a third source is added.
 - **Work order / bundle**: the Ploy↔Labs boundary (see "Two products"). Both get a schema next to `case.schema.json` and are validated at the boundary, like cases.
 - **Profile**: which columns/fields mean what, the case key, tag fields, blocked phrase. Missing required keys fail at build time.
-- **Output layout** follows the framework README exactly: `apps/<App>/{data,locators,modules}`, `tests/<App>/test_*.py`, `expected_result.csv`, `ENV:` tokens for secrets (never literal credentials), `DriverWrapper` only (no raw Playwright), `add_step(..., level="business")`.
+- **Output layout**: `apps/<App>/{data,locators,modules}`, `tests/<App>/test_*.py`, `expected_result.csv` (read by the T3 agent's checks), `ENV:` tokens for secrets (never literal credentials), `DriverWrapper` for actions, `add_step(...)` for steps. The app repo carries only the framework this needs (`templates/framework/`, about 8 KB: shared browser and `driver` fixture, `DriverWrapper`, steps, CSV reader, settings; with `--html` each test's steps, final screen and the run's video).
 
 ## Boards, apps and repos
 
@@ -90,7 +90,7 @@ One Jira project (board) = one application under test. Humans write and document
 
 - **Registry** (`projects.json`): the Jira projects the pipeline automates, each with its app name and profile (`"DWQ": {"app": "CobroOrdenes", ...}`). Registration is explicit on purpose: a Jira token sees dozens of projects and must never turn each one into a repo.
 - **`hydra init`** (interactive, or `--answers team.json --yes` for CI): asks the core questions (project id, app name, QA URL, is it production, may tests write, base branch, test repo remote) and then one set per enabled add-on (`ploy`: case source, JQL, write-back, stability runs; `labs`: crawl paths, model tier). Each answer is checked as it is given (URL reachable, Jira query, remote readable; a temporary failure is a warning, not a stop), one page is crawled as a preview, and nothing is written until the person confirms. It then writes `profiles/<app>.json` (with `"addons"`) and the registry entry, and runs the onboarding below. A profile without `addons` keeps everything, as before. `jiraProject` names the Jira project the cases come from when it differs from the registry key (PQA takes DWQ issues): `poll --only DWQ-139` finds the project through it, and write-back comments only on that project's issues (cases fed from files, like PQA-1, are not Jira issues). Every `hydra` command loads `~/.hydra.env` and `HydraLabs/.hydra.env` itself. `poll` skips projects without `ploy`; `crawl` needs `labs`; `automate` needs `labs` (Ploy alone only runs stored tests).
-- **Onboarding** (`hydra onboard --project KEY`, and automatically before every poll): the first time a registered project is seen, the pipeline creates **`Hydra-<App>`** next to the other repos on the machine that runs n8n (`reposRoot`, default `~/Documents/GitHub`). It is built from the framework template (`templates/framework/`), with the suite registered in `runner_central.py` and one baseline commit, so every later review branch shows only generated tests. It never writes into a folder that is not already a Hydra repo, and a second run changes nothing.
+- **Onboarding** (`hydra onboard --project KEY`, and automatically before every poll): the first time a registered project is seen, the pipeline creates **`Hydra-<App>`** next to the other repos on the machine that runs n8n (`reposRoot`, default `~/Documents/GitHub`). It is built from the framework template (`templates/framework/`), with one baseline commit, so every later review branch shows only generated tests. It never writes into a folder that is not already a Hydra repo, and a second run changes nothing.
 - **Onboarding gate**: Jira cannot know where the app runs. A new project gets a read-only default profile with an empty `baseUrl` and stops with `needs-onboarding` until a person sets it (and `allowWrites` only for a QA environment that may be changed). With a URL set, the first crawl runs automatically.
 - **Everything an app produces lives in its own repo**, in a `hydra/` folder (the pipeline repo keeps only code, the registry, profiles and the template, nothing app-specific):
 

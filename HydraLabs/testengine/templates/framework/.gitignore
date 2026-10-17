@@ -1,24 +1,8 @@
 __pycache__/
-*.py[cod]
-*$py.class
-
-.venv/
-venv/
-env/
-
-.env
-.env.local
-
-reports/
-allure-results/
-*.log
-
-.vscode/
-.idea/
 .pytest_cache/
+.venv/
+.env
+reports/
 .DS_Store
-.playwright-mcp/
-x/
-
 # HydraPloy working files (run records, bundles, crawl screenshots/video, state): never committed
 hydra/out/

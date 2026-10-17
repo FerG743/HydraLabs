@@ -7,47 +7,6 @@ import (
 	"testing"
 )
 
-const runnerTemplate = `parser.add_argument(
-        '--suite',
-        choices=['Portal', 'all'],
-        default='Portal',
-    )
-    if args.suite == 'Portal':
-        test_targets.append(os.path.join(tests_dir, "Portal"))
-        report_name = "report_Portal.html"
-    elif args.suite == 'all':
-        test_targets.append(tests_dir)
-`
-
-func TestRegisterSuiteFollowsTheReadme(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "runner_central.py")
-	os.WriteFile(p, []byte(runnerTemplate), 0o644)
-	if note, err := registerSuite(p, "CobroOrdenes"); err != nil || note != "" {
-		t.Fatalf("%q %v", note, err)
-	}
-	got, _ := os.ReadFile(p)
-	for _, want := range []string{"choices=['Portal', 'CobroOrdenes', 'all']", "elif args.suite == 'CobroOrdenes':", `os.path.join(tests_dir, "CobroOrdenes")`} {
-		if !strings.Contains(string(got), want) {
-			t.Errorf("missing %q in\n%s", want, got)
-		}
-	}
-	registerSuite(p, "CobroOrdenes") // idempotent
-	again, _ := os.ReadFile(p)
-	if strings.Count(string(again), "elif args.suite == 'CobroOrdenes'") != 1 {
-		t.Error("registered twice")
-	}
-}
-
-func TestRegisterSuiteLeavesAnUnknownRunnerAlone(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "runner_central.py")
-	os.WriteFile(p, []byte("print('custom runner')\n"), 0o644)
-	note, err := registerSuite(p, "X")
-	got, _ := os.ReadFile(p)
-	if err != nil || note == "" || string(got) != "print('custom runner')\n" {
-		t.Errorf("a runner that is not the template must be left untouched and reported: %q %v %q", note, err, got)
-	}
-}
-
 func TestJUnitIsMappedBackToJiraKeys(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "j.xml")
 	os.WriteFile(p, []byte(`<?xml version="1.0"?><testsuites><testsuite name="pytest">

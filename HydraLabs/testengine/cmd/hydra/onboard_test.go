@@ -30,9 +30,14 @@ func TestOnboardingCreatesTheAppsOwnRepo(t *testing.T) {
 			t.Errorf("missing %s", f)
 		}
 	}
-	runner, _ := os.ReadFile(filepath.Join(repo, "runner_central.py"))
-	if strings.Contains(string(runner), "__APP__") || !strings.Contains(string(runner), "choices=['MiApp', 'all']") {
-		t.Errorf("runner not specialized:\n%s", runner)
+	readme, _ := os.ReadFile(filepath.Join(repo, "README.md"))
+	if strings.Contains(string(readme), "__APP__") || !strings.Contains(string(readme), "# Hydra-MiApp") {
+		t.Errorf("README not specialized:\n%s", readme)
+	}
+	for _, gone := range []string{"runner_central.py", "utils/logger.py", "utils/pdf_reader.py", "templates/mock_report.html"} {
+		if fileExists(filepath.Join(repo, gone)) {
+			t.Errorf("%s is not something Hydra needs; the repo must stay minimal", gone)
+		}
 	}
 	if n, _ := git(repo, "rev-list", "--count", "HEAD"); n != "1" {
 		t.Errorf("want exactly one baseline commit, got %s", n)

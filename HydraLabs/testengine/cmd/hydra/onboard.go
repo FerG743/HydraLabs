@@ -153,7 +153,7 @@ func (r *Registry) scaffold(repo, app, base string) error {
 			return err
 		}
 	}
-	for _, f := range []string{"runner_central.py"} {
+	for _, f := range []string{"README.md"} {
 		b, err := os.ReadFile(filepath.Join(repo, f))
 		if err != nil {
 			return err

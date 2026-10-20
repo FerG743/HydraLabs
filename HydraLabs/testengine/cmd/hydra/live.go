@@ -151,12 +151,12 @@ const STATUS={passed:'ok','needs-writes':'wait','needs-clarification':'wait','ne
 function on(e){const c=e.key?card(e.key):null;
 switch(e.kind){
 case'case':c.el.querySelector('h2 span').textContent=e.title||e.intent;set(c,0,'ok');set(c,1,'run');log(e,e.intent);break;
-case'gate':if(e.ok){set(c,1,'ok');set(c,2,'run')}else{set(c,1,'wait');c.el.querySelector('.why').textContent='Questions for the author:\n• '+(e.questions||[]).join('\n• ')}log(e,e.ok?'gate passed':'back to the author');break;
+case'gate':if(e.ok){set(c,1,'ok');set(c,2,'run');c.el.querySelector('.why').textContent=''}else{set(c,1,'wait');c.el.querySelector('.why').textContent='Questions for the author:\n• '+(e.questions||[]).join('\n• ')}log(e,e.ok?'gate passed':'back to the author');break;
 case'map':set(c,2,'ok');set(c,3,'ok');set(c,4,'run');c.el.querySelector('table').innerHTML=(e.steps||[]).map(s=>'<tr><td class=n>'+esc(s.n)+'</td><td>'+esc(s.text)+'</td><td class=loc>'+(s.locator?'<i class=dot style=background:'+s.color+'></i>'+esc(s.locator):(s.mapped?'<span style=color:var(--mute)>page</span>':'<span style=color:var(--bad)>not mapped</span>'))+'</td></tr>').join('');
 log(e,'mapped '+(e.steps||[]).filter(s=>s.mapped).length+'/'+(e.steps||[]).length+' steps · '+(e.tokens||0)+' tokens');break;
 case'verify':set(c,4,'run');log(e,'running in the real app'+(e.show?' (visible browser)':''));break;
 case'verified':set(c,4,STATUS[e.status]||'bad');if(e.shot)document.getElementById('shot').src='/shots/'+e.shot+'?'+n;
-if(e.status!='passed')c.el.querySelector('.why').textContent=(e.detail||[]).join('\n');log(e,'verify: '+e.status);break;
+c.el.querySelector('.why').textContent=e.status=='passed'?'':(e.detail||[]).join('\n');log(e,'verify: '+e.status);break;
 case'done':c.el.querySelector('.meta').textContent=e.tier+' · '+e.status+' · '+(e.tokens||0)+' tokens · '+(e.ms/1000).toFixed(1)+'s';log(e,'done: '+e.status);break;
 case'stability':set(c,5,e.status=='passed'?(e.run<e.of?'run':'ok'):'bad');c.st[5].textContent=e.run+'/'+e.of+(e.status=='passed'?' passed':' '+e.status);log(e,'stability run '+e.run+'/'+e.of+': '+e.status);break;
 case'delivered':set(c,6,e.branch?'ok':'wait');if(e.branch)c.st[6].textContent='branch ✓';

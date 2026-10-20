@@ -276,7 +276,7 @@ func (c Config) Deliver(only []string, exclude map[string]bool) (d Delivery, err
 	}
 	d.Runs = len(results)
 	if c.Show {
-		if rs, _ := filepath.Glob(filepath.Join(work, "report_*.html")); len(rs) > 0 {
+		if rs, _ := filepath.Glob(filepath.Join(work, "report*.html")); len(rs) > 0 {
 			d.Report, _ = filepath.Abs(rs[len(rs)-1])
 		}
 	}
@@ -343,7 +343,7 @@ func (c Config) runPytest(repo, work string, n int) (map[string]CaseOutcome, str
 	headless, slow := "true", "0"
 	if c.Show && n == 1 { // the first stability run is the one people watch; the repeats stay headless and fast
 		headless, slow = "false", strconv.Itoa(c.showSlow())
-		report, _ := filepath.Abs(filepath.Join(work, "report.html")) // the framework stamps it: report_<time>.html
+		report, _ := filepath.Abs(filepath.Join(work, "report.html")) // older framework copies stamp it: report_<time>.html
 		args = append(args, "--html="+report, "--self-contained-html")
 	}
 	cmd := exec.Command(c.Python, args...)

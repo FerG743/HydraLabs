@@ -7,9 +7,9 @@
   "agent": "agent/agent.py",
   "allowWrites": true,
   "app": "PortalQA",
-  "baseBranch": "Pro",
+  "baseBranch": "pro",
   "baseUrl": "http://127.0.0.1:3000",
-  "jiraComments": true,
+  "jiraComments": false,
   "jiraProject": "DWQ",
   "jql": "parent = DWQ-129 AND labels in (\"automate\", \"execute\") ORDER BY key ASC",
   "maxPages": 25,
@@ -17,7 +17,7 @@
   "maxTurns": 20,
   "model": "prism-ml/bonsai-27b",
   "paths": [
-    "/cobro_ordenes"
+    "/"
   ],
   "safeClicks": true,
   "stabilityRuns": 3,

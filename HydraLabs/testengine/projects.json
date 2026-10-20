@@ -1,7 +1,7 @@
 {
   "_doc": "Which Jira projects the pipeline automates. Registration is explicit: a Jira token sees dozens of projects and must never turn each into a repo. Each app gets its own repo, Hydra-\u003capp\u003e, next to the others.",
   "projects": {
-    "PQA": {
+    "DWQ": {
       "app": "PortalQA",
       "profile": "profiles/portal-qa.json"
     }

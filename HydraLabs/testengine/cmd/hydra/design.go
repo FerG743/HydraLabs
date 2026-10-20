@@ -245,6 +245,7 @@ func (c Config) Design(requirement, source string, max int) (Design, error) {
 	}
 	defer os.RemoveAll(tmp)
 	low := strings.ToLower(requirement)
+	seen := map[string]string{} // steps + expected -> the first draft that had them
 	for i, dr := range drafts {
 		if start != "" && (len(dr.Steps) == 0 || !strings.HasPrefix(dr.Steps[0], "Navigate to ")) {
 			dr.Steps = append([]string{"Navigate to `" + start + "`."}, dr.Steps...) // where the requirement says it happens
@@ -260,10 +261,26 @@ func (c Config) Design(requirement, source string, max int) (Design, error) {
 		if len(cs.Steps) > 0 && !strings.HasPrefix(cs.Steps[0].Action, "Navigate to ") {
 			bad = append(bad, "does not start by opening a page (step 1 must be navigate): the test would have nowhere to begin")
 		}
+		key := strings.Join(dr.Steps, "\n") + "\n=>" + strings.Join(dr.Expected, "\n")
+		if first, dup := seen[key]; dup {
+			bad = append(bad, "same steps and expected results as "+first)
+		} else {
+			seen[key] = res.ID
+		}
 		res.Problems = append(res.Problems, bad...)
 		for _, s := range cs.Steps {
 			for _, m := range backticked.FindAllStringSubmatch(s.Action, -1) {
-				if v := strings.ToLower(m[1]); !strings.Contains(low, v) && !known[v] {
+				v := strings.ToLower(m[1])
+				// the requirement is untrusted text too: these two never pass because it mentions them
+				if strings.HasPrefix(v, "env:") {
+					res.Problems = append(res.Problems, fmt.Sprintf("step %s uses %q: secrets are never test data in a draft", s.N, m[1]))
+					continue
+				}
+				if strings.HasPrefix(s.Action, "Navigate to ") && !known[v] {
+					res.Problems = append(res.Problems, fmt.Sprintf("step %s opens %q, which is not a page of the app (crawl)", s.N, m[1]))
+					continue
+				}
+				if !strings.Contains(low, v) && !known[v] {
 					res.Problems = append(res.Problems, fmt.Sprintf("step %s uses %q, which is neither in the requirement nor in the app", s.N, m[1]))
 				}
 			}

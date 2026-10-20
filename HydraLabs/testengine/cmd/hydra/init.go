@@ -241,7 +241,10 @@ func checkJQL(v string, a answers) (string, string, error) {
 		v = fmt.Sprintf(`project = %s AND labels in ("automate", "execute") ORDER BY key ASC`, a["ploy.jiraKey"])
 	}
 	n, err := jiraCount(v)
-	if err != nil {
+	if err != nil && strings.Contains(err.Error(), ": 400 ") { // Jira read it and rejected it: ask again
+		return v, "", fmt.Errorf("Jira does not accept that query (for one issue use: key = DWQ-140; for a set: parent = DWQ-129 AND labels in (\"automate\", \"execute\")): %.160s", err.Error())
+	}
+	if err != nil { // Jira not reachable or no token: a warning, the query may still be right
 		return v, "could not check it against Jira (" + err.Error() + "); kept as written", nil
 	}
 	return v, fmt.Sprintf("%d issue(s) match today", n), nil

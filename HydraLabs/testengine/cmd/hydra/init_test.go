@@ -165,3 +165,19 @@ func writeAnswers(t *testing.T, s string) string {
 	os.WriteFile(p, []byte(s), 0o644)
 	return p
 }
+
+func TestAQueryJiraRejectsIsAskedAgain(t *testing.T) {
+	offline(t, true)
+	jiraCount = func(jql string) (int, error) {
+		if jql == "DWQ-140" {
+			return 0, errors.New(`jira GET /rest/api/3/search/jql: 400 {"errorMessages":["Error in the JQL Query"]}`)
+		}
+		return 3, nil
+	}
+	if _, _, err := checkJQL("DWQ-140", answers{}); err == nil || !strings.Contains(err.Error(), "does not accept") {
+		t.Errorf("an invalid query must be asked again: %v", err)
+	}
+	if _, warn, err := checkJQL("key = DWQ-140", answers{}); err != nil || !strings.Contains(warn, "3 issue(s)") {
+		t.Errorf("%q %v", warn, err)
+	}
+}

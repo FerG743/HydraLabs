@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HydraLabs teaser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=block" rel="stylesheet">
+<style>
+  @font-face { font-family: "Genius Techno"; src: url("GeniusTechnoOblique.ttf") format("truetype"); font-display: block; }
+  :root { --bg: #1c1719; --card: #2d2527; --muted: #43373b; --ink: #f6f3f4; --dim: #e6a8bd; --primary: #f490b1; --accent: #ffa98f; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: var(--bg); overflow: hidden; }
+  body { color: var(--ink); font-family: "Genius Techno", "Arial Black", sans-serif; }
+  .stage { position: fixed; inset: 0; width: 1920px; height: 1080px; left: 50%; top: 50%;
+           transform: translate(-50%, -50%) scale(var(--s, 1)); transform-origin: center; overflow: hidden; }
+  .world { position: absolute; inset: 0; transform-origin: 50% 50%; }
+  .grid { position: absolute; inset: -48px; will-change: transform;
+          background-image: radial-gradient(circle, var(--card) 1.5px, transparent 1.6px);
+          background-size: 48px 48px; opacity: 0.9; }
+  /* Centred lines: each one owns the full frame and centres its own text. */
+  .line { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+          text-align: center; font-size: 84px; font-weight: 500; letter-spacing: 0.01em;
+          opacity: 0; white-space: nowrap; will-change: transform, opacity, filter; }
+  .line .ch { display: inline-block; white-space: pre; }
+  .old { color: rgba(246, 243, 244, 0.42); }
+  .term-wrap { text-align: left; font-size: 36px; letter-spacing: 0.01em; white-space: normal; font-family: "Share Tech Mono", ui-monospace, Menlo, Consolas, monospace; }
+  .term { width: 1640px; background: var(--card); border: 2px solid var(--muted); border-radius: 24px; padding: 32px 44px 36px; line-height: 1.4; }
+  .term .dots { display: flex; gap: 10px; margin-bottom: 22px; }
+  .term .dots i { width: 16px; height: 16px; border-radius: 50%; background: var(--muted); display: block; }
+  .trow { opacity: 0; color: var(--ink); white-space: pre; }
+  .trow.dim { color: var(--dim); }
+  .trow.ans { color: var(--primary); }
+  .trow.gap { height: 12px; }
+  .term-note { position: absolute; left: 0; right: 0; bottom: 36px; text-align: center; font-family: "Share Tech Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 36px; color: var(--dim); opacity: 0; }
+  .new { color: var(--primary); }
+  .endcard { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; }
+  .endcard .line { position: relative; inset: auto; height: auto; display: block; }
+  .mono { font-family: "Share Tech Mono", ui-monospace, Menlo, Consolas, monospace; text-transform: uppercase; letter-spacing: 0.22em; }
+  .dot { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px;
+         border-radius: 50%; background: var(--primary); opacity: 0; }
+  .wordmark { font-size: 200px; font-weight: 900; letter-spacing: 0.02em; }
+  .flow { position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; gap: 12px; }
+  .box { width: 186px; height: 230px; border: 2px solid var(--muted); border-radius: 28px;
+         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+         background: var(--card); opacity: 0; font-size: 34px; font-weight: 500; text-align: center; padding: 0 8px; line-height: 1.15; will-change: transform, opacity; }
+  .box small { font-size: 24px; color: var(--dim); }
+  .box.hero { border-color: var(--primary); background: var(--primary); color: var(--bg); }
+  .box.hero small { color: var(--card); }
+  .arrow { width: 36px; height: 2px; background: var(--ink); transform: scaleX(0); transform-origin: left center; }
+  .tick { color: var(--accent); font-size: 110px; font-weight: 700; line-height: 1; }
+  .caption { position: absolute; left: 0; right: 0; bottom: 150px; text-align: center; font-size: 44px; color: var(--dim); opacity: 0; }
+  .bar { position: absolute; left: 0; bottom: 0; height: 6px; background: var(--ink); width: 0; }
+  .foot { position: absolute; left: 0; right: 0; bottom: 70px; text-align: center; font-size: 22px; color: var(--dim); opacity: 0; }
+  .flash { position: absolute; inset: 0; background: var(--ink); opacity: 0; pointer-events: none; }
+  .end-title { font-size: 150px; font-weight: 900; letter-spacing: 0.02em; }
+  .end-tag { font-size: 40px; font-weight: 400; color: var(--dim); }
+</style>
+</head>
+<body>
+<body>
+<div class="stage" id="stage">
+  <div class="world" id="world">
+    <div class="grid"></div>
+
+    <!-- Scene 1: hydra init. The real prompts and the real summary, typed out line by line. -->
+    <div class="line term-wrap" data-a="0.336" data-b="8.2" data-dir="up">
+      <div class="term">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <div class="trow" data-t="0.643">$ hydra init</div>
+        <div class="trow" data-t="1.463">Project id ............ <span class="ans">DEMO</span></div>
+        <div class="trow" data-t="1.668">App name .............. <span class="ans">Shop</span></div>
+        <div class="trow" data-t="1.873">Add-ons ............... <span class="ans">ploy, labs</span></div>
+        <div class="trow" data-t="2.079">QA URL ................ <span class="ans">https://example.com</span></div>
+        <div class="trow" data-t="2.284">Test cases ............ <span class="ans">jira: project = DEMO AND status = Ready</span></div>
+        <div class="trow" data-t="2.693">Delivery .............. <span class="ans">after 3 passes in a row</span></div>
+        <div class="trow" data-t="2.898">Crawl ................. <span class="ans">/</span></div>
+        <div class="trow" data-t="4.744">Write this and create the repo? (y/N) <span class="ans">y</span></div>
+      </div>
+    </div>
+    <div class="term-note" data-t="6.178">one question at a time. nothing is written until the final yes.</div>
+
+    <div class="line split wordmark new" data-a="8.536" data-b="10.486" data-dir="punch">Hydra</div>
+    <div class="dot" data-dot></div>
+    <div class="line split new" data-a="11.201" data-b="14.381" data-dir="left">You write the idea.</div>
+    <div class="line split new" data-a="14.481" data-b="17.661" data-dir="left">It learns your app.</div>
+    <div class="line split new" data-a="17.761" data-b="20.941" data-dir="right">It writes the test.</div>
+    <div class="line split new" data-a="21.041" data-b="24.221" data-dir="left">Three passes in a row.</div>
+    <div class="flow">
+      <div class="box" data-a="25.961" data-b="33.956" data-dir="left"><small class="mono">Step 1</small>Your idea</div>
+      <div class="arrow" data-arrow data-a="26.166" data-b="33.956"></div>
+      <div class="box" data-a="26.371" data-b="33.956" data-dir="up"><small class="mono">Step 2</small>Checked</div>
+      <div class="arrow" data-arrow data-a="26.576" data-b="33.956"></div>
+      <div class="box" data-a="26.781" data-b="33.956" data-dir="up"><small class="mono">Step 3</small>App learned</div>
+      <div class="arrow" data-arrow data-a="26.986" data-b="33.956"></div>
+      <div class="box hero" data-a="27.191" data-b="33.956" data-dir="zoom"><small class="mono">Step 4</small>Test written</div>
+      <div class="arrow" data-arrow data-a="27.396" data-b="33.956"></div>
+      <div class="box" data-a="27.601" data-b="33.956" data-dir="up"><small class="mono">Step 5</small>Ran in your app</div>
+      <div class="arrow" data-arrow data-a="27.806" data-b="33.956"></div>
+      <div class="box" data-a="28.011" data-b="33.956" data-dir="up"><small class="mono">Step 6</small>Passed 3 times</div>
+      <div class="arrow" data-arrow data-a="28.216" data-b="33.956"></div>
+      <div class="box" data-a="28.421" data-b="33.956" data-dir="right"><small class="mono">Step 7</small>Review branch</div>
+    </div>
+    <div class="caption" data-a="27.601" data-b="33.956" data-dir="up">Your idea in. A checked test out. Nothing ships by itself.</div>
+    <div class="line split new" data-a="38.261" data-b="40.266" data-dir="zoom">A person decides.</div>
+    <div class="endcard">
+      <div class="line split end-title new" data-a="40.516" data-b="99" data-dir="punch">HydraLabs</div>
+      <div class="line end-tag" data-a="41.336" data-b="99" data-dir="up">Your automated QA pipeline at your fingertips</div>
+    </div>
+    <div class="foot mono" data-a="42.156" data-b="99" data-dir="up">Hydra · QA testing suite</div>
+
+    <div class="flash" data-flash></div>
+    <div class="bar" data-bar></div>
+  </div>
+</div>
+
+<script>
+  const DURATION = 44;
+  const LETTER_STAGGER = 0.03;
+  const EXIT_TIME = 0.22;                    // quick snap-out before the next line arrives
+  const FLASH_AT = [0.336, 8.536, 11.201, 14.481, 17.761, 21.041, 25.961, 38.261, 40.516];
+
+  // Easing curves.
+  const EXPO = t => t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
+  const BACK = t => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+
+  // Progress of an entrance that starts at a and takes dur seconds, clamped 0..1.
+  const enter = (t, a, dur = 0.5) => t < a ? 0 : EXPO(Math.min(1, (t - a) / dur));
+  // How far an element has left after its end time b, 0 (still there) to 1 (gone).
+  const leave = (t, b) => t <= b ? 0 : Math.min(1, (t - b) / EXIT_TIME);
+
+  // Wrap each character of split lines in a span so the letters can stagger.
+  document.querySelectorAll('.split').forEach(el => {
+    const text = el.textContent;
+    el.textContent = '';
+    [...text].forEach(ch => {
+      const s = document.createElement('span');
+      s.className = 'ch';
+      s.textContent = ch;
+      el.appendChild(s);
+    });
+  });
+
+  const els = [...document.querySelectorAll('[data-a]')];
+  const arrows = [...document.querySelectorAll('[data-arrow]')];
+  const dot = document.querySelector('[data-dot]');
+  const bar = document.querySelector('[data-bar]');
+  const flash = document.querySelector('[data-flash]');
+  const world = document.getElementById('world');
+  const grid = document.querySelector('.grid');
+  const termRows = [...document.querySelectorAll('.term .trow')];
+  const noteRows = [...document.querySelectorAll('.term-note')];
+
+  // Typing: every character of a terminal row is its own span. Rows type one after another,
+  // at TYPE_CPS characters a second, with a short pause between lines.
+  const TYPE_CPS = 95, LINE_PAUSE = 0.18, GAP_PAUSE = 0.14, TYPE_START = 0.5;
+  const caret = document.createElement('span');
+  caret.className = 'caret';
+  caret.textContent = '▌';
+  caret.style.color = 'var(--primary)';
+  let cursorT = TYPE_START;
+  termRows.forEach(row => {
+    const chars = [];
+    const walk = node => {
+      [...node.childNodes].forEach(n => {
+        if (n.nodeType === 3) {
+          const frag = document.createDocumentFragment();
+          [...n.textContent].forEach(c => {
+            const sp = document.createElement('span');
+            sp.className = 'tc';
+            sp.textContent = c;
+            sp.style.opacity = 0;
+            frag.appendChild(sp);
+            chars.push(sp);
+          });
+          n.replaceWith(frag);
+        } else if (n.nodeType === 1) {
+          walk(n);
+        }
+      });
+    };
+    walk(row);
+    row.typeChars = chars;
+    row.typeStart = cursorT;
+    row.style.opacity = 0;
+    if (chars.length) cursorT += chars.length / TYPE_CPS + LINE_PAUSE;
+    else cursorT += GAP_PAUSE;
+  });
+  const TYPE_END = cursorT;
+
+  // Move an element by its direction: 'up' rises, 'left'/'right' slide in, 'zoom' shrinks in from large,
+  // 'punch' overshoots from big to normal.
+  function motion(dir, p) {
+    const q = 1 - p;
+    switch (dir) {
+      case 'left':  return { x: -q * 260, y: 0, s: 1, blur: q * 8 };
+      case 'right': return { x:  q * 260, y: 0, s: 1, blur: q * 8 };
+      case 'zoom':  return { x: 0, y: 0, s: 1 + q * 0.6, blur: q * 12 };
+      case 'punch': return { x: 0, y: 0, s: 1 + (1 - BACK(p)) * 0.35, blur: q * 6 };
+      default:      return { x: 0, y: q * 70, s: 1, blur: q * 10 };
+    }
+  }
+
+  // The render function is pure: it sets every element for time t, so frames can be captured one by one.
+  window.render = function (t) {
+    t = Math.max(0, Math.min(DURATION, t));
+
+    // Camera: a steady push in, a slow drift, and a short glitch shake on each cut.
+    let gx = 0, gy = 0;
+    FLASH_AT.forEach((at, i) => {
+      const d = t - at;
+      if (d >= 0 && d < 0.16) {
+        const k = (1 - d / 0.16);
+        gx += Math.sin(i * 91.7 + 1.3) * 22 * k;
+        gy += Math.cos(i * 53.1 + 0.7) * 10 * k;
+      }
+    });
+    const push = 1 + 0.12 * t / DURATION;
+    const driftX = Math.sin(t * 0.5) * 16, driftY = Math.cos(t * 0.37) * 8;
+    world.style.transform = `translate(${(gx + driftX).toFixed(2)}px, ${(gy + driftY).toFixed(2)}px) scale(${push.toFixed(5)})`;
+
+    // The grid scrolls diagonally, so the whole frame keeps moving forward.
+    grid.style.transform = `translate(${(-(t * 46) % 48).toFixed(2)}px, ${(-(t * 46) % 48).toFixed(2)}px)`;
+
+    for (const el of els) {
+      const a = parseFloat(el.dataset.a), b = parseFloat(el.dataset.b);
+      const dir = el.dataset.dir || 'up';
+      const k = leave(t, b);
+      if (t < a || k >= 1) { el.style.opacity = 0; continue; }
+
+      const p = enter(t, a, 0.5);
+      const m = motion(dir, p);
+      const out = 1 + 0.1 * k;                // exit: swell and blur out
+      el.style.opacity = 1 - k;
+      el.style.filter = `blur(${(m.blur + 10 * k).toFixed(2)}px)`;
+      el.style.transform = `translate(${m.x.toFixed(2)}px, ${m.y.toFixed(2)}px) scale(${(m.s * out).toFixed(4)})`;
+
+      // Letters on split lines stagger in on top of the line's own entrance.
+      if (el.classList.contains('split')) {
+        el.style.opacity = 1 - k;
+        el.querySelectorAll('.ch').forEach((ch, i) => {
+          const cp = enter(t, a + i * LETTER_STAGGER, 0.45);
+          ch.style.opacity = cp;
+          ch.style.transform = `translateY(${((1 - cp) * 0.55).toFixed(3)}em)`;
+        });
+      }
+    }
+
+    for (const el of arrows) {
+      const a = parseFloat(el.dataset.a), b = parseFloat(el.dataset.b);
+      el.style.transform = `scaleX(${enter(t, a, 0.6).toFixed(4)})`;
+      el.style.opacity = t >= a && t <= b ? 1 : 0;
+    }
+
+    // Red dot: a short pulse before the wordmark punches in.
+    const dotIn = 0;
+    const pulse = 1 + 0.25 * Math.sin(t * 6);
+    dot.style.opacity = dotIn;
+    dot.style.transform = `scale(${(dotIn * pulse).toFixed(3)})`;
+
+    // White flash on each scene cut.
+    let f = 0;
+    for (const at of FLASH_AT) {
+      const d = t - at;
+      if (d >= 0 && d < 0.12) f = Math.max(f, (1 - d / 0.12) * 0.05);
+    }
+    flash.style.opacity = f.toFixed(4);
+
+    // Typed rows: characters appear one by one; a blinking caret sits after the last one typed.
+    let active = null, lastVisible = -1;
+    for (const row of termRows) {
+      row.style.opacity = t >= row.typeStart ? 1 : 0;
+      let vis = -1;
+      row.typeChars.forEach((sp, i) => {
+        const on = t >= row.typeStart + i / TYPE_CPS;
+        sp.style.opacity = on ? 1 : 0;
+        if (on) vis = i;
+      });
+      if (t >= row.typeStart && (row.typeChars.length === 0 || vis < row.typeChars.length - 1 || t < TYPE_END)) {
+        if (t >= row.typeStart && t <= row.typeStart + row.typeChars.length / TYPE_CPS + LINE_PAUSE) active = { row, vis };
+      }
+    }
+    // Put the caret after the character being typed (or at the start of the row).
+    if (active && t < 8.2) {
+      const { row, vis } = active;
+      if (vis >= 0) {
+        const at = row.typeChars[vis];
+        at.parentNode.insertBefore(caret, at.nextSibling);
+      } else {
+        row.insertBefore(caret, row.firstChild);
+      }
+      caret.style.opacity = Math.floor(t * 2.5) % 2 === 0 ? 1 : 0;
+    } else {
+      caret.style.opacity = 0;
+    }
+    for (const note of noteRows) {
+      const x = parseFloat(note.dataset.t);
+      note.style.opacity = t >= x && t < 8.2 ? Math.min(1, (t - x) / 0.08) : 0;
+    }
+
+    bar.style.width = (t / DURATION * 100).toFixed(3) + '%';
+  };
+
+  // Browser playback: scale the 1920x1080 stage to fit, then play the timeline in a loop.
+  function fit() {
+    document.getElementById('stage').style.setProperty('--s', Math.min(innerWidth / 1920, innerHeight / 1080));
+  }
+  addEventListener('resize', fit); fit();
+
+  if (!location.search.includes('capture')) {
+    const start = performance.now();
+    (function loop(now) {
+      window.render(((now - start) / 1000) % (DURATION + 1));
+      requestAnimationFrame(loop);
+    })(start);
+  }
+</script>
+</body>
+</html>

@@ -44,8 +44,8 @@ var initAddons = []addon{
 	{name: "ploy", title: "HydraPloy: cases in, gates, verify, stability runs, delivery to review branches",
 		needs: "automating new cases (intent automate) needs labs too; without it only stored tests run (execute)",
 		questions: []question{
-			{key: "source", prompt: "Where do the test cases live? (jira | none; CSV and in-repo files are coming)", def: "jira",
-				check: oneOf("jira", "none")},
+			{key: "source", prompt: "Where do the test cases live? (jira | local: Markdown files in the test repo | none)", def: "jira",
+				check: oneOf("jira", "local", "none")},
 			{key: "jiraKey", prompt: "Jira project key", when: is("ploy.source", "jira"),
 				check: upperID}, // default: the project id (filled in when asked)
 			{key: "jql", prompt: "Which issues to pick up (JQL)", when: is("ploy.source", "jira"), check: checkJQL},
@@ -351,8 +351,11 @@ func (a answers) profile() map[string]any {
 	if contains(addons, "ploy") {
 		n, _ := strconv.Atoi(a["ploy.stabilityRuns"])
 		p["stabilityRuns"] = n
-		if a["ploy.source"] == "jira" {
+		switch a["ploy.source"] {
+		case "jira":
 			p["jql"], p["jiraComments"], p["jiraProject"] = a["ploy.jql"], a.yes("ploy.comments"), a["ploy.jiraKey"]
+		case "local":
+			p["caseSource"] = "local"
 		}
 	}
 	if contains(addons, "labs") {
@@ -390,8 +393,11 @@ func (a answers) summary(w io.Writer, profilePath, repo string) {
 	fmt.Fprintf(w, "  test repo %s (branch %s, remote: %s)\n", repo, a["core.baseBranch"], remote)
 	if src := a["ploy.source"]; src != "" {
 		fmt.Fprintf(w, "  cases     %s", src)
-		if src == "jira" {
+		switch src {
+		case "jira":
 			fmt.Fprintf(w, ": %s   write-back: %s", a["ploy.jql"], a["ploy.comments"])
+		case "local":
+			fmt.Fprintf(w, ": %s/cases/%s-1.md, one file per case", repo, a["core.project"])
 		}
 		fmt.Fprintf(w, "\n  delivery  after %s passes in a row\n", a["ploy.stabilityRuns"])
 	}
@@ -629,6 +635,11 @@ func runInit(cfg *Config, answersPath string, yes, noPreview bool) error {
 			fmt.Fprintln(os.Stderr, "hydra: could not add the sign-in test:", err)
 		}
 	}
+	if a["ploy.source"] == "local" {
+		if err := seedFile(o.Repo, filepath.Join("cases", "README.md"), localCasesReadme, "hydra init: cases/ for local test cases"); err != nil {
+			fmt.Fprintln(os.Stderr, "hydra: could not add cases/README.md:", err)
+		}
+	}
 	b, _ := json.MarshalIndent(o, "", "  ")
 	fmt.Println(string(b))
 	if o.Gate != "" {
@@ -638,14 +649,11 @@ func runInit(cfg *Config, answersPath string, yes, noPreview bool) error {
 	return nil
 }
 
-// seedLoginTest: the app's first test is its sign-in, the step every other test starts behind. One commit on the
-// base branch; an existing test_login.py (a person's, or a second init) is left alone.
+// seedLoginTest: hydra/login.json (the framework signs in with it before each test) and the app's first test, its
+// sign-in, each in one commit on the base branch; files that already exist (a person's, or a second init) are kept.
 func seedLoginTest(repo string, a answers) error {
 	app := a["core.app"]
 	rel := filepath.Join("tests", app, "test_login.py")
-	if fileExists(filepath.Join(repo, rel)) {
-		return nil
-	}
 	py := func(s string) string { b, _ := json.Marshal(s); return string(b) } // a JSON string is a valid Python literal
 	src := fmt.Sprintf(`# %s
 #
@@ -654,39 +662,47 @@ func seedLoginTest(repo string, a answers) error {
 
 import os
 
+import pytest
 from playwright.sync_api import expect
 
 from config.settings import Config
+from utils import login
 from utils.templete_report import add_step
 
-LOGIN_PATH = %s
-USER_FIELD = %s
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PASSWORD_FIELD = %s
-SUBMIT = %s
 
 
+@pytest.mark.signed_out  # it does the sign-in itself; every other test starts already signed in
 def test_login(driver):
-    add_step("Open the sign-in page")
-    driver.get(Config.BASE_URL.rstrip("/") + LOGIN_PATH)
-    add_step("Enter the user and the password")
-    driver.page.fill(USER_FIELD, os.environ[%s])
-    driver.page.fill(PASSWORD_FIELD, os.environ[%s])
-    add_step("Sign in")
-    driver.page.click(SUBMIT)
-    add_step("The sign-in form is gone")
+    add_step("Sign in with the QA account (hydra/login.json)")
+    login.sign_in(driver.page, Config.BASE_URL, login.load(ROOT_DIR))
+    add_step("The app is shown and the sign-in form is gone")
+    assert driver.page.url.startswith(Config.BASE_URL.rstrip("/")), "not on the app after signing in: " + driver.page.url
     expect(driver.page.locator(PASSWORD_FIELD)).to_have_count(0, timeout=Config.PLAYWRIGHT_TIMEOUT * 1000)
-`, filepath.ToSlash(rel), a.envName("USER"), a.envName("PASSWORD"), py(a["core.loginPath"]), py(a["core.userField"]),
-		py(a["core.passwordField"]), py(a["core.submit"]), py(a.envName("USER")), py(a.envName("PASSWORD")))
+`, filepath.ToSlash(rel), a.envName("USER"), a.envName("PASSWORD"), py(a["core.passwordField"]))
+	steps, _ := json.MarshalIndent(map[string]any{"path": a["core.loginPath"], "steps": a.loginSteps()}, "", "  ")
+	if err := seedFile(repo, filepath.Join("hydra", "login.json"), string(steps)+"\n", "hydra init: sign in before each test of "+app); err != nil {
+		return err
+	}
+	return seedFile(repo, rel, src, "hydra init: sign-in test for "+app)
+}
+
+// seedFile adds one file to the repo in its own commit; an existing file (a person's, or a second init) is left alone.
+func seedFile(repo, rel, content, msg string) error {
+	if fileExists(filepath.Join(repo, rel)) {
+		return nil
+	}
 	if err := os.MkdirAll(filepath.Dir(filepath.Join(repo, rel)), 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(repo, rel), []byte(src), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repo, rel), []byte(content), 0o644); err != nil {
 		return err
 	}
 	if _, err := git(repo, "add", rel); err != nil {
 		return err
 	}
-	_, err := git(repo, append(gitIdentity(repo), "commit", "-q", "-m", "hydra init: sign-in test for "+app)...)
+	_, err := git(repo, append(gitIdentity(repo), "commit", "-q", "-m", msg)...)
 	return err
 }
 

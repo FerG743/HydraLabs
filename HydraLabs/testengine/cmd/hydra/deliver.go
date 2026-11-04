@@ -187,6 +187,9 @@ func (c Config) Deliver(only []string, exclude map[string]bool) (d Delivery, err
 			return d, fmt.Errorf("a delivery is still running on %s, or was stopped before it could clean up. If none is running, undo it with: "+
 				"git -C %s reset --hard && git -C %s clean -fd && git -C %s checkout %s && git -C %s branch -D %s", b, repo, repo, repo, base, repo, b)
 		}
+		if strings.Contains(st, " cases/") { // local test cases are the team's files: committed by a person, never by the pipeline
+			return d, fmt.Errorf("commit the case files in %s/cases first (git -C %s add cases && git -C %s commit -m \"test cases\"): delivery switches branches and must not carry them along (git status: %q)", repo, repo, repo, st)
+		}
 		return d, fmt.Errorf("the delivery repo must be clean before delivering (git status --porcelain: %q %v)", st, e)
 	}
 	if _, e := git(repo, "rev-parse", "--verify", base); e != nil {

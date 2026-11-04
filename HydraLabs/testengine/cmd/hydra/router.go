@@ -68,6 +68,7 @@ type Config struct {
 	Addons        []string            `json:"addons"`         // enabled add-ons (ploy, labs...); empty = all, as before add-ons existed
 	Remote        string              `json:"remote"`         // the test repo's remote URL, when it has one
 	JiraProject   string              `json:"jiraProject"`    // the Jira project the cases come from, when it differs from the registry key
+	CaseSource    string              `json:"caseSource"`     // jira (default) | local: cases/<KEY>.md in the app's repo
 }
 
 type Run struct {
@@ -371,6 +372,9 @@ func (c Config) verifyRun(key string) Verdict {
 		"--shots", filepath.Join(c.liveDir(), "shots")}
 	if c.AllowWrites {
 		args = append(args, "--allow-writes")
+	}
+	if c.LoginFile != "" { // the app has a sign-in: the test runs behind it, like a person would
+		args = append(args, "--login", c.LoginFile, "--login-path", c.LoginPath)
 	}
 	if c.Show {
 		args = append(args, "--headed", "--slow", strconv.Itoa(c.showSlow()))

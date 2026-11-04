@@ -114,6 +114,26 @@ class StateAfterWithoutClickTest(unittest.TestCase):
         self.assertGreater(body.index("verificar_procesar_enabled_flujo"), body.index("hacer_clic_agregar_flujo"))
 
 
+class SignedOutTest(unittest.TestCase):
+    """A case whose precondition says nobody is signed in skips the app's sign-in; every other case keeps it."""
+
+    def render(self, precondition):
+        case = {"id": "DEMO-1", "name": "TC-1 - Open", "language": "en", "precondition": precondition,
+                "steps": [{"n": "1", "action": "Navigate to `/login`."}], "expected": []}
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "cases"))
+            with open(os.path.join(d, "cases", "DEMO-1.case.json"), "w") as f:
+                json.dump(case, f)
+            subprocess.check_output([sys.executable, os.path.join(HERE, "render_pytest.py"), "--cases", os.path.join(d, "cases"), "--app", "App", "--out", d])
+            return open(os.path.join(d, "tests", "App", "test_demo_1.py"), encoding="utf-8").read()
+
+    def test_marker(self):
+        for pre in ("Nobody is signed in.", "The user is logged out.", "Sin iniciar sesión.", "No user is logged in yet."):
+            self.assertIn("@pytest.mark.signed_out\ndef test_", self.render(pre), pre)
+        for pre in ("The QA user is signed in.", "", "Orders exist."):
+            self.assertNotIn("signed_out", self.render(pre), pre)
+
+
 class RenderTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

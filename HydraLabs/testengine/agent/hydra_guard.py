@@ -9,6 +9,11 @@ from urllib.parse import urlparse
 
 import pytest
 
+try:  # the framework's sign-in (utils/login.py); repos created before it have none
+    from utils import login as _login
+except ImportError:
+    _login = None
+
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 
 
@@ -27,7 +32,7 @@ def _hydra_guard(request):
     blocked = []
 
     def guard(route, req):
-        if write_allowed(req.method, urlparse(req.url).hostname, allow, extra):
+        if write_allowed(req.method, urlparse(req.url).hostname, allow, extra) or (_login and _login.ACTIVE):
             route.continue_()
         else:
             blocked.append(f"{req.method} {req.url}")
@@ -35,5 +40,6 @@ def _hydra_guard(request):
 
     driver.page.context.route("**/*", guard)
     yield
+    driver.page.context.unroute("**/*", guard)  # the page is shared: left on, it would block the next test's sign-in
     if blocked:
         pytest.fail("HydraLabs bloqueó escrituras reales (solo lectura, o fuera de loopback): " + "; ".join(blocked))

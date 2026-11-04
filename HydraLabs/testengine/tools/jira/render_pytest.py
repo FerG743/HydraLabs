@@ -388,6 +388,10 @@ from utils.templete_report import add_step
     return head + "\n\n" + "\n\n\n".join(app.flujos.values()) + "\n"
 
 
+# a case that starts signed out: the app's sign-in (when it has one) is skipped for it
+SIGNED_OUT = re.compile(r"\b(signed|logged) out\b|\b(not|nobody|no one|no user)\b.*\b(signed|logged) in\b|\bsin (iniciar )?sesi[oó]n\b|\bsesi[oó]n cerrada\b", re.I)
+
+
 def render_test(case, a, calls, ctx, expected, app_name):
     token, key = a["token"], case["id"]
     title = re.sub(r"^TC-\d+\s*[–-]\s*", "", plain(case["name"]))
@@ -408,7 +412,10 @@ def render_test(case, a, calls, ctx, expected, app_name):
         L += ["datos_caso = next((fila for fila in DATA_CASO if fila[0] == CASO_ID), None)"]
     if ctx["has_download"]:
         L += ['DOWNLOADS_DIR = os.path.join(ROOT_DIR, "reports", "downloads")']
-    L += ["", "", f"def {fn}(driver):"]
+    L += ["", ""]
+    if SIGNED_OUT.search(plain(case.get("precondition", ""))):
+        L.append("@pytest.mark.signed_out")
+    L.append(f"def {fn}(driver):")
     if a["pending"]:
         L.append(f"    pytest.skip({('Pasos sin automatizar: ' + ' | '.join(a['pending']))!r})")
     if cols:

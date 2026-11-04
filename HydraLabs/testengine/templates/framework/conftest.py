@@ -8,9 +8,15 @@ import pytest
 from playwright.sync_api import sync_playwright
 
 from config.settings import Config
+from utils import login
 from utils import templete_report as tr
 
 VIEWPORT = {"width": 1280, "height": 900}
+LOGIN = login.load(os.path.dirname(os.path.abspath(__file__)))  # None: the app has no sign-in
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "signed_out: the test starts without signing in (a sign-in test, a public page)")
 
 
 class Driver:
@@ -48,8 +54,10 @@ def _browser(request):
 
 
 @pytest.fixture
-def driver(_browser):
+def driver(_browser, request):
     tr.STEPS.clear()
+    if LOGIN and not request.node.get_closest_marker("signed_out"):
+        login.sign_in(_browser, Config.BASE_URL, LOGIN)
     yield Driver(_browser)
     try:  # the page is shared: a job id or other storage left by this test would change the next one's UI
         _browser.evaluate("() => { try { localStorage.clear(); sessionStorage.clear(); } catch (e) {} }")

@@ -62,6 +62,16 @@ func colorOf(loc string, confirmed bool) string {
 
 // Watch serves the live page for one app until interrupted. The page asks for new lines every half second.
 func (c Config) Watch(addr string) error {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil { // the usual cause: a live view is already running, in another terminal tab
+		return fmt.Errorf("cannot serve on %s (%v): if a hydra watch is already running, just open http://localhost%s; otherwise pick another port with --addr :8100", addr, err, addr)
+	}
+	fmt.Printf("live view of %s: http://localhost%s  (Ctrl-C to stop)\n", c.App, addr)
+	return http.Serve(ln, c.liveView())
+}
+
+// liveView is the live page and what it reads; its URLs are relative, so it also works mounted under /live/.
+func (c Config) liveView() http.Handler {
 	events := filepath.Join(c.liveDir(), "events.jsonl")
 	os.MkdirAll(c.liveDir(), 0o755)
 	mux := http.NewServeMux()
@@ -78,12 +88,7 @@ func (c Config) Watch(addr string) error {
 		}
 		http.ServeFile(w, r, p)
 	})
-	ln, err := net.Listen("tcp", addr)
-	if err != nil { // the usual cause: a live view is already running, in another terminal tab
-		return fmt.Errorf("cannot serve on %s (%v): if a hydra watch is already running, just open http://localhost%s; otherwise pick another port with --addr :8100", addr, err, addr)
-	}
-	fmt.Printf("live view of %s: http://localhost%s  (Ctrl-C to stop)\n", c.App, addr)
-	return http.Serve(ln, mux)
+	return mux
 }
 
 // tailFrom writes the lines of file from line number `from` on (the crawl viewer's protocol).
@@ -155,16 +160,16 @@ case'gate':if(e.ok){set(c,1,'ok');set(c,2,'run');c.el.querySelector('.why').text
 case'map':set(c,2,'ok');set(c,3,'ok');set(c,4,'run');c.el.querySelector('table').innerHTML=(e.steps||[]).map(s=>'<tr><td class=n>'+esc(s.n)+'</td><td>'+esc(s.text)+'</td><td class=loc>'+(s.locator?'<i class=dot style=background:'+s.color+'></i>'+esc(s.locator):(s.mapped?'<span style=color:var(--mute)>page</span>':'<span style=color:var(--bad)>not mapped</span>'))+'</td></tr>').join('');
 log(e,'mapped '+(e.steps||[]).filter(s=>s.mapped).length+'/'+(e.steps||[]).length+' steps · '+(e.tokens||0)+' tokens');break;
 case'verify':set(c,4,'run');log(e,'running in the real app'+(e.show?' (visible browser)':''));break;
-case'verified':set(c,4,STATUS[e.status]||'bad');if(e.shot)document.getElementById('shot').src='/shots/'+e.shot+'?'+n;
+case'verified':set(c,4,STATUS[e.status]||'bad');if(e.shot)document.getElementById('shot').src='shots/'+e.shot+'?'+n;
 c.el.querySelector('.why').textContent=e.status=='passed'?'':(e.detail||[]).join('\n');log(e,'verify: '+e.status);break;
 case'done':c.el.querySelector('.meta').textContent=e.tier+' · '+e.status+' · '+(e.tokens||0)+' tokens · '+(e.ms/1000).toFixed(1)+'s';log(e,'done: '+e.status);break;
 case'stability':set(c,5,e.status=='passed'?(e.run<e.of?'run':'ok'):'bad');c.st[5].textContent=e.run+'/'+e.of+(e.status=='passed'?' passed':' '+e.status);log(e,'stability run '+e.run+'/'+e.of+': '+e.status);break;
 case'delivered':set(c,6,e.branch?'ok':'wait');if(e.branch)c.st[6].textContent='branch ✓';
-if(e.report)c.el.querySelector('.meta').innerHTML+=' · <a target=_blank href="/report?p='+encodeURIComponent(e.report)+'">HTML report</a>';
+if(e.report)c.el.querySelector('.meta').innerHTML+=' · <a target=_blank href="report?p='+encodeURIComponent(e.report)+'">HTML report</a>';
 if(e.gate)c.el.querySelector('.why').textContent=e.gate;log(e,e.branch?'review branch '+e.branch:'not delivered');break;
 default:log(e,e.kind)}
 document.getElementById('st').textContent='last event '+e.t}
-async function tick(){try{const r=await fetch('/events?from='+n);if(+r.headers.get('X-Total')<n){location.reload();return}const t=await r.text();for(const l of t.split('\n').filter(Boolean)){n++;on(JSON.parse(l))}}catch(x){}setTimeout(tick,500)}tick();
+async function tick(){try{const r=await fetch('events?from='+n);if(+r.headers.get('X-Total')<n){location.reload();return}const t=await r.text();for(const l of t.split('\n').filter(Boolean)){n++;on(JSON.parse(l))}}catch(x){}setTimeout(tick,500)}tick();
 </script>`
 
 // caseTitle: the stored case's name, for the live view's card ("" when the case is not stored yet).

@@ -141,6 +141,16 @@ func (c Config) CasesUI(addr string) error {
 	if c.Home == "" || !fileExists(filepath.Join(c.Home, ".git")) {
 		return fmt.Errorf("no test repo for %s yet: run hydra init (or poll once) first", c.App)
 	}
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("cannot serve on %s (%v): pick another port with --addr 127.0.0.1:8101", addr, err)
+	}
+	fmt.Printf("test cases of %s: http://%s  (Ctrl-C to stop)\n", c.App, ln.Addr())
+	return http.Serve(ln, localOnly(c.casesView()))
+}
+
+// casesView is the cases page and its API; its URLs are relative, so it also works mounted under /cases/.
+func (c Config) casesView() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, strings.NewReplacer("{{APP}}", c.App, "{{PROJECT}}", c.Project).Replace(casesPage))
@@ -180,12 +190,7 @@ func (c Config) CasesUI(addr string) error {
 		}
 		reply(200, map[string]any{"key": key, "questions": ask})
 	})
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("cannot serve on %s (%v): pick another port with --addr 127.0.0.1:8101", addr, err)
-	}
-	fmt.Printf("test cases of %s: http://%s  (Ctrl-C to stop)\n", c.App, ln.Addr())
-	return http.Serve(ln, localOnly(mux))
+	return mux
 }
 
 // localOnly refuses requests for another host name: a site that points its own name at 127.0.0.1 (DNS rebinding)
@@ -272,15 +277,15 @@ $('intent').value=c?c.intent||'automate':'automate';$('pre').value=c?c.precondit
 for(const b of ['steps','expected']){$(b).innerHTML='';const v=c?(b=='steps'?c.steps:c.expected):[];(v.length?v:['']).forEach(x=>add(b,x))}
 $('keyinfo').textContent=c?'saved as cases/'+c.key+'.md':'it gets the next number: {{PROJECT}}-…';$('msg').className='';
 [...$('list').children].forEach(b=>b.setAttribute('aria-current',c&&b.dataset.key==c.key));$('name').focus()}
-async function load(){const r=await fetch('/api/cases');const j=await r.json();if(!r.ok){show('bad',j.error);return}cases=j;
+async function load(){const r=await fetch('api/cases');const j=await r.json();if(!r.ok){show('bad',j.error);return}cases=j;
 $('list').innerHTML='';for(const c of cases){const b=document.createElement('button');b.type='button';b.className='case';b.dataset.key=c.key;
 b.innerHTML='<span></span><small></small>';b.firstChild.textContent=c.name||'(no name)';b.lastChild.textContent=c.key+' · '+c.intent;
-b.onclick=()=>edit(c);$('list').append(b)}if(!cases.length)$('list').innerHTML='<p class=hint>No cases yet.</p>'}
+b.onclick=()=>edit(c);b.setAttribute('aria-current',!!cur&&c.key==cur.key);$('list').append(b)}if(!cases.length)$('list').innerHTML='<p class=hint>No cases yet.</p>'}
 function show(cls,text,qs){const m=$('msg');m.className=cls;m.textContent=text;if(qs&&qs.length){const u=document.createElement('ul');
 qs.forEach(q=>{const li=document.createElement('li');li.textContent=q;u.append(li)});m.append(u)}}
 async function save(e){e.preventDefault();const body={key:cur?cur.key:'',name:$('name').value,intent:$('intent').value,precondition:$('pre').value,steps:vals('steps'),expected:vals('expected')};
-const r=await fetch('/api/cases',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();
+const r=await fetch('api/cases',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();
 if(!r.ok){show('bad',j.error);return}await load();edit(cases.find(c=>c.key==j.key));
 show('ok','Saved '+j.key+'. Hydra picks it up on the next poll.'+(j.questions&&j.questions.length?' Before it can be automated, answer:':''),j.questions)}
-load().then(()=>edit())
+load().then(()=>edit());setInterval(load,5000) // cases added elsewhere (a file, a teammate's commit) show up
 </script>`

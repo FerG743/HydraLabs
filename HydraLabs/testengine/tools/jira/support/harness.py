@@ -38,7 +38,18 @@ class Driver:  # the surface the framework's `driver` fixture exposes
         self.page.context.clear_cookies()
 
 
-def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=None, slow_ms=0):
+# the framework's own sign-in, so the verify run signs in exactly as the delivered tests will
+_LOGIN_PY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "templates", "framework", "utils", "login.py")
+
+
+def _sign_in(page, base_url, login):
+    spec = importlib.util.spec_from_file_location("hydra_login", _LOGIN_PY)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.sign_in(page, base_url, login)
+
+
+def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=None, slow_ms=0, login=None):
     from playwright.sync_api import sync_playwright
     work = tempfile.mkdtemp(prefix="hydra_run_")
     shutil.copytree(out_dir, work, dirs_exist_ok=True)
@@ -71,8 +82,10 @@ def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=No
                 else:
                     result["aborted_writes"].append(f"{request.method} {request.url}")
                     route.abort()
-            page.route("**/*", net)
             try:
+                if login and not any(m.name == "signed_out" for m in getattr(fn, "pytestmark", [])):
+                    _sign_in(page, base_url, login)  # before the guard: signing in is the one write a read-only run makes
+                page.route("**/*", net)
                 fn(Driver(page))
                 result["status"] = "passed"
             except Skipped as e:

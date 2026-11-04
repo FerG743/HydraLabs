@@ -236,16 +236,36 @@ func TestInitWithSignInKeepsTheSecretOutOfEverythingButTheEnvFile(t *testing.T) 
 		t.Fatal(err)
 	}
 	src, _ := os.ReadFile(filepath.Join(repo, "tests", "Toolshop", "test_login.py"))
-	if !strings.Contains(string(src), `os.environ["HYDRA_SHOP_PASSWORD"]`) || !strings.Contains(string(src), `LOGIN_PATH = "/login"`) || strings.Contains(string(src), "s3cr3t!") {
+	if !strings.Contains(string(src), "login.sign_in(") || !strings.Contains(string(src), `PASSWORD_FIELD = "input[type=password]"`) || strings.Contains(string(src), "s3cr3t!") {
 		t.Errorf("test_login.py:\n%s", src)
 	}
 	if out, err := exec.Command("python3", "-m", "py_compile", filepath.Join(repo, "tests", "Toolshop", "test_login.py")).CombinedOutput(); err != nil && !errors.Is(err, exec.ErrNotFound) {
 		t.Errorf("test_login.py is not valid Python: %s", out)
+	}
+	if !strings.Contains(string(src), "@pytest.mark.signed_out  #") {
+		t.Error("the sign-in test must not sign in first")
+	}
+	if l := readJSON(t, filepath.Join(repo, "hydra", "login.json")); l["path"] != "/login" || len(l["steps"].([]any)) != 3 {
+		t.Errorf("hydra/login.json, for the framework's conftest: %v", l)
 	}
 	if log, _ := git(repo, "log", "--oneline"); !strings.Contains(log, "sign-in test for Toolshop") {
 		t.Errorf("the test must be committed: %q", log)
 	}
 	if err := seedLoginTest(repo, a); err != nil {
 		t.Errorf("a second init leaves the test alone: %v", err)
+	}
+}
+
+func TestInitWithLocalCasesNeedsNoJira(t *testing.T) {
+	offline(t, true)
+	reg, regPath := initRegistry(t)
+	given := answers{"core.project": "SHOP", "core.app": "Toolshop", "core.addons": "ploy,labs", "core.baseUrl": "http://qa", "ploy.source": "local"}
+	var out bytes.Buffer
+	if _, err := Init(reg, regPath, strings.NewReader(""), &out, given, true, nil); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	p := readJSON(t, filepath.Join(filepath.Dir(regPath), "profiles", "toolshop.json"))
+	if p["caseSource"] != "local" || p["jql"] != nil || strings.Contains(out.String(), "against Jira") || !strings.Contains(out.String(), "cases/SHOP-1.md") {
+		t.Errorf("local cases: no Jira question, no query, the folder named in the summary: %v\n%s", p, out.String())
 	}
 }

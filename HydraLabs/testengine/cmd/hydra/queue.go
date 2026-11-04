@@ -138,11 +138,19 @@ func schedule(ordered []*job, modelCap int) (run, deferred []*job) {
 	return
 }
 
-// collect: Jira -> the jobs of one project that are new (or forced). Every new case is stored first so "Same as TC-1" resolves.
+func (c Config) localCases() bool { return c.CaseSource == "local" }
+
+// collect: Jira (or cases/*.md) -> the jobs of one project that are new (or forced). Every new case is stored first so "Same as TC-1" resolves.
 func collect(cfg *Config, j *Jira, o PollOpts) ([]*job, map[string]string, error) {
 	var issues []Issue
 	force := o.Force
-	if o.Only != "" { // a person asked for exactly this issue: no JQL, no seen-state
+	if cfg.localCases() {
+		var err error
+		if issues, err = localIssues(cfg.localCaseDir(), o.Only); err != nil {
+			return nil, nil, err
+		}
+		force = force || o.Only != ""
+	} else if o.Only != "" { // a person asked for exactly this issue: no JQL, no seen-state
 		is, err := j.Get(o.Only)
 		if err != nil {
 			return nil, nil, err
@@ -170,8 +178,10 @@ func collect(cfg *Config, j *Jira, o PollOpts) ([]*job, map[string]string, error
 		}
 		jobs = append(jobs, &job{cfg: cfg, key: is.Key, intent: intent, stamp: stamp})
 	}
-	if err := cfg.storeReferenced(j); err != nil {
-		return nil, nil, err
+	if !cfg.localCases() { // a local "Same as SHOP-1" resolves against the other files, all stored above
+		if err := cfg.storeReferenced(j); err != nil {
+			return nil, nil, err
+		}
 	}
 	sort.Slice(jobs, func(a, b int) bool { return jobs[a].key < jobs[b].key })
 	return jobs, seen, nil
@@ -189,9 +199,13 @@ func loadState(c *Config) map[string]string {
 
 // Poll runs one pass over the given projects. gated is true if any project stopped at an onboarding gate.
 func Poll(cfgs []*Config, o PollOpts) (gated bool, err error) {
-	j, err := JiraFromEnv()
-	if err != nil {
-		return false, err
+	var j *Jira // only when a project reads Jira: a team on local cases needs no token
+	for _, cfg := range cfgs {
+		if !cfg.localCases() && j == nil {
+			if j, err = JiraFromEnv(); err != nil {
+				return false, err
+			}
+		}
 	}
 	var all []*job
 	states := map[*Config]map[string]string{}
@@ -250,7 +264,7 @@ func Poll(cfgs []*Config, o PollOpts) (gated bool, err error) {
 		report(r)
 		states[jb.cfg][jb.key] = jb.stamp
 		if needsPerson(r) {
-			if cfg := jb.cfg; cfg.JiraComments || (len(cfgs) == 1 && o.Comment) {
+			if cfg := jb.cfg; !cfg.localCases() && (cfg.JiraComments || (len(cfgs) == 1 && o.Comment)) {
 				msg := Message(r)
 				if _, e := cfg.PostOnce(j, jb.key, shortID(r.Status, msg), msg); e != nil {
 					fmt.Fprintln(os.Stderr, "comment failed:", e)

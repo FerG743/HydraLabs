@@ -368,6 +368,8 @@ def render_locators(app_name, app):
             rows.append(f"    {name} = {app.confirmed[name]!r}  # confirmado en el portal real")
         else:
             rows.append(f"    {name} = {value!r}" + (f"  # TODO: {todo}" if todo else ""))
+    if not app.locators:  # a case that only navigates and reads text has no selectors; an empty class is a SyntaxError
+        rows.append("    pass")
     return "\n".join(rows) + "\n"
 
 

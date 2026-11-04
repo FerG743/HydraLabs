@@ -114,6 +114,19 @@ class StateAfterWithoutClickTest(unittest.TestCase):
         self.assertGreater(body.index("verificar_procesar_enabled_flujo"), body.index("hacer_clic_agregar_flujo"))
 
 
+class NoLocatorsTest(unittest.TestCase):
+    def test_a_case_with_nothing_to_click_still_imports(self):
+        case = {"id": "DEMO-1", "name": "TC-1 - Title", "language": "en", "precondition": "",
+                "steps": [{"n": "1", "action": "Navigate to `/orders`."}], "expected": []}
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "cases"))
+            with open(os.path.join(d, "cases", "DEMO-1.case.json"), "w") as f:
+                json.dump(case, f)
+            subprocess.check_output([sys.executable, os.path.join(HERE, "render_pytest.py"), "--cases", os.path.join(d, "cases"), "--app", "App", "--out", d])
+            src = open(os.path.join(d, "apps", "App", "locators", "app_locators.py"), encoding="utf-8").read()
+        compile(src, "app_locators.py", "exec")  # an empty class body is a SyntaxError
+
+
 class SignedOutTest(unittest.TestCase):
     """A case whose precondition says nobody is signed in skips the app's sign-in; every other case keeps it."""
 

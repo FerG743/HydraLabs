@@ -66,10 +66,14 @@ def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=No
     try:
         import config.settings as settings
         settings.Config.BASE_URL = base_url
-        spec = importlib.util.spec_from_file_location(f"gen_{token}", os.path.join(work, "tests", _tests_dir(work), f"test_{token}.py"))
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        fn = next(getattr(mod, n) for n in dir(mod) if n.startswith("test_"))
+        try:  # generated code that does not even import is a failed run, reported like any other
+            spec = importlib.util.spec_from_file_location(f"gen_{token}", os.path.join(work, "tests", _tests_dir(work), f"test_{token}.py"))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            fn = next(getattr(mod, n) for n in dir(mod) if n.startswith("test_"))
+        except Exception as e:
+            result["status"], result["error"] = "failed", f"the generated test does not load: {type(e).__name__}: {str(e).strip()[:400]}"
+            return result
         from _pytest.outcomes import Skipped
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=not headed, slow_mo=slow_ms)

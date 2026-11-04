@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -33,39 +32,28 @@ h1{font-size:16px;margin:0 0 8px}img{max-width:100%;border:1px solid #8884;borde
 <script>let n=0,pages=0,els=0;const ev=document.getElementById('ev'),live=document.getElementById('live');
 function row(e){const d=document.createElement('div');d.className='e '+e.kind;
 if(e.kind=='page'){pages++;els+=e.elements;d.innerHTML='<b>'+e.title+'</b> <small>'+e.url+'</small><br>'+e.elements+' elements '+JSON.stringify(e.strategies);
-im.src='/shots/'+e.shot+'?'+n;cap.innerHTML='<b>'+e.url+'</b>';live.innerHTML='';pb.style.width='0'}
-else if(e.kind=='video'){d.innerHTML='Video saved: <a href="/videos/'+e.path.split('/').pop()+'" target=_blank>'+e.path.split('/').pop()+'</a> ('+e.mb+' MB)'}
+im.src='shots/'+e.shot+'?'+n;cap.innerHTML='<b>'+e.url+'</b>';live.innerHTML='';pb.style.width='0'}
+else if(e.kind=='video'){d.innerHTML='Video saved: <a href="videos/'+e.path.split('/').pop()+'" target=_blank>'+e.path.split('/').pop()+'</a> ('+e.mb+' MB)'}
 else if(e.kind=='done'){d.textContent='Done: '+e.pages+' pages, '+e.elements+' elements, '+e.weak+' weak locators'}
 else d.textContent=e.kind+': '+(e.text||e.url||e.action||'');return d}
-async function tick(){try{const t=await (await fetch('/events?from='+n)).text();
+async function tick(){try{const r=await fetch('events?from='+n);if(+r.headers.get('X-Total')<n){location.reload();return}const t=await r.text();
 for(const line of t.split('\n').filter(Boolean)){n++;const e=JSON.parse(line);
 if(e.kind=='element'){const d=document.createElement('div');d.style.color=e.color;d.textContent=e.role+' '+JSON.stringify(e.name)+'  ->  '+e.locator;
 live.prepend(d);while(live.children.length>14)live.lastChild.remove();pb.style.width=(100*e.n/e.of)+'%';
-if(e.live){im.src='/shots/live.png?'+n;cap.innerHTML='<b>'+e.url+'</b> <small>'+e.n+' / '+e.of+' elements</small>'}}
+if(e.live){im.src='shots/live.png?'+n;cap.innerHTML='<b>'+e.url+'</b> <small>'+e.n+' / '+e.of+' elements</small>'}}
 else{ev.prepend(row(e));st.textContent=pages+' pages, '+els+' elements'}}}catch(x){}setTimeout(tick,500)}tick()</script>`
 
 // Serve blocks; run it in a goroutine next to the crawl.
-func Serve(addr, eventsFile string) error {
+func Serve(addr, eventsFile string) error { return http.ListenAndServe(addr, crawlView(eventsFile)) }
+
+// crawlView is the crawl page and what it reads; its URLs are relative, so it also works mounted under /crawl/.
+func crawlView(eventsFile string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, viewPage) })
-	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
-		from, _ := strconv.Atoi(r.URL.Query().Get("from"))
-		f, err := os.Open(eventsFile)
-		if err != nil {
-			return
-		}
-		defer f.Close()
-		sc := bufio.NewScanner(f)
-		sc.Buffer(make([]byte, 1<<20), 1<<20)
-		for i := 0; sc.Scan(); i++ {
-			if i >= from {
-				fmt.Fprintln(w, sc.Text())
-			}
-		}
-	})
+	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) { tailFrom(w, eventsFile, r.URL.Query().Get("from")) })
 	mux.Handle("/videos/", http.StripPrefix("/videos/", http.FileServer(http.Dir(filepath.Join(filepath.Dir(eventsFile), "videos")))))
 	mux.Handle("/shots/", http.StripPrefix("/shots/", http.FileServer(http.Dir(filepath.Join(filepath.Dir(eventsFile), "shots")))))
-	return http.ListenAndServe(addr, mux)
+	return mux
 }
 
 func (c Config) videoDir() string { return filepath.Join(c.Out, "crawl", "videos") }

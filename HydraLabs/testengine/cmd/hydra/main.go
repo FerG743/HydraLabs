@@ -307,6 +307,10 @@ func main() {
 			fmt.Println()
 			printDesign(d)
 		}
+	case "board": // one page with every view of the project side by side (demos, onboarding)
+		addr := fs.String("addr", "127.0.0.1:8090", "where to serve the page (localhost only)")
+		fs.Parse(os.Args[2:])
+		err = cfg.BoardUI(*addr)
 	case "cases": // a local page to write the app's test cases (cases/<KEY>.md, committed) without opening the repo
 		addr := fs.String("addr", "127.0.0.1:8098", "where to serve the page (localhost only)")
 		fs.Parse(os.Args[2:])

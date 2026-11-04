@@ -307,6 +307,10 @@ func main() {
 			fmt.Println()
 			printDesign(d)
 		}
+	case "cases": // a local page to write the app's test cases (cases/<KEY>.md, committed) without opening the repo
+		addr := fs.String("addr", "127.0.0.1:8098", "where to serve the page (localhost only)")
+		fs.Parse(os.Args[2:])
+		err = cfg.CasesUI(*addr)
 	case "watch": // read-only: the live view of every stage this app's runs go through
 		addr := fs.String("addr", ":8099", "where to serve the page")
 		fs.Parse(os.Args[2:])

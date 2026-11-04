@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -61,12 +62,15 @@ func TestInitAsksFixesATypoAndWritesOnlyAfterYes(t *testing.T) {
 		"",                      // writes: default no
 		"",                      // base branch: main
 		"",                      // no remote
+		"",                      // no sign-in
 		"",                      // ploy source: jira
 		"",                      // jira key: defaults to the project id
 		"",                      // jql: the default one
 		"",                      // write-back: no
 		"",                      // stability runs: 3
 		"/, /login",             // crawl paths
+		"y",                     // record the crawl as a video
+		"3000",                  // pause between elements: a demo
 		"",                      // model: no
 		"y",                     // confirm
 	}, "\n") + "\n"
@@ -95,6 +99,9 @@ func TestInitAsksFixesATypoAndWritesOnlyAfterYes(t *testing.T) {
 	}
 	if paths := p["paths"].([]any); len(paths) != 2 || paths[1] != "/login" {
 		t.Errorf("paths: %v", p["paths"])
+	}
+	if p["recordVideo"] != true || p["slowMs"] != 3000.0 {
+		t.Errorf("the crawl must be recorded and paced as answered: %v", p)
 	}
 	r := readJSON(t, regPath)
 	if r["_doc"] != "keep me" || r["projects"].(map[string]any)["SHOP"] == nil || r["projects"].(map[string]any)["DWQ"] == nil {
@@ -179,5 +186,66 @@ func TestAQueryJiraRejectsIsAskedAgain(t *testing.T) {
 	}
 	if _, warn, err := checkJQL("key = DWQ-140", answers{}); err != nil || !strings.Contains(warn, "3 issue(s)") {
 		t.Errorf("%q %v", warn, err)
+	}
+}
+
+func TestInitWithSignInKeepsTheSecretOutOfEverythingButTheEnvFile(t *testing.T) {
+	offline(t, true)
+	reg, regPath := initRegistry(t)
+	envFile := filepath.Join(t.TempDir(), ".hydra.env")
+	os.WriteFile(envFile, []byte("JIRA_TOKEN=keep\nHYDRA_SHOP_PASSWORD=old\n"), 0o644)
+	old := hydraEnvPath
+	hydraEnvPath = envFile
+	t.Cleanup(func() { hydraEnvPath = old; os.Unsetenv("HYDRA_SHOP_USER"); os.Unsetenv("HYDRA_SHOP_PASSWORD") })
+	given, _ := loadAnswers(writeAnswers(t, `{"core": {"project": "SHOP", "app": "Toolshop", "addons": ["labs"], "baseUrl": "https://qa.shop.test",
+		"login": true, "user": "qa@shop.test", "password": "s3cr3t!"}}`))
+	var out bytes.Buffer
+	a, err := Init(reg, regPath, strings.NewReader(""), &out, given, true, nil)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if strings.Contains(out.String(), "s3cr3t!") || !strings.Contains(out.String(), "sign-in   /login as qa@shop.test") {
+		t.Errorf("the summary names the user and never the password:\n%s", out.String())
+	}
+	profilePath := filepath.Join(filepath.Dir(regPath), "profiles", "toolshop.json")
+	pb, _ := os.ReadFile(profilePath)
+	p := readJSON(t, profilePath)
+	if p["loginPath"] != "/login" || p["loginFile"] != filepath.Join(filepath.Dir(regPath), "profiles", "toolshop.login.json") || strings.Contains(string(pb), "s3cr3t!") {
+		t.Errorf("profile: %s", pb)
+	}
+	steps, _ := os.ReadFile(p["loginFile"].(string))
+	if strings.Contains(string(steps), "s3cr3t!") || !strings.Contains(string(steps), "ENV:HYDRA_SHOP_PASSWORD") || !strings.Contains(string(steps), "input[type=password]") {
+		t.Errorf("login steps hold ENV: tokens only: %s", steps)
+	}
+	env, _ := os.ReadFile(envFile)
+	if st, _ := os.Stat(envFile); st.Mode().Perm() != 0o600 {
+		t.Errorf("the env file must be private: %v", st.Mode())
+	}
+	if !strings.Contains(string(env), "JIRA_TOKEN=keep\n") || !strings.Contains(string(env), "HYDRA_SHOP_PASSWORD=s3cr3t!\n") || strings.Contains(string(env), "=old") {
+		t.Errorf("other secrets kept, the old password replaced: %s", env)
+	}
+	if os.Getenv("HYDRA_SHOP_USER") != "qa@shop.test" {
+		t.Error("the first crawl runs in this process: it needs the names set now")
+	}
+
+	repo := t.TempDir()
+	if out, err := exec.Command("git", "-C", repo, "init", "-q").CombinedOutput(); err != nil {
+		t.Skip("no git:", string(out))
+	}
+	if err := seedLoginTest(repo, a); err != nil {
+		t.Fatal(err)
+	}
+	src, _ := os.ReadFile(filepath.Join(repo, "tests", "Toolshop", "test_login.py"))
+	if !strings.Contains(string(src), `os.environ["HYDRA_SHOP_PASSWORD"]`) || !strings.Contains(string(src), `LOGIN_PATH = "/login"`) || strings.Contains(string(src), "s3cr3t!") {
+		t.Errorf("test_login.py:\n%s", src)
+	}
+	if out, err := exec.Command("python3", "-m", "py_compile", filepath.Join(repo, "tests", "Toolshop", "test_login.py")).CombinedOutput(); err != nil && !errors.Is(err, exec.ErrNotFound) {
+		t.Errorf("test_login.py is not valid Python: %s", out)
+	}
+	if log, _ := git(repo, "log", "--oneline"); !strings.Contains(log, "sign-in test for Toolshop") {
+		t.Errorf("the test must be committed: %q", log)
+	}
+	if err := seedLoginTest(repo, a); err != nil {
+		t.Errorf("a second init leaves the test alone: %v", err)
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -54,5 +55,26 @@ func TestTheEventCountLetsThePageNoticeAClearedLog(t *testing.T) {
 	tailFrom(w, filepath.Join(c.liveDir(), "events.jsonl"), "5")
 	if w.Header().Get("X-Total") != "2" || w.Body.Len() != 0 {
 		t.Errorf("a page that read 5 lines of a 2-line log must learn it was cleared: %v %q", w.Header(), w.Body.String())
+	}
+}
+
+func TestAnEmptyCrawlNeverReplacesTheAppMap(t *testing.T) {
+	dir := t.TempDir()
+	out, fresh := filepath.Join(dir, "App.crawl.json"), filepath.Join(dir, "App.crawl.json.new")
+	writeJSON(out, map[string]any{"pages": []any{map[string]any{"url": "/a"}}})
+	writeJSON(fresh, map[string]any{"pages": []any{}})
+	if err := keepCrawl(fresh, out, "http://qa"); err == nil || !strings.Contains(err.Error(), "previous app map is kept") {
+		t.Fatalf("%v", err)
+	}
+	b, _ := os.ReadFile(out)
+	if !strings.Contains(string(b), `"/a"`) || fileExists(fresh) {
+		t.Errorf("old map must survive and the empty one be discarded: %s", b)
+	}
+	writeJSON(fresh, map[string]any{"pages": []any{map[string]any{"url": "/b"}}})
+	if err := keepCrawl(fresh, out, "http://qa"); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(out); !strings.Contains(string(b), `"/b"`) {
+		t.Errorf("a crawl with pages replaces the map: %s", b)
 	}
 }

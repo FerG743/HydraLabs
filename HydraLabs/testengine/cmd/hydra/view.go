@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -122,7 +123,9 @@ func (c Config) Crawl(watch string, headed bool) error {
 	// Ctrl-C or a kill of hydra must stop the crawler too: an orphan keeps writing to the same events file
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	cmd := exec.CommandContext(ctx, c.Python, c.crawlArgs(events, out, headed)...)
+	fresh := out + ".new" // the app map is only replaced by a crawl that found something (keepCrawl)
+	os.Remove(fresh)
+	cmd := exec.CommandContext(ctx, c.Python, c.crawlArgs(events, fresh, headed)...)
 	var quiet bytes.Buffer
 	cmd.Stderr = os.Stderr
 	if c.Quiet { // the live element stream is noise here; kept only to explain a failure
@@ -134,6 +137,9 @@ func (c Config) Crawl(watch string, headed bool) error {
 			return fmt.Errorf("crawl failed: %w: %s", err, lines[len(lines)-1])
 		}
 		return fmt.Errorf("crawl failed: %w", err)
+	}
+	if err := keepCrawl(fresh, out, c.PortalURL); err != nil {
+		return err
 	}
 	if !c.Quiet {
 		fmt.Println("app map:", out)
@@ -147,4 +153,21 @@ func (c Config) showSlow() int {
 		return c.SlowMS
 	}
 	return 300
+}
+
+// keepCrawl replaces the app map with a new crawl only if it found pages. A crawl of an app that is down or still
+// starting finds nothing: replacing the map with that would erase every known locator (and store "all pages gone").
+func keepCrawl(fresh, out, url string) error {
+	b, err := os.ReadFile(fresh)
+	if err != nil {
+		return fmt.Errorf("crawl wrote no app map: %w", err)
+	}
+	var m struct {
+		Pages []json.RawMessage `json:"pages"`
+	}
+	if json.Unmarshal(b, &m) != nil || len(m.Pages) == 0 {
+		os.Remove(fresh)
+		return fmt.Errorf("the crawl found no pages at %s (is the app up, still starting, behind a login?); the previous app map is kept", url)
+	}
+	return os.Rename(fresh, out)
 }

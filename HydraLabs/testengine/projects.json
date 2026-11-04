@@ -4,6 +4,10 @@
     "DWQ": {
       "app": "PortalQA",
       "profile": "profiles/portal-qa.json"
+    },
+    "ENACTOR": {
+      "app": "EnactorPos",
+      "profile": "profiles/enactor-pos.json"
     }
   },
   "reposRoot": "~/Documents/GitHub",

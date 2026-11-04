@@ -1,0 +1,19 @@
+<section id="problem" style="background:#1c1719;color:#f6f3f4;font-family:'DM Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-family:'Rubik', Arial, sans-serif;font-size:76px;font-weight:700;line-height:1.1">Humans write the cases. The pipeline does the rest.</h2>
+<div style="display:flex;gap:32px">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#2d2527;padding:40px;border:2px solid #43373b;border-radius:16px">
+<h3 style="font-family:'Rubik', Arial, sans-serif;font-size:40px;font-weight:600;color:#f490b1">1 · Write</h3>
+<p style="font-size:30px;line-height:1.4">QA writes and documents each case in Jira first. That is the human gate.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#2d2527;padding:40px;border:2px solid #43373b;border-radius:16px">
+<h3 style="font-family:'Rubik', Arial, sans-serif;font-size:40px;font-weight:600;color:#f490b1">2 · Automate</h3>
+<p style="font-size:30px;line-height:1.4">The pipeline reads the case, maps its steps to the real app and renders a test.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#2d2527;padding:40px;border:2px solid #43373b;border-radius:16px">
+<h3 style="font-family:'Rubik', Arial, sans-serif;font-size:40px;font-weight:600;color:#f490b1">3 · Prove</h3>
+<p style="font-size:30px;line-height:1.4">The test must pass in the real framework, run three times in a row, before it counts.</p>
+</div>
+</div>
+<p style="font-size:32px;color:#e6a8bd">A rendered test is not an automated test. Only a passing one is.</p>
+<aside>The three steps map to the scope sentence. Stress that "rendered" does not count; only a test that passes does.</aside>
+</section>

@@ -1,0 +1,1 @@
+Labs never grades its own work. HydraLabs builds the tests, HydraPloy checks them, and a human approves every PR.

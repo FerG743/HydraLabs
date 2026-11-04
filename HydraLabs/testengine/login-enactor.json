@@ -1,0 +1,12 @@
+[
+  {"fill": "input[name=\"deviceId\"]", "value": "ENV:POS_FIRST_LOGIN_ID"},
+  {"select": "select[name=\"protocol\"]", "value": "https"},
+  {"fill": "input[name=\"hostPort\"]", "value": "443"},
+  {"click": "role=button[name=\"Submit\"]"},
+  {"click": "#text-input-username"},
+  {"keypad": "ENV:POS_USER"},
+  {"click": "#text-input-password"},
+  {"keypad": "ENV:POS_PASSWORD"},
+  {"click": "role=button[name=\"ENT\"]"},
+  {"wait": 8000}
+]

@@ -14,6 +14,10 @@ Everything here is **not part of the HydraLabs pipeline** (`HydraLabs/testengine
 |---|---|---|---|
 | `testengine/engine/`, `testengine/cmd/demo/` | A Go block-graph engine (blocks, rules, an interpreter) and its demo runner (`login_then_buy.json`) | Never part of the Jira → test pipeline; the pipeline needed no engine | `cmd/hydra` (the router) and the tiers in PIPELINE.md |
 | `testengine/web/` (`testengine-canvas`), `testengine/examples/` | A React Flow canvas for drawing block graphs for that engine (its catalog mirrored the engine's `BlockMeta` and it exported the JSON the engine consumed), and the sample graph the demo used (a byte-identical copy of the demo's) | Only existed to serve the engine; nothing referenced them | n/a |
+| `promo/` (moved from the repo root) | HydraLabs marketing material: poster, teaser and promo videos and their HTML sources, presentation (en/es), brag output, demo video, and the two brand fonts | Marketing, not the QA pipeline; nothing in `testengine` or the pipeline references it | n/a |
+| `HydraLabs/` app files: `src/`, `src-tauri/`, `public/`, `uiagent/`, `.vscode/`, and the root config (`package.json`, `vite.config.ts`, `tsconfig*.json`, `tailwind.config.js`, `postcss.config.js`, `components.json`, `index.html`) | The Tauri desktop app (a React dashboard over a Rust shell) and `uiagent/` (a vision planner, its own Go module) | The pipeline needs no dashboard; nothing in `testengine` imports or calls either (checked: `testengine` builds and vets without them) | n/a. Still parked in PIPELINE.md |
+
+`HydraLabs/README.md`, `HydraLabs/.gitignore`, `HydraLabs/testengine/` and `HydraLabs/.hydra.env` (the pipeline's secrets, git-ignored) stay where they are.
 
 Code here is **not built** with the pipeline: it lives outside the `testengine` Go module, so its imports (e.g. `testengine/engine`) do not resolve from this folder. To revive something, move it back with `git mv` first.
 
@@ -23,8 +27,6 @@ PIPELINE.md lists these as "parked". Moving each one needs the dependency on the
 
 | Candidate | Still used by | Safe to move when |
 |---|---|---|
-| Tauri desktop app (`HydraLabs/src`, `src-tauri`, `package.json`, `vite.config.ts`, ...) | nothing in `testengine` | you decide the pipeline needs no dashboard (note: `src/App.tsx` has your own uncommitted change) |
-| `uiagent/` (vision planner) | nothing in `testengine` references it (I did not search the desktop app) | any time, after checking the app |
 | `testengine/cmd/skeleton/`, `cmd/lint/` (Gherkin output) | the old Gherkin n8n workflows, `tools/jira/gherkin_gen.py`, `jira2feature.py`, `resolve_refs.py`, `tools/scorecard/` | those old workflows and scripts move with them |
 | `n8n/jira-pipeline.json`, `jira-pipeline-test.json`, `build_jira_workflow.py` (Jira → Gherkin) | n8n still has them imported (`jira-gherkin`, `jira-gherkin-test`) | you delete or deactivate them in n8n |
 | `n8n/facturacion-pipeline.json`, `build_workflow.py`, `n8n/profiles/facturacion.json` (CSV matrix → Gherkin) | `cmd/matrix`, `cmd/suite`, `cmd/join` (CSV adapters), imported in n8n as `gherkin-test` | the CSV source is retired |

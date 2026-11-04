@@ -1,0 +1,373 @@
+{
+  "ok": true,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 4,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<div id=\"scene-hook\"> is a timeline element that contains nested <div id=\"hook\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#scene-hook",
+        "dataAttributes": {},
+        "sourceFile": "/Users/fergomez/Documents/GitHub/HydraLabs/promo/brag-output-2026-10-28-081337/composition/index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <div id=\"scene-hook\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<div id=\"scene-pipeline\"> is a timeline element that contains nested <div id=\"ticket\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#scene-pipeline",
+        "dataAttributes": {},
+        "sourceFile": "/Users/fergomez/Documents/GitHub/HydraLabs/promo/brag-output-2026-10-28-081337/composition/index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <div id=\"scene-pipeline\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<div id=\"scene-workbench\"> is a timeline element that contains nested <div id=\"window\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#scene-workbench",
+        "dataAttributes": {},
+        "sourceFile": "/Users/fergomez/Documents/GitHub/HydraLabs/promo/brag-output-2026-10-28-081337/composition/index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <div id=\"scene-workbench\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<div id=\"scene-outro\"> is a timeline element that contains nested <div id=\"no\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#scene-outro",
+        "dataAttributes": {},
+        "sourceFile": "/Users/fergomez/Documents/GitHub/HydraLabs/promo/brag-output-2026-10-28-081337/composition/index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <div id=\"scene-outro\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      }
+    ],
+    "filesScanned": 1
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "duration": 21.21,
+    "samples": [
+      1.178,
+      3.535,
+      5.892,
+      8.248,
+      10.605,
+      12.962,
+      15.318,
+      17.675,
+      20.032
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 0,
+    "truncated": false
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [
+      1.178,
+      5.892,
+      10.605,
+      15.318,
+      20.032
+    ],
+    "checked": 54,
+    "passed": 54
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 2,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "line_unread",
+        "severity": "warning",
+        "message": "\"PR for review\" (3 words) is on screen 0.97 s (±0.01 s), under its 1.05 s floor: hold it about 0.5 s + 0.3 s a word (1.40 s here) before it leaves or changes; see references/motion.md.",
+        "text": "PR for review",
+        "selector": "#chips > div:nth-of-type(5) > div:nth-of-type(2)",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 1457,
+          "y": 626.71,
+          "width": 155.44000000000005,
+          "height": 33
+        },
+        "time": 8.273,
+        "words": 3,
+        "seconds": 0.968,
+        "floorSeconds": 1.05
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 21 text elements stay under it for 0.5 s or more, the smallest \"Send\" at 23 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "Send",
+        "selector": "#send",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 1516.8,
+          "y": 268.91,
+          "width": 56.39,
+          "height": 28
+        },
+        "time": 9.482,
+        "times": [
+          9.482,
+          9.482,
+          9.482,
+          9.482,
+          9.482,
+          9.482,
+          9.482,
+          9.482,
+          9.482,
+          9.482,
+          9.482,
+          9.482,
+          9.482,
+          9.482,
+          9.482,
+          9.482,
+          10.355,
+          12.352,
+          13.225,
+          13.225,
+          13.225
+        ],
+        "fontPx": 23.17,
+        "floorPx": 28,
+        "seconds": 8.11,
+        "elements": [
+          {
+            "selector": "#send",
+            "text": "Send",
+            "fontPx": 23.17,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "div.btns > div:nth-of-type(1)",
+            "text": "Save",
+            "fontPx": 24,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "div.btns > div:nth-of-type(2)",
+            "text": "Settings",
+            "fontPx": 24,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "div.tabs > div:nth-of-type(1)",
+            "text": "Collections",
+            "fontPx": 24,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "div.tab.on",
+            "text": "Test Suites",
+            "fontPx": 24,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "#side > div:nth-of-type(2) > div:nth-of-type(2)",
+            "text": "functional · 12 tests",
+            "fontPx": 24,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "#side > div:nth-of-type(3) > div:nth-of-type(2)",
+            "text": "integration · 8 tests",
+            "fontPx": 24,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "#side > div:nth-of-type(4) > div:nth-of-type(2)",
+            "text": "performance · 5 tests",
+            "fontPx": 24,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "div.method",
+            "text": "GET",
+            "fontPx": 24,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "span.on",
+            "text": "Headers",
+            "fontPx": 24,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "#reqtabs > span:nth-of-type(2)",
+            "text": "Body",
+            "fontPx": 24,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "#reqtabs > span:nth-of-type(3)",
+            "text": "Auth",
+            "fontPx": 24,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "div.head",
+            "text": "Activity",
+            "fontPx": 24,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "#url-text",
+            "text": "htt",
+            "fontPx": 24,
+            "time": 10.355,
+            "seconds": 7.237
+          },
+          {
+            "selector": "#body",
+            "text": "[ { \"id\": 1, \"name\": \"Leanne Graham\", \"username\": \"Bret\" } ]",
+            "fontPx": 24,
+            "time": 13.225,
+            "seconds": 4.367
+          },
+          {
+            "selector": "span.ts",
+            "text": "10:42:07",
+            "fontPx": 24,
+            "time": 13.225,
+            "seconds": 4.367
+          },
+          {
+            "selector": "#act-row > span:nth-of-type(3)",
+            "text": "GET https://jsonplaceholder.typicode.com/users - 200 OK",
+            "fontPx": 24,
+            "time": 13.225,
+            "seconds": 4.367
+          },
+          {
+            "selector": "#side > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "Login Tests",
+            "fontPx": 26,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "#side > div:nth-of-type(3) > div:nth-of-type(1)",
+            "text": "API Integration",
+            "fontPx": 26,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "#side > div:nth-of-type(4) > div:nth-of-type(1)",
+            "text": "Performance Tests",
+            "fontPx": 26,
+            "time": 9.482,
+            "seconds": 8.11
+          },
+          {
+            "selector": "#sending",
+            "text": "Sending request...",
+            "fontPx": 26,
+            "time": 12.352,
+            "seconds": 0.749
+          }
+        ]
+      }
+    ],
+    "enabled": true,
+    "step": 0.125,
+    "samples": 170
+  },
+  "audio": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  }
+}

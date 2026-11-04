@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HydraLabs promo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=block" rel="stylesheet">
+<style>
+  @font-face { font-family: "Genius Techno"; src: url("GeniusTechnoOblique.ttf") format("truetype"); font-display: block; }
+  :root { --bg: #1c1719; --card: #2d2527; --muted: #43373b; --ink: #f6f3f4; --dim: #e6a8bd; --primary: #f490b1; --accent: #ffa98f; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: var(--bg); overflow: hidden; }
+  body { color: var(--ink); font-family: "Genius Techno", "Arial Black", sans-serif; }
+  .stage { position: fixed; inset: 0; width: 1920px; height: 1080px; left: 50%; top: 50%;
+           transform: translate(-50%, -50%) scale(var(--s, 1)); transform-origin: center; overflow: hidden; }
+  canvas { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+  .line { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+          text-align: center; font-size: 110px; font-weight: 500; letter-spacing: 0.01em;
+          opacity: 0; white-space: nowrap; will-change: transform, opacity, filter; }
+  .line .ch { display: inline-block; white-space: pre; }
+  .wordmark { font-size: 240px; font-weight: 900; letter-spacing: 0.02em; }
+  .endcard { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; }
+  .endcard .line { position: relative; inset: auto; height: auto; display: block; }
+  .end-title { font-size: 200px; font-weight: 900; letter-spacing: 0.02em; }
+  .tagline { font-size: 56px; font-weight: 400; color: var(--dim); }
+  .new { color: var(--primary); }
+  .flash { position: absolute; inset: 0; background: var(--ink); opacity: 0; pointer-events: none; }
+  .bar { position: absolute; left: 0; bottom: 0; height: 6px; background: var(--ink); width: 0; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="c" width="1920" height="1080"></canvas>
+
+  <!-- Words: short, one at a time -->
+  <div class="line split" data-a="0.8" data-b="4.2" data-dir="left">Messy.</div>
+  <div class="line split" data-a="4.6" data-b="7.9" data-dir="right">Tangled.</div>
+  <div class="line split new wordmark" data-a="8.536" data-b="10.5" data-dir="punch">Hydra</div>
+  <div class="line split new" data-a="10.996" data-b="12.636" data-dir="up">Clean.</div>
+  <div class="line split new" data-a="13.866" data-b="15.506" data-dir="zoom">Yours.</div>
+
+  <div class="endcard">
+    <div class="line split new end-title" data-a="20.9" data-b="99" data-dir="punch">HydraLabs</div>
+    <div class="line tagline" data-a="21.9" data-b="99" data-dir="up">Your automated QA pipeline at your fingertips</div>
+  </div>
+
+  <div class="flash" data-flash></div>
+  <div class="bar" data-bar></div>
+</div>
+
+<script>
+  const DURATION = 30;
+  const P = 0.41, PH = 0.336;
+  const beat = k => PH + k * P;
+  const FLASH_AT = [0.8, 4.6, 8.536, 10.996, 13.866, 20.9];
+  const DROP = beat(20);          // 8.536: the kick where the chaos snaps into order
+  const LIT_START = beat(38);     // the nodes start lighting on the beat
+
+  const EXPO = t => t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
+  const BACK = t => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+  const enter = (t, a, dur = 0.5) => t < a ? 0 : EXPO(Math.min(1, (t - a) / dur));
+  const leave = (t, b) => t <= b ? 0 : Math.min(1, (t - b) / 0.22);
+  const LETTER_STAGGER = 0.03;
+
+  // Split line letters for the stagger.
+  document.querySelectorAll('.split').forEach(el => {
+    const text = el.textContent; el.textContent = '';
+    [...text].forEach(c => { const s = document.createElement('span'); s.className = 'ch'; s.textContent = c; el.appendChild(s); });
+  });
+
+  const els = [...document.querySelectorAll('[data-a]')];
+  const flash = document.querySelector('[data-flash]');
+  const bar = document.querySelector('[data-bar]');
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  function motion(dir, p) {
+    const q = 1 - p;
+    switch (dir) {
+      case 'left':  return { x: -q * 260, y: 0, s: 1, blur: q * 8 };
+      case 'right': return { x:  q * 260, y: 0, s: 1, blur: q * 8 };
+      case 'zoom':  return { x: 0, y: 0, s: 1 + q * 0.6, blur: q * 12 };
+      case 'punch': return { x: 0, y: 0, s: 1 + (1 - BACK(p)) * 0.35, blur: q * 6 };
+      default:      return { x: 0, y: q * 70, s: 1, blur: q * 10 };
+    }
+  }
+
+  // Ribbons: many lines. Before the drop they tangle; after it they settle into a clean set of lanes.
+  const RIBBONS = 26, POINTS = 90;
+  const seeds = Array.from({ length: RIBBONS }, (_, i) => ({
+    a: 1 + (i * 37 % 7) * 0.31, b: 0.7 + (i * 53 % 5) * 0.23, c: (i * 0.618) % 1 * 6.28, d: (i * 0.377) % 1 * 6.28,
+  }));
+  function ribbonY(i, j, t, chaos) {
+    const lane = 120 + (i / (RIBBONS - 1)) * 840;         // where the ribbon rests once it's in order
+    const s = seeds[i];
+    const wobble = Math.sin(j * 0.21 * s.a + t * 1.7 + s.c) * 120 + Math.sin(j * 0.07 * s.b - t * 1.1 + s.d) * 160;
+    return lane * (1 - chaos) + (lane + wobble) * chaos;
+  }
+  function draw(t) {
+    const chaos = t < DROP ? 1 : 1 - EXPO(Math.min(1, (t - DROP) / 0.9));
+    ctx.fillStyle = '#1c1719';
+    ctx.fillRect(0, 0, 1920, 1080);
+
+    // Ribbons
+    ctx.lineWidth = 3;
+    for (let i = 0; i < RIBBONS; i++) {
+      const orderLine = i % 3 === 0;
+      const r = orderLine ? 244 : 246, g = orderLine ? 144 : 243, b = orderLine ? 177 : 244;   // pink vs ink
+      const alpha = chaos > 0.5 ? 0.5 : 0.25 + 0.4 * (1 - chaos);
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+      ctx.beginPath();
+      for (let j = 0; j <= POINTS; j++) {
+        const x = (j / POINTS) * 1920;
+        const y = ribbonY(i, j, t, chaos);
+        j === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Lit nodes after the drop: a row of pink dots that light on the beat, joined by a line.
+    const nodes = 7, nx = i => 300 + i * (1320 / (nodes - 1)), ny = 540;
+    let lastLit = -1;
+    if (t < LIT_START - 1 || t > 20.4) return;   // the row only exists between its own entrance and the end card
+    for (let i = 0; i < nodes; i++) {
+      const on = t >= LIT_START + i * P;
+      if (on) lastLit = i;
+      const pulse = on ? 1 + 0.15 * Math.max(0, 1 - (t - (LIT_START + i * P)) / 0.25) : 1;
+      ctx.beginPath();
+      ctx.arc(nx(i), ny, (on ? 16 : 9) * pulse, 0, Math.PI * 2);
+      ctx.fillStyle = on ? '#f490b1' : 'rgba(246,243,244,0.25)';
+      ctx.shadowColor = '#f490b1'; ctx.shadowBlur = on ? 30 : 0;
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+    if (lastLit > 0) {
+      ctx.strokeStyle = 'rgba(244,144,177,0.8)'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(nx(0), ny); ctx.lineTo(nx(lastLit), ny); ctx.stroke();
+    }
+  }
+
+  window.render = function (t) {
+    t = Math.max(0, Math.min(DURATION, t));
+    draw(t);
+
+    for (const el of els) {
+      const a = parseFloat(el.dataset.a), b = parseFloat(el.dataset.b);
+      const dir = el.dataset.dir || 'up';
+      const k = leave(t, b);
+      if (t < a || k >= 1) { el.style.opacity = 0; continue; }
+      const p = enter(t, a, 0.5);
+      const m = motion(dir, p);
+      const out = 1 + 0.1 * k;
+      el.style.opacity = 1 - k;
+      el.style.filter = `blur(${(m.blur + 10 * k).toFixed(2)}px)`;
+      el.style.transform = `translate(${m.x.toFixed(2)}px, ${m.y.toFixed(2)}px) scale(${(m.s * out).toFixed(4)})`;
+      if (el.classList.contains('split')) {
+        el.querySelectorAll('.ch').forEach((ch, i) => {
+          const cp = enter(t, a + i * LETTER_STAGGER, 0.45);
+          ch.style.opacity = cp;
+          ch.style.transform = `translateY(${((1 - cp) * 0.55).toFixed(3)}em)`;
+        });
+      }
+    }
+
+    let f = 0;
+    for (const at of FLASH_AT) {
+      const d = t - at;
+      if (d >= 0 && d < 0.12) f = Math.max(f, (1 - d / 0.12) * 0.05);
+    }
+    flash.style.opacity = f.toFixed(4);
+    bar.style.width = (t / DURATION * 100).toFixed(3) + '%';
+  };
+
+  function fit() {
+    document.getElementById('stage').style.setProperty('--s', Math.min(innerWidth / 1920, innerHeight / 1080));
+  }
+  addEventListener('resize', fit); fit();
+
+  if (!location.search.includes('capture')) {
+    const start = performance.now();
+    (function loop(now) {
+      window.render(((now - start) / 1000) % (DURATION + 1));
+      requestAnimationFrame(loop);
+    })(start);
+  }
+</script>
+</body>
+</html>

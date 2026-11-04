@@ -1,0 +1,243 @@
+{
+  "version": 1,
+  "historyId": "5eee14b7-1324-41be-b79a-9683a74632c2",
+  "currentRevision": "7df5de27-dc00-4d44-9259-11e9b9ccf3ec",
+  "pendingChanges": false,
+  "files": {
+    "assets/sfx/casino/card-slide-1.ogg": {
+      "hash": "006cf9822d15d7063f8899e56041f41646df30adb6fbd8b974ee5d5420012690",
+      "content": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/00/006cf9822d15d7063f8899e56041f41646df30adb6fbd8b974ee5d5420012690"
+    },
+    "assets/sfx/impact/impactBell_heavy_000.ogg": {
+      "hash": "94b8bb5f2d43ab65e4bcc32b28562416e9bc2c51d9fd4be1e333660ee52f977f",
+      "content": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/94/94b8bb5f2d43ab65e4bcc32b28562416e9bc2c51d9fd4be1e333660ee52f977f"
+    },
+    "assets/sfx/impact/impactSoft_medium_001.ogg": {
+      "hash": "7642a4fd43e547afe4f7adfadb3dabb681c0ff512f52c1674bae30a726841faf",
+      "content": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/76/7642a4fd43e547afe4f7adfadb3dabb681c0ff512f52c1674bae30a726841faf"
+    },
+    "assets/sfx/impact/impactSoft_medium_002.ogg": {
+      "hash": "5069e3571a77d7f7aae9ef71d0364aa245fb7d64a7c8cc9956f221d03088c089",
+      "content": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/50/5069e3571a77d7f7aae9ef71d0364aa245fb7d64a7c8cc9956f221d03088c089"
+    },
+    "assets/sfx/interface/click_001.ogg": {
+      "hash": "ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9",
+      "content": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/cc/ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9"
+    },
+    "assets/sfx/interface/drop_001.ogg": {
+      "hash": "692ee3a6f1821402ca649ff735bee9591dc4846c8098fc7d6a90fd15fa57c1af",
+      "content": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/69/692ee3a6f1821402ca649ff735bee9591dc4846c8098fc7d6a90fd15fa57c1af"
+    },
+    "index.html": {
+      "hash": "140e8f0f3e51275374179c440f5b8be34b3b212c90ae1b79cf27c47f5d7946c4",
+      "content": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/14/140e8f0f3e51275374179c440f5b8be34b3b212c90ae1b79cf27c47f5d7946c4"
+    },
+    "assets/music/happy-beats-business-moves-vol-12-by-ende-dot-app.mp3": {
+      "hash": "5888d4bd2ba0119b87a94e502ae2cc401c08192945cc5e5c2f8e8a33aa47a0a1",
+      "content": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/58/5888d4bd2ba0119b87a94e502ae2cc401c08192945cc5e5c2f8e8a33aa47a0a1"
+    },
+    "assets/sfx/interface/drop_002.ogg": {
+      "hash": "4ac4d1cef7e936965cbf795852ca2020300b9e2ba7daa59f2bf4f1f7bf416218",
+      "content": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/4a/4ac4d1cef7e936965cbf795852ca2020300b9e2ba7daa59f2bf4f1f7bf416218"
+    }
+  },
+  "revisions": {
+    "05844bad-4e64-4430-8b48-1c9ffb9fb841": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793197013231,
+      "endedAt": 1793197013232,
+      "files": {
+        "index.html": {
+          "before": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/71/7131dfa7c09c699c233a86c52ae95af12e5ec307f92a82b7d95d79f6afb02f15",
+          "after": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/d2/d2b04013b1ca9956e344a2136c16a32e072a8d1e9890d03b331256fa338a58d5"
+        }
+      }
+    },
+    "c8eb6cfe-5a32-407c-ab44-ee605d598a13": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793197079538,
+      "endedAt": 1793197079542,
+      "files": {
+        "assets/sfx/interface/click_002.ogg": {
+          "before": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/ad/adcd1f4adc35f1b41bc1b5bbefeff7aa44f2f3f0d96d3199b544140c7c1e761c",
+          "after": null
+        },
+        "assets/sfx/interface/drop_002.ogg": {
+          "before": null,
+          "after": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/4a/4ac4d1cef7e936965cbf795852ca2020300b9e2ba7daa59f2bf4f1f7bf416218"
+        },
+        "index.html": {
+          "before": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/d2/d2b04013b1ca9956e344a2136c16a32e072a8d1e9890d03b331256fa338a58d5",
+          "after": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/9b/9ba30000186dd59d48e9c02476ad16add0a2cd40c5658906fb7d7f2ac5f217a5"
+        }
+      }
+    },
+    "7df5de27-dc00-4d44-9259-11e9b9ccf3ec": {
+      "actor": {
+        "kind": "outside",
+        "name": "Outside"
+      },
+      "label": "Changed outside the app",
+      "startedAt": 1793197109102,
+      "endedAt": 1793197109103,
+      "files": {
+        "index.html": {
+          "before": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/9b/9ba30000186dd59d48e9c02476ad16add0a2cd40c5658906fb7d7f2ac5f217a5",
+          "after": "/Users/fergomez/.cache/hyperframes/history/5eee14b7-1324-41be-b79a-9683a74632c2/blobs/14/140e8f0f3e51275374179c440f5b8be34b3b212c90ae1b79cf27c47f5d7946c4"
+        }
+      }
+    }
+  },
+  "checks": {
+    "latest": {
+      "revision": "7df5de27-dc00-4d44-9259-11e9b9ccf3ec",
+      "id": "0c4193e5-97a4-4652-ba50-b4a23f86d34b"
+    },
+    "revisions": {
+      "05844bad-4e64-4430-8b48-1c9ffb9fb841": [
+        {
+          "id": "19ffd79e-175b-4a53-899e-c1a73421e94a",
+          "scope": "project",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 10000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793197017003,
+          "contentHash": "7bdace5c028f1f3f9630b1451755369ac14f1bdcdbb0388e0d58d7c17ad55164",
+          "revision": "05844bad-4e64-4430-8b48-1c9ffb9fb841",
+          "inputFingerprint": "9ecd38efd6f45ebc0362f9587ac05d18dd5aa71430ed60a63236709043efebd5",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "f9479e4c-3380-4f46-aead-fcaad138f656"
+        }
+      ],
+      "c8eb6cfe-5a32-407c-ab44-ee605d598a13": [
+        {
+          "id": "c65b5126-16da-4f25-9864-77c810397947",
+          "scope": "project",
+          "metadata": {
+            "ok": false,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 10000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793197081533,
+          "contentHash": "2307b800b419f7bb40b6461d3df817881efaee51d6a7181d184acc698ee515a4",
+          "revision": "c8eb6cfe-5a32-407c-ab44-ee605d598a13",
+          "inputFingerprint": "3b36ba14d6be37744be3926f3477f54d1a29886f0e20b5d99cd19ecd7810c8b5",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision",
+          "status": "cleaned",
+          "cleanedAfterRender": "f9479e4c-3380-4f46-aead-fcaad138f656"
+        }
+      ],
+      "7df5de27-dc00-4d44-9259-11e9b9ccf3ec": [
+        {
+          "id": "0c4193e5-97a4-4652-ba50-b4a23f86d34b",
+          "scope": "project",
+          "report": "/Users/fergomez/Documents/GitHub/HydraLabs/promo/brag-output-2026-10-28-081337/composition/.hyperframes/artifacts/checks/0c4193e5-97a4-4652-ba50-b4a23f86d34b.json",
+          "metadata": {
+            "ok": true,
+            "browserSkipped": false,
+            "options": {
+              "samples": 9,
+              "atTransitions": false,
+              "maxIssues": 80,
+              "collapseStatic": true,
+              "tolerance": 2,
+              "timeout": 10000,
+              "contrast": true,
+              "strict": false,
+              "snapshots": false,
+              "browserGpuMode": "auto"
+            }
+          },
+          "createdAt": 1793197111172,
+          "contentHash": "db4e2e83915f44fb5be7114127a8486258ff834fed050a4b105abe3750813dde",
+          "revision": "7df5de27-dc00-4d44-9259-11e9b9ccf3ec",
+          "inputFingerprint": "54955638adeef2f3e370c0e366e739199b5527e871c227b177e0f3a6b7530598",
+          "inputScope": "local-project-files",
+          "attribution": "recorded-revision"
+        }
+      ]
+    },
+    "unversioned": [
+      {
+        "id": "dbd70509-33ef-444d-8e03-04e5af3d9b69",
+        "scope": "project",
+        "report": "/Users/fergomez/Documents/GitHub/HydraLabs/promo/brag-output-2026-10-28-081337/composition/.hyperframes/artifacts/checks/dbd70509-33ef-444d-8e03-04e5af3d9b69.json",
+        "metadata": {
+          "ok": false,
+          "browserSkipped": true,
+          "options": {
+            "samples": 9,
+            "atTransitions": false,
+            "maxIssues": 80,
+            "collapseStatic": true,
+            "tolerance": 2,
+            "timeout": 10000,
+            "contrast": true,
+            "strict": false,
+            "snapshots": false,
+            "browserGpuMode": "auto"
+          }
+        },
+        "createdAt": 1793196996726,
+        "contentHash": "dbc7b22b5932e4c9cfc7ce9d6ca8dc232ece1156562fb1a32aead3d82ae37b2f",
+        "revision": null,
+        "inputFingerprint": "306fec534e54489604ba255bb2add02a213217cd7e654a647ee625bfe01a5bf5",
+        "inputScope": "local-project-files",
+        "attribution": "unversioned"
+      }
+    ]
+  },
+  "snapshots": {
+    "latest": null,
+    "revisions": {},
+    "unversioned": []
+  },
+  "renders": {
+    "latest": {
+      "id": "f9479e4c-3380-4f46-aead-fcaad138f656",
+      "completedAt": 1793197152907,
+      "output": "/Users/fergomez/Documents/GitHub/HydraLabs/promo/brag-output-2026-10-28-081337/brag.mp4",
+      "status": "completed",
+      "revision": "7df5de27-dc00-4d44-9259-11e9b9ccf3ec"
+    },
+    "retainedRevisions": [
+      "7df5de27-dc00-4d44-9259-11e9b9ccf3ec"
+    ]
+  },
+  "pendingArtifactCleanup": []
+}

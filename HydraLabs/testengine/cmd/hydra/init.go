@@ -28,6 +28,7 @@ type question struct {
 	key, prompt, def string
 	when             func(a answers) bool                              // nil = always asked
 	check            func(v string, a answers) (string, string, error) // -> normalized value, warning, error
+	secret           bool                                              // not echoed while typed, never shown back
 }
 
 type addon struct {
@@ -54,6 +55,8 @@ var initAddons = []addon{
 	{name: "labs", title: "HydraLabs: crawl the app, map its elements, build tests from the cases",
 		questions: []question{
 			{key: "paths", prompt: "Pages to start the crawl from (comma separated)", def: "/", check: checkPaths},
+			{key: "video", prompt: "Record the crawl as a video? (y/N)", def: "n", check: yesNo},
+			{key: "slowMs", prompt: "Pause between elements, in ms (0 = as fast as possible; a demo can use 3000)", def: "0", check: intIn(0, 60000)},
 			{key: "model", prompt: "Use the local model when the rules cannot decide (tie-breaks, exploring a page)? (y/N)", def: "n", check: yesNo},
 		}},
 }
@@ -82,6 +85,13 @@ func coreQuestions(reg *Registry) []question {
 			when: func(a answers) bool { return !a.yes("core.prod") }, check: yesNo},
 		{key: "baseBranch", prompt: "Base branch of the test repo", def: "main", check: required},
 		{key: "remote", prompt: "Remote URL of the test repo (empty = local only for now)", def: "", check: checkRemote},
+		{key: "login", prompt: "Does the app ask to sign in before its pages? (y/N)", def: "n", check: yesNo},
+		{key: "loginPath", prompt: "Path of the sign-in page", def: "/login", when: needsLogin, check: checkPaths},
+		{key: "user", prompt: "User to sign in with (a QA account)", when: needsLogin, check: required},
+		{key: "password", prompt: "Its password (saved only in " + hydraEnvPath + ")", when: needsLogin, check: required, secret: true},
+		{key: "userField", prompt: "Selector of the user field", def: `input[type=email], input[autocomplete=username], input[name*=user i], input[name*=email i], input[type=text]`, when: needsLogin, check: required},
+		{key: "passwordField", prompt: "Selector of the password field", def: "input[type=password]", when: needsLogin, check: required},
+		{key: "submit", prompt: "Selector of the sign-in button", def: "button[type=submit], input[type=submit], form button", when: needsLogin, check: required},
 	}
 }
 
@@ -127,6 +137,8 @@ func addonNames() string {
 	}
 	return strings.Join(ns, ",")
 }
+
+func needsLogin(a answers) bool { return a.yes("core.login") }
 
 func is(k, v string) func(a answers) bool { return func(a answers) bool { return a[k] == v } }
 
@@ -266,6 +278,7 @@ type initRun struct {
 	out   io.Writer
 	given answers // from --answers
 	yes   bool    // --yes: no prompts; missing answers take their default
+	tty   bool    // stdin is a terminal: secrets are read with echo off
 	a     answers
 	warns []string
 }
@@ -285,7 +298,14 @@ func (r *initRun) ask(section string, q question) error {
 				fmt.Fprintf(r.out, " [%s]", q.def)
 			}
 			fmt.Fprint(r.out, ": ")
+			if q.secret && r.tty {
+				exec.Command("stty", "-echo").Run() // shortcut: stty, not x/term; on Windows the password is echoed
+			}
 			line, err := r.in.ReadString('\n')
+			if q.secret && r.tty {
+				exec.Command("stty", "echo").Run()
+				fmt.Fprintln(r.out)
+			}
 			if line = strings.TrimSpace(line); line != "" {
 				v, from = line, "typed"
 			}
@@ -337,6 +357,8 @@ func (a answers) profile() map[string]any {
 	}
 	if contains(addons, "labs") {
 		p["paths"], p["storeCrawl"] = strings.Split(a["labs.paths"], ","), true
+		p["recordVideo"] = a.yes("labs.video")
+		p["slowMs"], _ = strconv.Atoi(a["labs.slowMs"])
 		if !a.yes("labs.model") { // no means none: neither the T2 tie-break nor the T3 agent; a person decides instead
 			delete(p, "agent")
 			delete(p, "model")
@@ -376,12 +398,19 @@ func (a answers) summary(w io.Writer, profilePath, repo string) {
 	if p := a["labs.paths"]; p != "" {
 		fmt.Fprintf(w, "  crawl     %s   model tier: %s\n", p, a["labs.model"])
 	}
+	if a.yes("core.login") {
+		fmt.Fprintf(w, "  sign-in   %s as %s (password: %s, as %s)\n", a["core.loginPath"], a["core.user"], hydraEnvPath, a.envName("PASSWORD"))
+	}
 	fmt.Fprintf(w, "  writes    %s and an entry in projects.json\n\n", profilePath)
 }
 
 // Init runs the whole conversation. preview, when not nil, crawls one page of the app and returns a one-line summary.
 func Init(reg *Registry, regPath string, in io.Reader, out io.Writer, given answers, yes bool, preview func(answers) string) (answers, error) {
 	r := &initRun{in: bufio.NewReader(in), out: out, given: given, yes: yes, a: answers{}}
+	if f, ok := in.(*os.File); ok {
+		st, err := f.Stat()
+		r.tty = err == nil && st.Mode()&os.ModeCharDevice != 0
+	}
 	fmt.Fprintln(out, "HydraPloy / HydraLabs onboarding. Nothing is written until you confirm at the end.")
 	for _, q := range coreQuestions(reg) {
 		if err := r.ask("core", q); err != nil {
@@ -419,7 +448,18 @@ func Init(reg *Registry, regPath string, in io.Reader, out io.Writer, given answ
 			return r.a, fmt.Errorf("cancelled: nothing was written")
 		}
 	}
-	if err := writeJSON(profilePath, r.a.profile()); err != nil {
+	p := r.a.profile()
+	if r.a.yes("core.login") {
+		loginFile := strings.TrimSuffix(profilePath, ".json") + ".login.json"
+		if err := writeJSON(loginFile, r.a.loginSteps()); err != nil {
+			return r.a, err
+		}
+		if err := saveSecrets(expand(hydraEnvPath), map[string]string{r.a.envName("USER"): r.a["core.user"], r.a.envName("PASSWORD"): r.a["core.password"]}); err != nil {
+			return r.a, err
+		}
+		p["loginFile"], p["loginPath"] = loginFile, r.a["core.loginPath"]
+	}
+	if err := writeJSON(profilePath, p); err != nil {
 		return r.a, err
 	}
 	rel, _ := filepath.Rel(reg.dir, profilePath)
@@ -486,6 +526,48 @@ func loadAnswers(path string) (answers, error) {
 	return a, nil
 }
 
+// hydraEnvPath: the secrets file loadHydraEnv reads first (a var so tests write elsewhere).
+var hydraEnvPath = "~/.hydra.env"
+
+// envName: where this project's sign-in lives, e.g. HYDRA_DWQ_PASSWORD.
+func (a answers) envName(what string) string { return "HYDRA_" + a["core.project"] + "_" + what }
+
+// loginSteps: the crawler's sign-in, values as ENV: tokens so the file holds no secret.
+func (a answers) loginSteps() []map[string]string {
+	return []map[string]string{
+		{"fill": a["core.userField"], "value": "ENV:" + a.envName("USER")},
+		{"fill": a["core.passwordField"], "value": "ENV:" + a.envName("PASSWORD")},
+		{"click": a["core.submit"]},
+	}
+}
+
+// saveSecrets sets names in the env file (replacing old lines for them, keeping the rest) and in this process,
+// so the first crawl right after init can already sign in. The file is kept private (0600).
+func saveSecrets(path string, kv map[string]string) error {
+	b, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	var keep []string
+	for _, line := range strings.Split(strings.TrimRight(string(b), "\n"), "\n") {
+		k, _, _ := strings.Cut(strings.TrimPrefix(strings.TrimSpace(line), "export "), "=")
+		if _, replaced := kv[k]; line != "" && !replaced {
+			keep = append(keep, line)
+		}
+	}
+	for k, v := range kv {
+		if strings.ContainsAny(v, "\n\r") {
+			return fmt.Errorf("%s: a value cannot span lines", k)
+		}
+		keep = append(keep, k+"="+v)
+		os.Setenv(k, v)
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(keep, "\n")+"\n"), 0o600); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o600) // WriteFile keeps the mode of a file that already existed
+}
+
 // loadHydraEnv reads the pipeline's secrets file the way n8n/start.sh does, so init can check Jira from a plain
 // terminal. Only names it does not already have are set; values are never printed.
 func loadHydraEnv(paths ...string) {
@@ -542,6 +624,11 @@ func runInit(cfg *Config, answersPath string, yes, noPreview bool) error {
 			}
 		}
 	}
+	if a.yes("core.login") {
+		if err := seedLoginTest(o.Repo, a); err != nil {
+			fmt.Fprintln(os.Stderr, "hydra: could not add the sign-in test:", err)
+		}
+	}
 	b, _ := json.MarshalIndent(o, "", "  ")
 	fmt.Println(string(b))
 	if o.Gate != "" {
@@ -549,6 +636,58 @@ func runInit(cfg *Config, answersPath string, yes, noPreview bool) error {
 	}
 	fmt.Printf("\nDone. Next: hydra status   ·   hydra crawl --project %s --watch :8099\n", key)
 	return nil
+}
+
+// seedLoginTest: the app's first test is its sign-in, the step every other test starts behind. One commit on the
+// base branch; an existing test_login.py (a person's, or a second init) is left alone.
+func seedLoginTest(repo string, a answers) error {
+	app := a["core.app"]
+	rel := filepath.Join("tests", app, "test_login.py")
+	if fileExists(filepath.Join(repo, rel)) {
+		return nil
+	}
+	py := func(s string) string { b, _ := json.Marshal(s); return string(b) } // a JSON string is a valid Python literal
+	src := fmt.Sprintf(`# %s
+#
+# Sign-in with the QA account. Written by hydra init; the user and password come from the environment
+# (%s / %s in ~/.hydra.env, or in this repo's .env).
+
+import os
+
+from playwright.sync_api import expect
+
+from config.settings import Config
+from utils.templete_report import add_step
+
+LOGIN_PATH = %s
+USER_FIELD = %s
+PASSWORD_FIELD = %s
+SUBMIT = %s
+
+
+def test_login(driver):
+    add_step("Open the sign-in page")
+    driver.get(Config.BASE_URL.rstrip("/") + LOGIN_PATH)
+    add_step("Enter the user and the password")
+    driver.page.fill(USER_FIELD, os.environ[%s])
+    driver.page.fill(PASSWORD_FIELD, os.environ[%s])
+    add_step("Sign in")
+    driver.page.click(SUBMIT)
+    add_step("The sign-in form is gone")
+    expect(driver.page.locator(PASSWORD_FIELD)).to_have_count(0, timeout=Config.PLAYWRIGHT_TIMEOUT * 1000)
+`, filepath.ToSlash(rel), a.envName("USER"), a.envName("PASSWORD"), py(a["core.loginPath"]), py(a["core.userField"]),
+		py(a["core.passwordField"]), py(a["core.submit"]), py(a.envName("USER")), py(a.envName("PASSWORD")))
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(repo, rel)), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(repo, rel), []byte(src), 0o644); err != nil {
+		return err
+	}
+	if _, err := git(repo, "add", rel); err != nil {
+		return err
+	}
+	_, err := git(repo, append(gitIdentity(repo), "commit", "-q", "-m", "hydra init: sign-in test for "+app)...)
+	return err
 }
 
 // previewCrawl maps one page into a throwaway folder (read-only, like every crawl) and says what it found.
@@ -562,6 +701,14 @@ func previewCrawl(cfg Config, a answers) string {
 	c.Home, c.Registry, c.Out, c.AppMap, c.Quiet = "", nil, tmp, tmp, true
 	c.App, c.PortalURL, c.MaxPages, c.SafeClicks, c.LoginFile, c.StoreCrawl = a["core.app"], a["core.baseUrl"], 1, false, "", false
 	c.Paths = []string{strings.SplitN(a["labs.paths"]+",", ",", 2)[0]}
+	if a.yes("core.login") { // sign in first, so the preview shows the page behind the login, not the login itself
+		c.LoginFile, c.LoginPath = filepath.Join(tmp, "login.json"), a["core.loginPath"]
+		if err := writeJSON(c.LoginFile, a.loginSteps()); err != nil {
+			return "preview skipped: " + err.Error()
+		}
+		os.Setenv(a.envName("USER"), a["core.user"]) // this process and the crawler only; the file is written after the yes
+		os.Setenv(a.envName("PASSWORD"), a["core.password"])
+	}
 	if err := c.Crawl("", false); err != nil {
 		return "preview failed (" + err.Error() + "); the first crawl after setup will try again"
 	}

@@ -109,7 +109,11 @@ def draw(page, els, slow_ms, ev, shots):
 
 
 def resolve_env(v):
-    return os.environ.get(v[4:], v) if isinstance(v, str) and v.startswith("ENV:") else v
+    if not (isinstance(v, str) and v.startswith("ENV:")):
+        return v
+    if v[4:] not in os.environ:  # never type the token itself into a form
+        sys.exit(f"login: {v[4:]} is not set (add it to the --env-file)")
+    return os.environ[v[4:]]
 
 
 def load_env(path):
@@ -160,7 +164,8 @@ def crawl(a):
         context = browser.new_context(viewport={"width": 1280, "height": 800},
                                       **({"record_video_dir": a.video, "record_video_size": {"width": 1280, "height": 800}} if a.video else {}))
         page = context.new_page()
-        page.route("**/*", lambda route, req: route.continue_() if req.method == "GET" else route.abort())
+        login_now = {"on": False}  # the crawl is read-only; only the login steps may send forms (connection, sign-in)
+        page.route("**/*", lambda route, req: route.continue_() if req.method == "GET" or login_now["on"] else route.abort())
 
         def settle(url=None):
             # DOM ready is required; network quiet is best effort: a third-party tracker that never answers
@@ -175,21 +180,38 @@ def crawl(a):
 
         if a.login:
             settle(base + (a.login_path or "/"))
+            login_now["on"] = True
             for step in json.load(open(a.login, encoding="utf-8")):
                 if "fill" in step:
                     page.fill(step["fill"], resolve_env(step["value"]))
                     ev.emit("login", action="fill", selector=step["fill"], value="***")  # never the value
+                elif "select" in step:
+                    page.select_option(step["select"], resolve_env(step["value"]))
+                    ev.emit("login", action="select", selector=step["select"])
+                elif "wait" in step:  # the POS screen loads its data after sign-in; settle() returns too early
+                    page.wait_for_timeout(step["wait"])
+                elif "keypad" in step:  # on-screen keypad: click each character of the value (it ignores typed text)
+                    for ch in resolve_env(step["keypad"]):
+                        page.click(f'role=button[name="{ch}"]')
+                    ev.emit("login", action="keypad", value="***")
                 else:
                     page.click(step["click"])
                     ev.emit("login", action="click", selector=step["click"])
+            login_now["on"] = False
             settle()
+        reuse = bool(a.login)  # after sign-in, the page already on screen is not reloaded: on some apps (the POS) that drops the session
         while queue and len(pages) < a.max_pages:
             url = urldefrag(queue.pop(0))[0]
             if url in seen:
                 continue
             seen.add(url)
             try:
-                settled = settle(url)
+                # reuse it only when it is the page asked for; any other first path (/orders after landing on /home) is opened
+                settled = settle(None if reuse and urldefrag(page.url)[0] == url else url)
+                reuse = False
+                if urldefrag(page.url)[0] in seen - {url}:  # a redirect to a page already mapped (back to /home, or to the login)
+                    continue
+                seen.add(urldefrag(page.url)[0])
             except Exception as e:
                 ev.emit("error", url=url, text=f"{type(e).__name__}")
                 continue

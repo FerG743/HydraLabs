@@ -10,8 +10,6 @@ STUBS = {
     "config/settings.py": "class Config:\n    BASE_URL = ''\n    PLAYWRIGHT_TIMEOUT = 8\n",
     "utils/templete_report.py": ("STEPS = []\ndef set_business_mode(v): pass\n"
                                  "def add_step(msg, status=None, level=None): STEPS.append((status, msg))\n"),
-    "utils/csv_reader.py": ("import csv\ndef cargar_datos_csv(path):\n    with open(path, newline='', encoding='utf-8') as f:\n"
-                            "        return [tuple(r) for r in list(csv.reader(f))[1:]]\n"),
     "utils/driver_wrapper.py": ("class DriverWrapper:\n    def __init__(self, driver): self.driver, self.page = driver, driver.page\n"
                                 "    def click(self, selector, description=None): self.page.click(selector)\n"
                                 "    def send_keys(self, selector, text, description=None, is_secret=False): self.page.fill(selector, text)\n"),
@@ -39,7 +37,11 @@ class Driver:  # the surface the framework's `driver` fixture exposes
 
 
 # the framework's own sign-in, so the verify run signs in exactly as the delivered tests will
-_LOGIN_PY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "templates", "framework", "utils", "login.py")
+_FRAMEWORK_UTILS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "templates", "framework", "utils")
+_LOGIN_PY = os.path.join(_FRAMEWORK_UTILS, "login.py")
+# the framework's own CSV reader (ENV:NAME values from the environment), not a copy that could read data differently
+with open(os.path.join(_FRAMEWORK_UTILS, "csv_reader.py"), encoding="utf-8") as _f:
+    STUBS["utils/csv_reader.py"] = _f.read()
 
 
 def _sign_in(page, base_url, login):

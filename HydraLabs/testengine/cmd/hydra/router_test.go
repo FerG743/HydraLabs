@@ -136,3 +136,26 @@ func TestAppSlugMatchesTheRenderer(t *testing.T) { // same table as AppSlugTest 
 		}
 	}
 }
+
+func TestExecuteUsesTheDataKeptInTheTestRepo(t *testing.T) {
+	// the stub runner reports what the bundle's data file holds, as the stored test would read it
+	c := fakeEnv(t, "[]", "import json,sys,os\nd=sys.argv[sys.argv.index('--out')+1]+'/apps/App/data/abc_1_data.csv'\n"+
+		"print(json.dumps({'status':'passed' if 'B-00456' in open(d).read() else 'failed','error':open(d).read()}))")
+	os.MkdirAll(filepath.Join(c.bundleDir("ABC-1"), "tests"), 0o755)
+	writeData := func(dir, boleta string) {
+		p := filepath.Join(dir, "apps", "App", "data", "abc_1_data.csv")
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, []byte("caso,boleta_number\nABC-1,"+boleta+"\n"), 0o644)
+	}
+	writeData(c.bundleDir("ABC-1"), "B-00123") // the value the test was built with: used up since
+	if r := c.Route("ABC-1", "execute"); r.Status != "failed" {
+		t.Fatalf("without a repo copy the bundle's own data is used: %+v", r)
+	}
+	c.Home = t.TempDir()
+	os.MkdirAll(filepath.Join(c.Home, ".git"), 0o755) // the app's test repo
+	writeData(c.Home, "B-00456")                      // a person put a fresh one in the test repo
+	r := c.Route("ABC-1", "execute")
+	if r.Tier != "T0-existing" || r.Status != "passed" || !strings.Contains(strings.Join(r.Detail, " "), "data: apps/App/data/abc_1_data.csv (test repo)") {
+		t.Errorf("execute must run with the test repo's data: %+v", r)
+	}
+}

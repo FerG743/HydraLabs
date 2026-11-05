@@ -2,7 +2,7 @@
 import os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from crawl import best_locator  # noqa: E402
+from crawl import best_locator, path_under  # noqa: E402
 
 
 def b(**k):
@@ -22,3 +22,11 @@ def test_generated_testid_falls_back_to_role_and_name():
 def test_generated_testid_alone_is_used_but_flagged_weak():
     assert b(testid="product-01M4YH6982NP1CKJVFTV5Y6VNB")[1:] == ("testid", False)
     assert b(testid="row-3fa85f64-5717-4562-b3fc-2c963f66afa6")[2] is False
+
+
+def test_the_sign_in_path_is_relative_to_the_base_url():
+    assert path_under("https://qa.example/apppao", "https://qa.example/apppao/login") == "/login"
+    assert path_under("https://qa.example/apppao/login", "https://qa.example/apppao/login") == "/"  # a base URL that already is the sign-in page
+    assert path_under("http://127.0.0.1:3077", "http://127.0.0.1:3077/login?next=/home") == "/login"
+    assert path_under("https://qa.example/apppao", "https://qa.example/apppao2/login") is None  # a sibling app, not a sub-path
+    assert path_under("https://qa.example/apppao", "https://sso.example/apppao/login") is None  # single sign-on on another host

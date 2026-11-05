@@ -279,6 +279,7 @@ type initRun struct {
 	given answers // from --answers
 	yes   bool    // --yes: no prompts; missing answers take their default
 	tty   bool    // stdin is a terminal: secrets are read with echo off
+	found answers // read off the app itself (the sign-in form): not asked, shown in the summary
 	a     answers
 	warns []string
 }
@@ -292,6 +293,8 @@ func (r *initRun) ask(section string, q question) error {
 		v, from := q.def, "default"
 		if g, ok := r.given[k]; ok {
 			v, from = g, "file"
+		} else if f, ok := r.found[k]; ok {
+			v, from = f, "found"
 		} else if !r.yes {
 			fmt.Fprintf(r.out, "%s", q.prompt)
 			if q.def != "" {
@@ -330,6 +333,40 @@ func (r *initRun) ask(section string, q question) error {
 			r.warns = append(r.warns, q.key+": "+warn)
 		}
 		return nil
+	}
+}
+
+// detectLogin opens the app read-only and finds its sign-in form (tools/crawl --detect-login); runInit sets it.
+var detectLogin func(baseURL, path string) (loginForm, error)
+
+type loginForm struct {
+	Found                            bool
+	Why, Path                        string
+	UserField, PasswordField, Submit string
+	Weak                             []string
+}
+
+// findLogin fills the sign-in page and its three selectors from the app, so a person only gives the user and password.
+// Not found (app down, an unusual form): the questions are asked as before, with the reason.
+func (r *initRun) findLogin() {
+	if detectLogin == nil {
+		return
+	}
+	path := r.given["core.loginPath"]
+	fmt.Fprintln(r.out, "  looking for the sign-in form on the app...")
+	f, err := detectLogin(r.a["core.baseUrl"], path)
+	if err != nil || !f.Found {
+		why := f.Why
+		if err != nil {
+			why = err.Error()
+		}
+		fmt.Fprintf(r.out, "  ! could not find it (%s): tell me its fields\n", why)
+		return
+	}
+	r.found = answers{"core.loginPath": f.Path, "core.userField": f.UserField, "core.passwordField": f.PasswordField, "core.submit": f.Submit}
+	fmt.Fprintf(r.out, "  ✓ found it at %s: user %s · password %s · button %s\n", f.Path, f.UserField, f.PasswordField, f.Submit)
+	if len(f.Weak) > 0 {
+		fmt.Fprintf(r.out, "  ! no stable locator for: %s (kept, but check them in the profile's login file)\n", strings.Join(f.Weak, ", "))
 	}
 }
 
@@ -421,6 +458,9 @@ func Init(reg *Registry, regPath string, in io.Reader, out io.Writer, given answ
 	for _, q := range coreQuestions(reg) {
 		if err := r.ask("core", q); err != nil {
 			return r.a, err
+		}
+		if q.key == "login" && r.a.yes("core.login") {
+			r.findLogin()
 		}
 	}
 	for _, ad := range initAddons {
@@ -604,6 +644,18 @@ func runInit(cfg *Config, answersPath string, yes, noPreview bool) error {
 	given, err := loadAnswers(answersPath)
 	if err != nil {
 		return err
+	}
+	detectLogin = func(baseURL, path string) (loginForm, error) {
+		args := []string{cfg.Crawler, "--detect-login", "--base-url", baseURL}
+		if path != "" {
+			args = append(args, "--login-path", path)
+		}
+		out, err := exec.Command(cfg.Python, args...).Output()
+		var f loginForm
+		if err != nil {
+			return f, fmt.Errorf("the crawler failed: %v", err)
+		}
+		return f, json.Unmarshal(out, &f)
 	}
 	var preview func(answers) string
 	if !noPreview {

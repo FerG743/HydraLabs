@@ -95,11 +95,11 @@ func (c Config) Announce(only []string, post bool) error {
 	return nil
 }
 
-// inJira: only issues of the project's Jira project get comments; cases fed from files (PQA-1) are not Jira issues.
+// inJira: only issues of the project's Jira project get comments; cases fed from files (PQA-1, DWQ-L1) are not Jira issues.
 func (c Config) inJira(key string) bool {
 	p := c.JiraProject
 	if p == "" {
 		p = c.Project
 	}
-	return p == "" || strings.HasPrefix(key, p+"-")
+	return (p == "" || strings.HasPrefix(key, p+"-")) && !c.isLocalCase(key)
 }

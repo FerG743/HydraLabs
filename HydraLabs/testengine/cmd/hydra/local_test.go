@@ -83,3 +83,31 @@ func TestPollWithOnlyLocalProjectsNeedsNoJiraToken(t *testing.T) {
 		t.Errorf("an empty cases/ folder is nothing new, not a Jira error: %v", err)
 	}
 }
+
+func TestAJiraProjectAlsoRunsTheCasesWrittenInItsRepo(t *testing.T) {
+	fakeJira(t, map[string][]string{"DWQ": {"DWQ-1", "DWQ-2"}})
+	j, err := JiraFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	c := &Config{Home: home, Out: filepath.Join(home, "hydra", "out"), Lang: "en", Project: "DWQ", JQL: "project = DWQ"}
+	os.MkdirAll(c.localCaseDir(), 0o755)
+	os.WriteFile(filepath.Join(c.localCaseDir(), "DWQ-L1.md"), []byte(signIn), 0o644)
+
+	jobs, _, err := collect(c, j, PollOpts{JQL: c.JQL})
+	if err != nil || keys(jobs) != "DWQ-1 DWQ-2 DWQ-L1" {
+		t.Fatalf("Jira's and the repo's cases together: [%s] %v", keys(jobs), err)
+	}
+
+	t.Setenv("JIRA_BASE_URL", "http://127.0.0.1:1") // Jira unreachable: a local case asked for by name does not need it
+	j2, _ := JiraFromEnv()
+	if jobs, _, err := collect(c, j2, PollOpts{Only: "DWQ-L1"}); err != nil || keys(jobs) != "DWQ-L1" {
+		t.Errorf("--only on a file reads the file: [%s] %v", keys(jobs), err)
+	}
+
+	os.WriteFile(filepath.Join(c.localCaseDir(), "DWQ-2.md"), []byte(signIn), 0o644)
+	if _, _, err := collect(c, j, PollOpts{JQL: c.JQL}); err == nil || !strings.Contains(err.Error(), "rename the file") {
+		t.Errorf("a file named like a Jira issue would mix two cases' runs and tests: %v", err)
+	}
+}

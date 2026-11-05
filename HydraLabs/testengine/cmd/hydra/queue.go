@@ -138,28 +138,60 @@ func schedule(ordered []*job, modelCap int) (run, deferred []*job) {
 	return
 }
 
+// localCases: the project's cases come only from cases/*.md (no Jira at all). A Jira project reads those files too.
 func (c Config) localCases() bool { return c.CaseSource == "local" }
 
-// collect: Jira (or cases/*.md) -> the jobs of one project that are new (or forced). Every new case is stored first so "Same as TC-1" resolves.
+// isLocalCase: the case is a file in cases/, not a Jira issue (never commented on, never fetched from Jira).
+func (c Config) isLocalCase(key string) bool {
+	if c.Home == "" {
+		return false
+	}
+	files, _ := filepath.Glob(filepath.Join(c.localCaseDir(), "*.md"))
+	for _, f := range files {
+		if strings.EqualFold(filepath.Base(f), key+".md") {
+			return true
+		}
+	}
+	return false
+}
+
+// collect: Jira and/or cases/*.md -> the jobs of one project that are new (or forced). Every new case is stored first so "Same as TC-1" resolves.
 func collect(cfg *Config, j *Jira, o PollOpts) ([]*job, map[string]string, error) {
 	var issues []Issue
 	force := o.Force
-	if cfg.localCases() {
+	switch {
+	case cfg.localCases() || (o.Only != "" && cfg.isLocalCase(o.Only)): // a file asked for by name needs no Jira
 		var err error
 		if issues, err = localIssues(cfg.localCaseDir(), o.Only); err != nil {
 			return nil, nil, err
 		}
 		force = force || o.Only != ""
-	} else if o.Only != "" { // a person asked for exactly this issue: no JQL, no seen-state
+	case o.Only != "": // a person asked for exactly this issue: no JQL, no seen-state
 		is, err := j.Get(o.Only)
 		if err != nil {
 			return nil, nil, err
 		}
 		issues, force = []Issue{*is}, true
-	} else {
+	default:
 		var err error
 		if issues, err = j.Search(o.JQL); err != nil {
 			return nil, nil, err
+		}
+		if cfg.Home != "" { // a Jira project can also have cases written in its repo (cases/<KEY>-L<n>.md)
+			local, err := localIssues(cfg.localCaseDir(), "")
+			if err != nil {
+				return nil, nil, err
+			}
+			inJira := map[string]bool{}
+			for _, is := range issues {
+				inJira[is.Key] = true
+			}
+			for _, is := range local {
+				if inJira[is.Key] { // two different cases under one key: the runs, bundles and test file would mix
+					return nil, nil, fmt.Errorf("%s is a Jira issue and also cases/%s.md: rename the file (local cases are %s-L1, -L2...)", is.Key, is.Key, cfg.Project)
+				}
+			}
+			issues = append(issues, local...)
 		}
 	}
 	seen := loadState(cfg)
@@ -264,7 +296,7 @@ func Poll(cfgs []*Config, o PollOpts) (gated bool, err error) {
 		report(r)
 		states[jb.cfg][jb.key] = jb.stamp
 		if needsPerson(r) {
-			if cfg := jb.cfg; !cfg.localCases() && (cfg.JiraComments || (len(cfgs) == 1 && o.Comment)) {
+			if cfg := jb.cfg; !cfg.localCases() && !cfg.isLocalCase(jb.key) && (cfg.JiraComments || (len(cfgs) == 1 && o.Comment)) {
 				msg := Message(r)
 				if _, e := cfg.PostOnce(j, jb.key, shortID(r.Status, msg), msg); e != nil {
 					fmt.Fprintln(os.Stderr, "comment failed:", e)

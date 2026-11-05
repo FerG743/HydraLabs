@@ -25,8 +25,8 @@ def test_generated_testid_alone_is_used_but_flagged_weak():
 
 
 def test_the_sign_in_path_is_relative_to_the_base_url():
-    assert path_under("https://qa.example/apppao", "https://qa.example/apppao/login") == "/login"
-    assert path_under("https://qa.example/apppao/login", "https://qa.example/apppao/login") == "/"  # a base URL that already is the sign-in page
+    assert path_under("https://qa.example/app", "https://qa.example/app/login") == "/login"
+    assert path_under("https://qa.example/app/login", "https://qa.example/app/login") == "/"  # a base URL that already is the sign-in page
     assert path_under("http://127.0.0.1:3077", "http://127.0.0.1:3077/login?next=/home") == "/login"
-    assert path_under("https://qa.example/apppao", "https://qa.example/apppao2/login") is None  # a sibling app, not a sub-path
-    assert path_under("https://qa.example/apppao", "https://sso.example/apppao/login") is None  # single sign-on on another host
+    assert path_under("https://qa.example/app", "https://qa.example/app2/login") is None  # a sibling app, not a sub-path
+    assert path_under("https://qa.example/app", "https://sso.example/app/login") is None  # single sign-on on another host

@@ -490,8 +490,10 @@ def main():
                   "caso_id," + ",".join(an["data"]) + "\n" + ",".join([case["id"]] + [v for v in an["data"].values()]) + "\n")
         expected_rows.append((case["id"], " ".join(e["text"] for e in an["expected"])))
         # per step, what it was mapped to: the locator in force (confirmed on the real app, or still a guess)
+        # "column": the data CSV column this step reads (fill/select), so a person can see which step a value is for
         step_map = [{"n": s["n"], "text": s["text"], "mapped": bool(s["op"]), "locator": app.located(s.get("loc"))[0],
-                     "confirmed": app.located(s.get("loc"))[1]} for s, _ in calls]
+                     "confirmed": app.located(s.get("loc"))[1], "column": slug(s["g"][0]) if s["op"] in ("fill", "select") else None}
+                    for s, _ in calls]
         report.append({"case": case["id"], "map": step_map, "steps_mapped": sum(1 for s, _ in calls if s["op"]), "steps": len(calls),
                        "expected_asserted": len({id(e) for e, l, _ in exp if l}), "expected": len(an["expected"]),
                        "pending": an["pending"]})

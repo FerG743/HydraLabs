@@ -12,8 +12,9 @@ import (
 // The board's buttons: one hydra command at a time, the same binary and flags a person would type, its output kept
 // for the page. Only the commands below can run; the page never sends a command line.
 
-// boardArgs: the action a button asked for -> hydra's arguments. key narrows a poll to one case.
-func boardArgs(action, project, registry, key string) ([]string, error) {
+// boardArgs: the action a button asked for -> hydra's arguments. key narrows a poll to one case; built says that case
+// already has a test, so Run executes it as it is (with the data in the test repo) instead of rebuilding it from its text.
+func boardArgs(action, project, registry, key string, built bool) ([]string, error) {
 	base := []string{"--project", project, "--registry", registry}
 	switch action {
 	case "crawl", "deliver":
@@ -25,7 +26,11 @@ func boardArgs(action, project, registry, key string) ([]string, error) {
 		if !caseKey.MatchString(key) {
 			return nil, fmt.Errorf("%q is not a case key", key)
 		}
-		return append([]string{"poll"}, append(base, "--only", key)...), nil
+		args := append([]string{"poll"}, append(base, "--only", key)...)
+		if built {
+			args = append(args, "--intent", "execute")
+		}
+		return args, nil
 	}
 	return nil, fmt.Errorf("unknown action %q", action)
 }

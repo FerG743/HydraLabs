@@ -372,6 +372,9 @@ func (c Config) renderOnce(stage, bundle, only string) ([]string, []StepMap, err
 	for i := range steps {
 		steps[i].Color = colorOf(steps[i].Locator, steps[i].Confirmed)
 	}
+	if err := writeJSON(filepath.Join(bundle, "steps.json"), steps); err != nil { // which step reads which data column
+		return nil, nil, err
+	}
 	return pending, steps, nil
 }
 

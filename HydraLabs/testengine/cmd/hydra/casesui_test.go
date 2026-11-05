@@ -15,7 +15,7 @@ func casesRepo(t *testing.T) Config {
 		t.Skip("no git:", string(out))
 	}
 	git(home, append(gitIdentity(home), "commit", "-q", "--allow-empty", "-m", "baseline")...)
-	return Config{Home: home, Project: "SHOP", BaseBranch: "main", Lang: "en"}
+	return Config{Home: home, Project: "SHOP", BaseBranch: "main", Lang: "en", CaseSource: "local"}
 }
 
 func TestTheCasesPageWritesAndCommitsAFilePollReads(t *testing.T) {
@@ -71,7 +71,25 @@ func TestCaseKeysSortAsNumbers(t *testing.T) {
 	if !keyLess("SHOP-2", "SHOP-10") || keyLess("SHOP-10", "SHOP-2") {
 		t.Error("SHOP-2 comes before SHOP-10")
 	}
-	if nextKey("SHOP", []Issue{{Key: "SHOP-2"}, {Key: "SHOP-10"}, {Key: "OTHER-99"}}) != "SHOP-11" {
+	if nextKey("SHOP-", []Issue{{Key: "SHOP-2"}, {Key: "SHOP-10"}, {Key: "OTHER-99"}}) != "SHOP-11" {
 		t.Error("next after the highest of this project")
+	}
+}
+
+func TestInAJiraProjectLocalCasesGetNamesJiraNeverGives(t *testing.T) {
+	c := casesRepo(t)
+	c.CaseSource, c.Project = "", "DWQ" // a Jira project
+	f := caseForm{Name: "Extra check", Steps: []string{"Navigate to /orders."}, Expected: []string{`The page shows "Orders".`}}
+	if k, _, err := c.saveCase(f); err != nil || k != "DWQ-L1" {
+		t.Fatalf("%s %v", k, err)
+	}
+	if k, _, _ := c.saveCase(f); k != "DWQ-L2" {
+		t.Errorf("next: %s", k)
+	}
+	if !c.isLocalCase("DWQ-L1") || !c.isLocalCase("dwq-l2") || c.isLocalCase("DWQ-131") {
+		t.Error("only the files are local cases")
+	}
+	if c.inJira("DWQ-L1") || !c.inJira("DWQ-131") {
+		t.Error("a local case must never be commented on in Jira")
 	}
 }

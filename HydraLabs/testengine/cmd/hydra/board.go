@@ -71,7 +71,7 @@ func (c Config) board() Board {
 			bc.Stale = append(bc.Stale, "the app was crawled again after this run")
 		}
 	}
-	if c.localCases() { // the file is the case: an edit since the last run means the result is for older text
+	if c.Home != "" { // a case file (any project): an edit since the last run means the result is for older text
 		seen := loadState(&c)
 		issues, _ := localIssues(c.localCaseDir(), "")
 		for _, is := range issues {
@@ -216,12 +216,12 @@ g.classList.toggle('one',on);if(on)t.classList.add('big');document.querySelector
 function pill(s){const cls=!s?'none':(s=='passed'?'passed':(s=='failed'||s=='env-down'?s:'other'));return '<span class="pill '+cls+'">'+esc(s||'not run')+'</span>'}
 async function load(){try{const b=await (await fetch('api/board')).json();
 $('url').textContent=(b.baseUrl||'no base URL')+(b.signIn?' · signs in first':' · no sign-in');
-$('srcinfo').textContent='from '+(b.source=='local'?'cases/ files':'Jira');if(b.source!='local')$('writer').style.display='none';
+$('srcinfo').textContent='from '+(b.source=='local'?'cases/ files':'Jira + cases/ files');
 const st=[[b.board.length,'cases'],[b.passing,'passing'],[b.needsPerson,'need a person'],[b.board.filter(c=>c.stale.length).length,'stale'],[b.testsOnBase,'tests on '+(b.base||'main')],[(b.awaitingReview||[]).length,'awaiting review']];
 $('stats').innerHTML=st.map(([n,l])=>'<span class=stat><b>'+n+'</b><span>'+l+'</span></span>').join('')+'<span class=stat><span>crawl '+(b.crawlAt?esc(b.crawlAt)+' · '+b.crawlPages+' pages':'never')+'</span></span>';
 $('cases').innerHTML=b.board.length?'<table><thead><tr><th>Case</th><th>Last result</th><th>History</th><th></th></tr></thead><tbody>'+b.board.map(c=>
 '<tr><td><b>'+esc(c.key)+'</b> '+esc(c.name)+(c.stale.length?'<small class=stale>⚠ '+c.stale.map(esc).join(' · ')+'</small>':'')+'</td><td>'+pill(c.status)+'<small>'+esc(c.tier)+' '+esc(c.updated)+'</small></td><td>'+(c.runs?c.runsPassed+' / '+c.runs+' passed':'—')+'</td><td><button type=button class=run data-key="'+esc(c.key)+'" aria-label="Run '+esc(c.key)+'"'+(busy?' disabled':'')+'>▶ Run</button></td></tr>').join('')+'</tbody></table>'
-:'<p class=empty>No cases yet.'+(b.source=='local'?' Write one in the Write a case tile.':'')+'</p>'}catch(e){}setTimeout(load,3000)}
+:'<p class=empty>No cases yet.'+' Write one in the Write a case tile.'+'</p>'}catch(e){}setTimeout(load,3000)}
 load()
 let busy=false,logOpen=false;
 async function run(action,key){

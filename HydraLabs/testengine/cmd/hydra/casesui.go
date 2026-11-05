@@ -57,15 +57,23 @@ func formOf(is Issue, lang string) (caseForm, *Case) {
 	return f, cs
 }
 
-// nextKey: <PROJECT>-<highest number in cases/ + 1>.
-func nextKey(project string, issues []Issue) string {
+// keyPrefix: local cases are SHOP-1, SHOP-2...; in a Jira project they are DWQ-L1, DWQ-L2..., a name Jira never gives.
+func (c Config) keyPrefix() string {
+	if c.localCases() {
+		return c.Project + "-"
+	}
+	return c.Project + "-L"
+}
+
+// nextKey: prefix + (highest number already in cases/ + 1).
+func nextKey(prefix string, issues []Issue) string {
 	n := 0
 	for _, is := range issues {
-		if v, err := strconv.Atoi(strings.TrimPrefix(is.Key, project+"-")); err == nil && v > n {
+		if v, err := strconv.Atoi(strings.TrimPrefix(is.Key, prefix)); err == nil && v > n {
 			n = v
 		}
 	}
-	return fmt.Sprintf("%s-%d", project, n+1)
+	return fmt.Sprintf("%s%d", prefix, n+1)
 }
 
 // saveCase validates, writes and commits one case. It returns the key and what the pipeline would still ask.
@@ -103,7 +111,7 @@ func (c Config) saveCase(f caseForm) (string, []string, error) {
 		return "", nil, err
 	}
 	if f.Key == "" {
-		f.Key = nextKey(c.Project, issues)
+		f.Key = nextKey(c.keyPrefix(), issues)
 	} else if f.Key = strings.ToUpper(f.Key); !caseKey.MatchString(f.Key) {
 		return "", nil, fmt.Errorf("%q is not a case key (e.g. %s-1)", f.Key, c.Project)
 	}
@@ -153,7 +161,7 @@ func (c Config) CasesUI(addr string) error {
 func (c Config) casesView() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, strings.NewReplacer("{{APP}}", c.App, "{{PROJECT}}", c.Project).Replace(casesPage))
+		fmt.Fprint(w, strings.NewReplacer("{{APP}}", c.App, "{{PREFIX}}", c.keyPrefix()).Replace(casesPage))
 	})
 	mux.HandleFunc("/api/cases", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -275,7 +283,7 @@ function vals(box){return [...$(box).querySelectorAll('textarea')].map(t=>t.valu
 function edit(c){cur=c||null;$('title').textContent=c?c.key+': '+c.name:'New case';$('name').value=c?c.name:'';
 $('intent').value=c?c.intent||'automate':'automate';$('pre').value=c?c.precondition:'';
 for(const b of ['steps','expected']){$(b).innerHTML='';const v=c?(b=='steps'?c.steps:c.expected):[];(v.length?v:['']).forEach(x=>add(b,x))}
-$('keyinfo').textContent=c?'saved as cases/'+c.key+'.md':'it gets the next number: {{PROJECT}}-…';$('msg').className='';
+$('keyinfo').textContent=c?'saved as cases/'+c.key+'.md':'it gets the next number: {{PREFIX}}…';$('msg').className='';
 [...$('list').children].forEach(b=>b.setAttribute('aria-current',c&&b.dataset.key==c.key));$('name').focus()}
 async function load(){const r=await fetch('api/cases');const j=await r.json();if(!r.ok){show('bad',j.error);return}cases=j;
 $('list').innerHTML='';for(const c of cases){const b=document.createElement('button');b.type='button';b.className='case';b.dataset.key=c.key;

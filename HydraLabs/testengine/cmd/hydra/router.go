@@ -138,6 +138,24 @@ func (c Config) loadCases() ([]*Case, error) {
 	return out, nil
 }
 
+// useRepoData: an execute runs the stored test with the data a person keeps in the test repo, not the copy made when
+// the test was built (a used-up boleta number is changed there, once). Not delivered yet: the bundle's own data stays.
+func (c Config) useRepoData(key string) (string, error) {
+	if c.Home == "" {
+		return "", nil
+	}
+	rel := filepath.Join("apps", c.App, "data", token(key)+"_data.csv")
+	b, err := os.ReadFile(filepath.Join(c.Home, rel))
+	if err != nil {
+		return "", nil
+	}
+	dst := filepath.Join(c.bundleDir(key), rel)
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return "", err
+	}
+	return filepath.ToSlash(rel), os.WriteFile(dst, b, 0o644)
+}
+
 // Route resolves references across everything stored, then runs the cheapest tier for this issue.
 func (c Config) Route(key, intent string) (r Run) {
 	t0 := time.Now()
@@ -163,8 +181,16 @@ func (c Config) Route(key, intent string) (r Run) {
 	if intent == "execute" {
 		if _, err := os.Stat(filepath.Join(c.bundleDir(key), "tests")); err == nil {
 			r.Tier = "T0-existing"
+			from, err := c.useRepoData(key)
+			if err != nil {
+				r.Status, r.Detail = "failed", []string{"could not use the test repo's data: " + err.Error()}
+				return r
+			}
 			v := c.verify(key)
 			r.Status, r.Detail = v.Status, v.Detail
+			if from != "" {
+				r.Detail = append(r.Detail, "data: "+from+" (test repo)")
+			}
 			return r
 		}
 		r.Detail = []string{"execute: no automated test for " + key + " yet, automating it first"}

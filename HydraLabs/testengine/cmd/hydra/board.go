@@ -179,6 +179,9 @@ main{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1f
 .tile h2 .sp{flex:1}.tile h2 button,.tile h2 a{font:12px system-ui;text-transform:none;letter-spacing:0;color:var(--fg);background:none;border:1px solid var(--line);border-radius:5px;padding:2px 8px;cursor:pointer;text-decoration:none}
 .tile iframe{flex:1;border:0;width:100%;min-height:0;background:var(--card)}.body{flex:1;overflow:auto}
 main.one{grid-template-columns:1fr;grid-template-rows:1fr}main.one .tile:not(.big){display:none}
+.tile.cases{grid-row:span 2}main.one .tile.cases{grid-row:auto}
+.tabs{display:flex;gap:2px;margin-left:4px}.tile h2 .tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;padding:2px 10px;color:var(--mute);font-weight:600}
+.tile h2 .tabs button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--on)}
 table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 12px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-weight:600;color:var(--mute);font-size:12px;position:sticky;top:0;background:var(--card)}td small{color:var(--mute);display:block}
 .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
@@ -192,7 +195,7 @@ th{font-weight:600;color:var(--mute);font-size:12px;position:sticky;top:0;backgr
 #runlog{display:none;margin:0;max-height:32vh;overflow:auto;padding:10px 16px;background:#111;color:#ddd;font:12px/1.45 ui-monospace,monospace;white-space:pre-wrap;border-bottom:1px solid var(--line)}
 #runlog.open{display:block}td .run{font:12px system-ui;padding:2px 8px;border-radius:5px;border:1px solid var(--line);background:none;color:var(--fg);cursor:pointer}
 button:focus-visible{outline:2px solid var(--on);outline-offset:1px}
-@media (max-width:900px){main{grid-template-columns:1fr;grid-template-rows:repeat(4,80vh)}}
+@media (max-width:900px){main{grid-template-columns:1fr;grid-template-rows:repeat(3,80vh)}.tile.cases{grid-row:auto}}
 </style>
 <header><h1>{{APP}} <small style="font-weight:400;color:var(--mute)">{{PROJECT}}</small></h1><span class=url id=url></span><div class=stats id=stats></div></header>
 <div class=actions role=toolbar aria-label="Run">
@@ -204,15 +207,14 @@ button:focus-visible{outline:2px solid var(--on);outline-offset:1px}
 </div>
 <pre id=runlog tabindex=0 aria-label="Command output"></pre>
 <main id=grid>
-<section class=tile><h2>Cases<span class=sp></span><span id=srcinfo style="text-transform:none;letter-spacing:0"></span><button type=button onclick="big(this)">Expand</button></h2><div class=body id=cases></div></section>
-<section class=tile><h2>Live pipeline<span class=sp></span><a href="live/" target=_blank>Open ↗</a><button type=button onclick="big(this)">Expand</button></h2><iframe src="live/" title="Live pipeline"></iframe></section>
-<section class=tile><h2>Last crawl<span class=sp></span><a href="crawl/" target=_blank>Open ↗</a><button type=button onclick="big(this)">Expand</button></h2><iframe src="crawl/" title="Last crawl"></iframe></section>
-<section class=tile id=writer><h2>Write a case<span class=sp></span><a href="cases/" target=_blank>Open ↗</a><button type=button onclick="big(this)">Expand</button></h2><iframe src="cases/" title="Write a case"></iframe></section>
+<section class="tile cases"><h2>Cases<span class=tabs role=tablist aria-label="Cases"><button type=button role=tab id=t-status aria-controls=cases aria-selected=true>Status</button><button type=button role=tab id=t-write aria-controls=p-write aria-selected=false tabindex=-1>Write a case</button></span><span class=sp></span><span id=srcinfo style="text-transform:none;letter-spacing:0"></span><a id=writeopen href="cases/" target=_blank hidden>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><div class=body id=cases role=tabpanel aria-labelledby=t-status></div><iframe id=p-write role=tabpanel aria-labelledby=t-write title="Write a case" hidden></iframe></section>
+<section class=tile><h2>Live pipeline<span class=sp></span><a href="live/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe src="live/" title="Live pipeline"></iframe></section>
+<section class=tile><h2>Last crawl<span class=sp></span><a href="crawl/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe src="crawl/" title="Last crawl"></iframe></section>
 </main>
 <script>
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function big(btn){const t=btn.closest('.tile'),g=$('grid'),on=!t.classList.contains('big');document.querySelectorAll('.tile').forEach(x=>x.classList.remove('big'));
-g.classList.toggle('one',on);if(on)t.classList.add('big');document.querySelectorAll('.tile h2 button').forEach(b=>b.textContent=b.closest('.tile').classList.contains('big')?'Back to grid':'Expand')}
+g.classList.toggle('one',on);if(on)t.classList.add('big');document.querySelectorAll('.tile h2 button.exp').forEach(b=>b.textContent=b.closest('.tile').classList.contains('big')?'Back to grid':'Expand')}
 function pill(s){const cls=!s?'none':(s=='passed'?'passed':(s=='failed'||s=='env-down'?s:'other'));return '<span class="pill '+cls+'">'+esc(s||'not run')+'</span>'}
 async function load(){try{const b=await (await fetch('api/board')).json();
 $('url').textContent=(b.baseUrl||'no base URL')+(b.signIn?' · signs in first':' · no sign-in');
@@ -221,8 +223,12 @@ const st=[[b.board.length,'cases'],[b.passing,'passing'],[b.needsPerson,'need a 
 $('stats').innerHTML=st.map(([n,l])=>'<span class=stat><b>'+n+'</b><span>'+l+'</span></span>').join('')+'<span class=stat><span>crawl '+(b.crawlAt?esc(b.crawlAt)+' · '+b.crawlPages+' pages':'never')+'</span></span>';
 $('cases').innerHTML=b.board.length?'<table><thead><tr><th>Case</th><th>Last result</th><th>History</th><th></th></tr></thead><tbody>'+b.board.map(c=>
 '<tr><td><b>'+esc(c.key)+'</b> '+esc(c.name)+(c.stale.length?'<small class=stale>⚠ '+c.stale.map(esc).join(' · ')+'</small>':'')+'</td><td>'+pill(c.status)+'<small>'+esc(c.tier)+' '+esc(c.updated)+'</small></td><td>'+(c.runs?c.runsPassed+' / '+c.runs+' passed':'—')+'</td><td><button type=button class=run data-key="'+esc(c.key)+'" aria-label="Run '+esc(c.key)+'"'+(busy?' disabled':'')+'>▶ Run</button></td></tr>').join('')+'</tbody></table>'
-:'<p class=empty>No cases yet.'+' Write one in the Write a case tile.'+'</p>'}catch(e){}setTimeout(load,3000)}
+:'<p class=empty>No cases yet.'+' Write one in the Write a case tab.'+'</p>'}catch(e){}setTimeout(load,3000)}
 load()
+const tabs=[$('t-status'),$('t-write')];
+function tab(t){tabs.forEach(x=>{const on=x===t;x.setAttribute('aria-selected',on);x.tabIndex=on?0:-1;$(x.getAttribute('aria-controls')).hidden=!on});
+  if(t.id=='t-write'&&!$('p-write').src)$('p-write').src='cases/';$('writeopen').hidden=t.id!='t-write'}
+tabs.forEach((t,i)=>{t.onclick=()=>tab(t);t.onkeydown=e=>{if(e.key=='ArrowRight'||e.key=='ArrowLeft'){const n=tabs[(i+(e.key=='ArrowRight'?1:tabs.length-1))%tabs.length];tab(n);n.focus()}}});
 let busy=false,logOpen=false;
 async function run(action,key){
   if(action=='deliver'&&!confirm('Deliver runs the whole suite in the real framework and puts the tests that pass on a review branch in the test repo (nothing is pushed). Go?'))return;

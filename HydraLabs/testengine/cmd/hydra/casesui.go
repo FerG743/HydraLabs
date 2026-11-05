@@ -280,11 +280,11 @@ d.innerHTML='<b></b><textarea rows=1></textarea><button type=button aria-label="
 d.querySelector('textarea').value=v;d.querySelector('button').onclick=()=>{d.remove();num(box)};$(box).append(d);num(box);return d}
 function num(box){[...$(box).children].forEach((r,i)=>r.querySelector('b').textContent=box=='steps'?(i+1)+'.':'•')}
 function vals(box){return [...$(box).querySelectorAll('textarea')].map(t=>t.value.trim()).filter(Boolean)}
-function edit(c){cur=c||null;$('title').textContent=c?c.key+': '+c.name:'New case';$('name').value=c?c.name:'';
+function edit(c,quiet){cur=c||null;$('title').textContent=c?c.key+': '+c.name:'New case';$('name').value=c?c.name:'';
 $('intent').value=c?c.intent||'automate':'automate';$('pre').value=c?c.precondition:'';
 for(const b of ['steps','expected']){$(b).innerHTML='';const v=c?(b=='steps'?c.steps:c.expected):[];(v.length?v:['']).forEach(x=>add(b,x))}
 $('keyinfo').textContent=c?'saved as cases/'+c.key+'.md':'it gets the next number: {{PREFIX}}…';$('msg').className='';
-[...$('list').children].forEach(b=>b.setAttribute('aria-current',c&&b.dataset.key==c.key));$('name').focus()}
+[...$('list').children].forEach(b=>b.setAttribute('aria-current',c&&b.dataset.key==c.key));if(!quiet)$('name').focus()}
 async function load(){const r=await fetch('api/cases');const j=await r.json();if(!r.ok){show('bad',j.error);return}cases=j;
 $('list').innerHTML='';for(const c of cases){const b=document.createElement('button');b.type='button';b.className='case';b.dataset.key=c.key;
 b.innerHTML='<span></span><small></small>';b.firstChild.textContent=c.name||'(no name)';b.lastChild.textContent=c.key+' · '+c.intent;
@@ -295,5 +295,6 @@ async function save(e){e.preventDefault();const body={key:cur?cur.key:'',name:$(
 const r=await fetch('api/cases',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();
 if(!r.ok){show('bad',j.error);return}await load();edit(cases.find(c=>c.key==j.key));
 show('ok','Saved '+j.key+'. Hydra picks it up on the next poll.'+(j.questions&&j.questions.length?' Before it can be automated, answer:':''),j.questions)}
-load().then(()=>edit());setInterval(load,5000) // cases added elsewhere (a file, a teammate's commit) show up
+load().then(()=>edit(null,true)); // no focus on load: inside the board it would pull the keyboard out of the tabs
+setInterval(load,5000) // cases added elsewhere (a file, a teammate's commit) show up
 </script>`

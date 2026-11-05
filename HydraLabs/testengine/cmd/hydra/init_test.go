@@ -307,3 +307,19 @@ func TestInitFindsTheSignInFormSoOnlyTheUserAndPasswordAreAsked(t *testing.T) {
 		t.Errorf("not found: say why and ask as before:\n%s", out.String())
 	}
 }
+
+func TestAnInstallationKeepsItsProjectsOutsideTheEngine(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("HYDRA_HOME", "")
+	if got := defaultRegistry(); got != filepath.Join(home, ".hydra", "projects.json") {
+		t.Errorf("default: %s", got)
+	}
+	t.Setenv("HYDRA_HOME", filepath.Join(home, "ci"))
+	if got := defaultRegistry(); got != filepath.Join(home, "ci", "projects.json") {
+		t.Errorf("HYDRA_HOME wins (CI, a shared machine): %s", got)
+	}
+	if strings.HasPrefix(defaultRegistry(), engineDir()+string(filepath.Separator)) {
+		t.Error("the registry must not live in the engine's repo")
+	}
+}

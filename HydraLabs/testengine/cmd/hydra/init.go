@@ -637,8 +637,17 @@ func (c Config) hasAddon(name string) bool { return len(c.Addons) == 0 || contai
 
 // runInit is the command: the conversation, then the existing Onboard for the new project.
 func runInit(cfg *Config, answersPath string, yes, noPreview bool) error {
-	if cfg.Registry == nil {
-		return fmt.Errorf("init needs the registry (projects.json) in the working directory")
+	if cfg.Registry == nil { // the first project of this installation: start its registry
+		p := defaultRegistry()
+		if err := writeJSON(p, map[string]any{"projects": map[string]any{}}); err != nil {
+			return err
+		}
+		reg, err := LoadRegistry(p)
+		if err != nil {
+			return err
+		}
+		cfg.Registry = reg
+		fmt.Println("new installation: projects and profiles are kept in", filepath.Dir(p))
 	}
 	regPath := filepath.Join(cfg.Registry.dir, "projects.json")
 	given, err := loadAnswers(answersPath)

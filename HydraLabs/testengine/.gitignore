@@ -3,3 +3,7 @@ out/
 __pycache__/
 *.pyc
 tools/scorecard/results/
+# an installation's own setup lives in ~/.hydra (or $HYDRA_HOME): projects, profiles, login steps. Never here.
+/projects.json
+/profiles/
+/login-*.json

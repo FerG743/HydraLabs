@@ -26,6 +26,7 @@ func TestTheBoardSaysWhichResultsMayNoLongerHold(t *testing.T) {
 			writeJSON(filepath.Join(c.Out, "runs", j.key+".json"), Run{Key: j.key, Status: "passed", Tier: "T1-render"})
 		}
 	}
+	seen["SHOP-1"] = strings.Replace(seen["SHOP-1"], "|automate", "|execute", 1) // last run by the board's Run (execute)
 	writeJSON(statePath(&c), seen)
 	write("SHOP-2", strings.Replace(signIn, "valid user", "second user, edited", 1))
 

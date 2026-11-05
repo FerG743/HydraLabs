@@ -23,7 +23,8 @@ type StepMap struct {
 	Mapped    bool   `json:"mapped"`
 	Locator   string `json:"locator,omitempty"`
 	Confirmed bool   `json:"confirmed"`
-	Color     string `json:"color,omitempty"` // same legend as the crawl: green stable id, blue role + name, orange weak
+	Color     string `json:"color,omitempty"`  // same legend as the crawl: green stable id, blue role + name, orange weak
+	Column    string `json:"column,omitempty"` // the data CSV column this step reads (Enter/Select steps)
 }
 
 func (c Config) liveDir() string { return filepath.Join(c.Out, "live") }

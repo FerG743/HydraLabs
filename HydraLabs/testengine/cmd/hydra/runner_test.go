@@ -47,14 +47,17 @@ func TestTheBoardRunsOneCommandAtATimeAndKeepsItsOutput(t *testing.T) {
 }
 
 func TestOnlyTheBoardsOwnCommandsCanRun(t *testing.T) {
-	if a, err := boardArgs("poll", "SHOP", "/r/projects.json", "SHOP-4"); err != nil || strings.Join(a, " ") != "poll --project SHOP --registry /r/projects.json --only SHOP-4" {
-		t.Errorf("%v %v", a, err)
+	if a, err := boardArgs("poll", "SHOP", "/r/projects.json", "SHOP-4", false); err != nil || strings.Join(a, " ") != "poll --project SHOP --registry /r/projects.json --only SHOP-4" {
+		t.Errorf("a case never built is built: %v %v", a, err)
 	}
-	if a, _ := boardArgs("deliver", "SHOP", "/r", ""); strings.Join(a, " ") != "deliver --project SHOP --registry /r" {
+	if a, _ := boardArgs("poll", "SHOP", "/r", "SHOP-4", true); strings.Join(a, " ") != "poll --project SHOP --registry /r --only SHOP-4 --intent execute" {
+		t.Errorf("Run on a built case runs it as it is, with the repo's data, not rebuilt from the case text: %v", a)
+	}
+	if a, _ := boardArgs("deliver", "SHOP", "/r", "", false); strings.Join(a, " ") != "deliver --project SHOP --registry /r" {
 		t.Errorf("%v", a)
 	}
 	for _, bad := range [][2]string{{"init", ""}, {"poll", "SHOP-1 --force"}, {"poll", "--registry=/etc"}, {"rm", ""}} {
-		if _, err := boardArgs(bad[0], "SHOP", "/r", bad[1]); err == nil {
+		if _, err := boardArgs(bad[0], "SHOP", "/r", bad[1], false); err == nil {
 			t.Errorf("must refuse %q %q", bad[0], bad[1])
 		}
 	}

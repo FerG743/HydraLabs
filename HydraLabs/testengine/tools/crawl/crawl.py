@@ -81,7 +81,7 @@ FIND_LOGIN = """() => {
 
 def find_login(page, wait_ms=30000):
     """The sign-in form on the page as login steps fields, or why it was not found. Read-only: nothing is typed."""
-    try:  # a login rendered by client code appears after load; micro-frontend shells (PAO) take 10-15 s in QA
+    try:  # a login rendered by client code appears after load; micro-frontend shells take 10-15 s in QA
         page.wait_for_selector("input[type=password]", state="visible", timeout=wait_ms)
     except Exception:
         pass
@@ -107,7 +107,7 @@ def find_login(page, wait_ms=30000):
 
 
 def path_under(base, url):
-    """url's path relative to the base URL (an app under /apppao: /apppao/login -> /login); None when outside it."""
+    """url's path relative to the base URL (an app under /app: /app/login -> /login); None when outside it."""
     b, u = urlparse(base), urlparse(url)
     bp, up = b.path.rstrip("/"), u.path
     if b.netloc != u.netloc or (up != bp and not up.startswith(bp + "/")):

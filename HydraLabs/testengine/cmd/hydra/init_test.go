@@ -269,3 +269,41 @@ func TestInitWithLocalCasesNeedsNoJira(t *testing.T) {
 		t.Errorf("local cases: no Jira question, no query, the folder named in the summary: %v\n%s", p, out.String())
 	}
 }
+
+func TestInitFindsTheSignInFormSoOnlyTheUserAndPasswordAreAsked(t *testing.T) {
+	offline(t, true)
+	t.Setenv("HOME", t.TempDir()) // the password goes to ~/.hydra.env
+	old, oldEnv := detectLogin, hydraEnvPath
+	hydraEnvPath = filepath.Join(t.TempDir(), ".hydra.env")
+	t.Cleanup(func() { detectLogin, hydraEnvPath = old, oldEnv })
+	given := answers{"core.project": "SHOP", "core.app": "Toolshop", "core.addons": "labs", "core.baseUrl": "http://qa", "core.prod": "n",
+		"core.allowWrites": "n", "core.baseBranch": "main", "core.remote": "", "labs.paths": "/", "labs.video": "n", "labs.slowMs": "0", "labs.model": "n"}
+
+	detectLogin = func(string, string) (loginForm, error) {
+		return loginForm{Found: true, Path: "/signin", UserField: "#email", PasswordField: "input[type=password]", Submit: `role=button[name="Entrar"]`}, nil
+	}
+	reg, regPath := initRegistry(t)
+	var out bytes.Buffer
+	a, err := Init(reg, regPath, strings.NewReader("y\nqa@shop.test\ns3cr3t!\ny\n"), &out, given, false, nil) // login? user, password, confirm
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if a["core.loginPath"] != "/signin" || a["core.userField"] != "#email" || a["core.submit"] != `role=button[name="Entrar"]` {
+		t.Errorf("the form's page and fields come from the app: %v", a)
+	}
+	if strings.Contains(out.String(), "Selector of") || strings.Contains(out.String(), "Path of the sign-in page") || !strings.Contains(out.String(), "✓ found it at /signin") {
+		t.Errorf("nothing about the form is asked when it was found:\n%s", out.String())
+	}
+
+	detectLogin = func(string, string) (loginForm, error) { return loginForm{Why: "no password field on this page"}, nil }
+	reg, regPath = initRegistry(t)
+	out.Reset()
+	given["core.project"], given["core.app"] = "SHOP2", "Toolshop2"
+	typed := "y\n\nqa@shop.test\ns3cr3t!\n\n\n\ny\n" // login? path (default), user, password, three selectors (defaults), confirm
+	if a, err = Init(reg, regPath, strings.NewReader(typed), &out, given, false, nil); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "could not find it (no password field on this page)") || !strings.Contains(out.String(), "Selector of the user field") || a["core.passwordField"] != "input[type=password]" {
+		t.Errorf("not found: say why and ask as before:\n%s", out.String())
+	}
+}

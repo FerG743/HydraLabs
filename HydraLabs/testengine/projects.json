@@ -8,6 +8,10 @@
     "ENACTOR": {
       "app": "EnactorPos",
       "profile": "profiles/enactor-pos.json"
+    },
+    "PAO": {
+      "app": "PAO",
+      "profile": "profiles/pao.json"
     }
   },
   "reposRoot": "~/Documents/GitHub",

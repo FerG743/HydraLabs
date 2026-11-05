@@ -49,10 +49,101 @@ EXTRACT = """() => {
       testid: e.getAttribute('data-testid') || e.getAttribute('data-test') || e.getAttribute('data-qa') || null,
       type: e.getAttribute('type'), placeholder: e.getAttribute('placeholder'), href: e.getAttribute('href'),
       disabled: e.disabled === true || e.getAttribute('aria-disabled') === 'true',
-      expanded: e.getAttribute('aria-expanded')});
+      expanded: e.getAttribute('aria-expanded'), login: e.dataset.hydraLogin || undefined,
+      nameAttr: e.dataset.hydraLogin ? e.getAttribute('name') : undefined});
   });
   return out;
 }"""
+
+
+# Marks the sign-in form's three elements (data-hydra-login) so EXTRACT + best_locator describe them like any other.
+# One visible password field; the user field is the last text/email/tel input before it in the same form; the button
+# is the one that submits that form, else a button whose text says sign in.
+FIND_LOGIN = """() => {
+  const vis = e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
+    return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
+  const pw = [...document.querySelectorAll('input[type=password]')].filter(vis);
+  if (pw.length !== 1) return pw.length ? 'several password fields (a sign-up form?)' : 'no password field on this page';
+  const p = pw[0], form = p.form || p.closest('form'), scope = form || document.body;
+  const texts = [...scope.querySelectorAll('input')].filter(e => vis(e) && ['text', 'email', 'tel'].includes(e.type));
+  const before = texts.filter(e => e.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING);
+  const u = before[before.length - 1];
+  const words = /log ?in|sign ?in|entrar|acceder|iniciar|ingresar|continuar|continue|submit|next|siguiente/i;
+  const btns = [...scope.querySelectorAll('button,input[type=submit],[role=button]')].filter(vis);
+  const s = (form && btns.find(b => (b.tagName === 'BUTTON' && b.type === 'submit') || (b.tagName === 'INPUT' && b.type === 'submit')))
+    || btns.find(b => words.test(b.innerText || b.value || b.getAttribute('aria-label') || ''));
+  if (!u) return 'no user field before the password';
+  if (!s) return 'no sign-in button';
+  u.dataset.hydraLogin = 'user'; p.dataset.hydraLogin = 'password'; s.dataset.hydraLogin = 'submit';
+  return '';
+}"""
+
+
+def find_login(page, wait_ms=30000):
+    """The sign-in form on the page as login steps fields, or why it was not found. Read-only: nothing is typed."""
+    try:  # a login rendered by client code appears after load; micro-frontend shells (PAO) take 10-15 s in QA
+        page.wait_for_selector("input[type=password]", state="visible", timeout=wait_ms)
+    except Exception:
+        pass
+    why = page.evaluate(FIND_LOGIN)
+    if why:
+        return {"found": False, "why": why, "path": urlparse(page.url).path}
+    els = page.evaluate(EXTRACT)
+    out = {"found": True, "path": urlparse(page.url).path or "/", "weak": []}
+    for el in els:
+        if not el.get("login"):
+            continue
+        loc, strategy, stable = best_locator(el)
+        if el["login"] == "password" and strategy not in ("testid", "id"):
+            stable = False  # the one visible password field: input[type=password] says so better than a role guess
+        if stable and sum(1 for e in els if best_locator(e)[0] == loc) > 1:
+            stable = False  # role + name shared with another element: not a locator
+        if not stable:
+            loc = {"password": "input[type=password]"}.get(el["login"]) or (f'{el["tag"]}[name="{el["nameAttr"]}"]' if el.get("nameAttr") else loc)
+            if el["login"] != "password" and not el.get("nameAttr"):
+                out["weak"].append(el["login"])
+        out[{"user": "userField", "password": "passwordField", "submit": "submit"}[el["login"]]] = loc
+    return out
+
+
+def path_under(base, url):
+    """url's path relative to the base URL (an app under /apppao: /apppao/login -> /login); None when outside it."""
+    b, u = urlparse(base), urlparse(url)
+    bp, up = b.path.rstrip("/"), u.path
+    if b.netloc != u.netloc or (up != bp and not up.startswith(bp + "/")):
+        return None
+    return up[len(bp):] or "/"
+
+
+def detect_login(a):
+    """--detect-login: open the app (it usually redirects to its sign-in page) and print the form's locators."""
+    base = a.base_url.rstrip("/")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.route("**/*", lambda route, req: route.continue_() if req.method == "GET" else route.abort())  # read-only
+        tried = []
+        for path in dict.fromkeys([a.login_path or "/", "/login"]):  # the given (or home) page, then the usual one
+            try:
+                page.goto(base + path, wait_until="domcontentloaded", timeout=20000)
+                try:
+                    page.wait_for_load_state("networkidle", timeout=5000)
+                except Exception:
+                    pass
+            except Exception as e:
+                tried.append(f"{path}: {type(e).__name__}")
+                continue
+            r = find_login(page)
+            if r["found"]:
+                browser.close()
+                rel = path_under(base, page.url)
+                if rel is None:  # e.g. a single sign-on page on another app: its path cannot be joined to the base URL
+                    return {"found": False, "why": f"the sign-in page {page.url} is outside {base}"}
+                r["path"] = rel
+                return r
+            tried.append(f'{r["path"]}: {r["why"]}')
+        browser.close()
+    return {"found": False, "why": "; ".join(tried)}
 
 
 def best_locator(el):
@@ -271,7 +362,7 @@ def crawl(a):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--base-url", required=True)
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--out", default="")
     ap.add_argument("--events", default="")
     ap.add_argument("--paths", default="")
     ap.add_argument("--max-pages", type=int, default=25)
@@ -282,4 +373,11 @@ if __name__ == "__main__":
     ap.add_argument("--login", default="")
     ap.add_argument("--login-path", default="")
     ap.add_argument("--env-file", default="")
-    crawl(ap.parse_args())
+    ap.add_argument("--detect-login", action="store_true", help="only find the sign-in form and print its locators as JSON")
+    args = ap.parse_args()
+    if args.detect_login:
+        print(json.dumps(detect_login(args)))
+    elif not args.out:
+        ap.error("--out is required")
+    else:
+        crawl(args)

@@ -141,7 +141,10 @@ func (r *Registry) scaffold(repo, app, base string) error {
 	if base == "" {
 		base = "main"
 	}
-	tpl := r.abs(r.Template)
+	tpl := filepath.Join(engineDir(), "templates", "framework") // the engine's own, unless the registry names another
+	if r.Template != "" {
+		tpl = r.abs(r.Template)
+	}
 	if !fileExists(filepath.Join(tpl, "conftest.py")) {
 		return fmt.Errorf("framework template not found at %s", tpl)
 	}

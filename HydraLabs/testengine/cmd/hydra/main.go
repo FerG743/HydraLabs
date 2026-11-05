@@ -18,21 +18,36 @@ import (
 	"syscall"
 )
 
-// engineDir: where projects.json, tools/ and templates/ are. The working directory when it has the registry,
-// otherwise the folder above the binary (testengine/bin/hydra, also through a symlink), so hydra works from any folder.
+// engineDir: where the code is (tools/, templates/, agent/). The working directory when it is the engine, otherwise
+// the folder above the binary (testengine/bin/hydra, also through a symlink), so hydra works from any folder.
 func engineDir() string {
+	isEngine := func(d string) bool { return fileExists(filepath.Join(d, "tools", "crawl", "crawl.py")) }
 	here, _ := os.Getwd()
-	if fileExists(filepath.Join(here, "projects.json")) {
+	if isEngine(here) {
 		return here
 	}
 	if exe, err := os.Executable(); err == nil {
 		if exe, err = filepath.EvalSymlinks(exe); err == nil {
-			if dir := filepath.Dir(filepath.Dir(exe)); fileExists(filepath.Join(dir, "projects.json")) {
+			if dir := filepath.Dir(filepath.Dir(exe)); isEngine(dir) {
 				return dir
 			}
 		}
 	}
 	return here
+}
+
+// defaultRegistry: this installation's projects.json, outside the engine's repo so a team's setup (projects, profiles,
+// login steps) is never committed with the code. $HYDRA_HOME, else ~/.hydra; an engine folder that still holds its
+// own projects.json (an install from before ~/.hydra) keeps using it until it is moved.
+func defaultRegistry() string {
+	if h := os.Getenv("HYDRA_HOME"); h != "" {
+		return filepath.Join(expand(h), "projects.json")
+	}
+	home, legacy := expand("~/.hydra/projects.json"), filepath.Join(engineDir(), "projects.json")
+	if !fileExists(home) && fileExists(legacy) {
+		return legacy
+	}
+	return home
 }
 
 // cfgFlags: defaults, then the --profile file, then explicit flags. A new web app is a new profile file, not new code.
@@ -44,8 +59,8 @@ func cfgFlags(fs *flag.FlagSet, args []string) (*Config, error) {
 		LMURL: "http://127.0.0.1:1234/v1", MaxPages: 25, BaseBranch: "main", StabilityRuns: 3, Crawler: filepath.Join(here, "tools", "crawl", "crawl.py"), Knowledge: filepath.Join(here, "knowledge"), JQL: `labels in ("automate", "execute") ORDER BY key ASC`} // "execute" is a reserved JQL word: it must be quoted
 	profilePath, project := argValue(args, "profile"), argValue(args, "project")
 	regPath := argValue(args, "registry")
-	if regPath == "" && fileExists(filepath.Join(here, "projects.json")) {
-		regPath = filepath.Join(here, "projects.json")
+	if regPath == "" && fileExists(defaultRegistry()) {
+		regPath = defaultRegistry()
 	}
 	if regPath != "" && (project != "" || profilePath == "") {
 		reg, err := LoadRegistry(regPath)
@@ -77,6 +92,9 @@ func cfgFlags(fs *flag.FlagSet, args []string) (*Config, error) {
 			}
 		}
 	}
+	if c.Agent != "" && !filepath.IsAbs(c.Agent) { // a profile names the engine's agent (agent/agent.py), not the caller's folder
+		c.Agent = filepath.Join(here, c.Agent)
+	}
 	if c.DeliverRepo == "" && c.Registry != nil && c.App != "" {
 		c.DeliverRepo = c.Registry.RepoPath(c.App) // every app delivers to its own Hydra-<App> repo
 	}
@@ -87,7 +105,7 @@ func cfgFlags(fs *flag.FlagSet, args []string) (*Config, error) {
 	}
 	fs.String("profile", "", "project profile JSON (profiles/<name>.json)")
 	fs.String("project", "", "registered Jira project key (projects.json): the profile and the repo follow from it")
-	fs.String("registry", "", "projects.json (default: next to the binary's working dir)")
+	fs.String("registry", "", "projects.json (default: $HYDRA_HOME or ~/.hydra)")
 	fs.StringVar(&c.Out, "out", c.Out, "run record, cases and bundles")
 	fs.StringVar(&c.ToolsDir, "tools", c.ToolsDir, "directory with render_pytest.py and run_generated.py")
 	fs.StringVar(&c.AppMap, "appmap", c.AppMap, "locators confirmed on the real app, one <App>.json each")
@@ -128,10 +146,9 @@ func pollMulti(args []string) (handled bool, code int) {
 	if argValue(args, "project") != "" || argValue(args, "profile") != "" {
 		return false, 0
 	}
-	here := engineDir()
 	regPath := argValue(args, "registry")
 	if regPath == "" {
-		regPath = filepath.Join(here, "projects.json")
+		regPath = defaultRegistry()
 	}
 	reg, err := LoadRegistry(regPath)
 	if err != nil {

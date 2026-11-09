@@ -148,6 +148,28 @@ class PerPageLocatorsTest(unittest.TestCase):
         self.assertIn("L.ORDENES__BOTON_ENVIAR", mod.split("def hacer_clic_enviar_en_ordenes_flujo")[1].split("def ")[0])
 
 
+class QuotedSelectTest(unittest.TestCase):
+    """Select "a value, with spaces" in "Field": two picks in one field are two values; commas survive the CSV."""
+
+    def test_two_picks_in_one_dropdown(self):
+        steps = ["Navigate to `/SPDH`.", 'Select "Greet" in "Mensaje".', 'Click "Enviar".',
+                 'Select "Solicitud de Plan 08 (Compra Normal, Dptal SBIA)" in "Mensaje".', 'Click "Enviar".']
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "cases"))
+            with open(os.path.join(d, "cases", "DEMO-1.case.json"), "w") as f:
+                json.dump({"id": "DEMO-1", "name": "TC", "language": "en", "precondition": "", "expected": [],
+                           "steps": [{"n": str(i + 1), "action": a} for i, a in enumerate(steps)]}, f)
+            rep = json.loads(subprocess.check_output([sys.executable, os.path.join(HERE, "render_pytest.py"), "--cases",
+                                                      os.path.join(d, "cases"), "--app", "App", "--out", d]))[0]
+            rows = list(csv.reader(open(os.path.join(d, "apps", "App", "data", "demo_1_data.csv"), encoding="utf-8")))
+            test = open(os.path.join(d, "tests", "App", "test_demo_1.py"), encoding="utf-8").read()
+        self.assertEqual(rep["pending"], [])
+        self.assertEqual(rows, [["caso_id", "mensaje", "mensaje_2"], ["DEMO-1", "Greet", "Solicitud de Plan 08 (Compra Normal, Dptal SBIA)"]])
+        self.assertIn("co.seleccionar_mensaje_en_spdh_flujo(driver, mensaje)", test)
+        self.assertIn("co.seleccionar_mensaje_en_spdh_flujo(driver, mensaje_2)", test)
+        self.assertEqual([m["column"] for m in rep["map"]], [None, "mensaje", None, "mensaje_2", None])
+
+
 class SignedOutTest(unittest.TestCase):
     """A case whose precondition says nobody is signed in skips the app's sign-in; every other case keeps it."""
 

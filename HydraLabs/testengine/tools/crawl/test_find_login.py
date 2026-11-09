@@ -79,3 +79,23 @@ def test_walking_a_case_maps_what_its_clicks_reveal_and_never_types(page):
     assert not page.evaluate("window.deleted"), "a destructive-looking click must never be made"
     skipped = " ".join(t for k, t in ev.got if k == "skip")
     assert "Enter order number" in skipped and "Eliminar todo" in skipped and "Nada" in skipped, ev.got
+
+
+SHADCN = """<div><label>Mensaje</label><button type=button role=combobox><span>Solicitud de Plan 86 (Tiempo Aire)</span></button></div>
+<div><label>Destino</label><button type=button role=combobox><span>sim — 172.22.64.229</span></button></div>
+<div><label>Puerto del stub</label><input value=8101></div>
+<div><label for=c>Cuenta</label><input id=c></div>
+<div><label>Ayuda</label><button>Ver ayuda</button></div>"""
+
+
+def test_a_field_is_named_by_the_unattached_label_next_to_it(page):
+    from crawl import EXTRACT, best_locator
+    page.set_content(SHADCN)
+    els = {e["name"]: e for e in page.evaluate(EXTRACT)}
+    for name, role in (("Mensaje", "combobox"), ("Destino", "combobox"), ("Puerto del stub", "textbox")):
+        assert name in els, list(els)  # not "Solicitud de Plan 86...", "sim — ...", "8101": those change with the value
+        loc, strategy, stable = best_locator(els[name])
+        assert strategy == "label" and stable and page.locator(loc).count() == 1, (name, loc)
+        assert page.locator(loc).get_attribute("role") == ("combobox" if role == "combobox" else None) or role == "textbox"
+    assert best_locator(els["Cuenta"])[0] == "#c"  # an attached label: the element's own id stays first
+    assert "Ver ayuda" in els and not els["Ver ayuda"].get("byLabel")  # a plain button is not a field: its own text names it

@@ -31,13 +31,20 @@ EXTRACT = """() => {
   const itype = {checkbox:'checkbox',radio:'radio',button:'button',submit:'button',file:'button',number:'spinbutton',range:'slider'};
   const vis = e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
     return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
-  const nameOf = e => {
+  const ownName = e => {  // a name the page gives the element itself (what Playwright's role selectors also see)
     const a = e.getAttribute('aria-label'); if (a) return a.trim();
     const lb = e.getAttribute('aria-labelledby');
     if (lb) { const t = lb.split(/\\s+/).map(i => (document.getElementById(i)||{}).innerText||'').join(' ').trim(); if (t) return t; }
     if (e.id) { const l = document.querySelector('label[for="'+CSS.escape(e.id)+'"]'); if (l && l.innerText.trim()) return l.innerText.trim(); }
     const wl = e.closest('label'); if (wl && wl.innerText.trim()) return wl.innerText.trim();
-    return (e.getAttribute('placeholder') || e.innerText || e.getAttribute('title') || e.getAttribute('alt') || e.value || '').trim().replace(/\\s+/g,' ').slice(0,80);
+    return '';
+  };
+  const nameOf = e => ownName(e) ||
+    (e.getAttribute('placeholder') || e.innerText || e.getAttribute('title') || e.getAttribute('alt') || e.value || '').trim().replace(/\\s+/g,' ').slice(0,80);
+  // a field whose <label> sits right before it but is not attached (no for=): the label, not its current value, names it
+  const nearLabel = (e, role) => {
+    const p = e.previousElementSibling, control = ['INPUT','SELECT','TEXTAREA'].includes(e.tagName) || role === 'combobox';
+    return control && !ownName(e) && p && p.tagName === 'LABEL' && !p.htmlFor ? p.innerText.trim().replace(/\\s+/g,' ').slice(0,80) : '';
   };
   const out = [];
   document.querySelectorAll(sel).forEach(e => {
@@ -45,7 +52,9 @@ EXTRACT = """() => {
     const tag = e.tagName; let role = e.getAttribute('role') || implicit[tag];
     if (tag === 'INPUT') role = e.getAttribute('role') || itype[e.type] || 'textbox';
     const b = e.getBoundingClientRect();
-    out.push({rect: {x: b.left + scrollX, y: b.top + scrollY, w: b.width, h: b.height}, tag: tag.toLowerCase(), role: role || null, name: nameOf(e), id: e.id || null,
+    const near = nearLabel(e, role);
+    out.push({rect: {x: b.left + scrollX, y: b.top + scrollY, w: b.width, h: b.height}, tag: tag.toLowerCase(), role: role || null, name: near || nameOf(e), id: e.id || null,
+      byLabel: near ? true : undefined,
       testid: e.getAttribute('data-testid') || e.getAttribute('data-test') || e.getAttribute('data-qa') || null,
       type: e.getAttribute('type'), placeholder: e.getAttribute('placeholder'), href: e.getAttribute('href'),
       disabled: e.disabled === true || e.getAttribute('aria-disabled') === 'true',
@@ -152,6 +161,9 @@ def best_locator(el):
         return f'[data-testid="{el["testid"]}"]', "testid", True
     if el["id"] and not UNSTABLE_ID.search(el["id"]):
         return f'#{el["id"]}', "id", True
+    if el.get("byLabel"):  # named by the label next to it, which role selectors cannot see: reach it through that label
+        target = el["tag"] if el["tag"] in ("input", "select", "textarea") else f'[role={el["role"]}]'
+        return f'label:text-is("{el["name"].replace(chr(34), chr(92) + chr(34))}") + {target}', "label", True
     if el["role"] and el["name"]:
         return f'role={el["role"]}[name="{el["name"].replace(chr(34), chr(92) + chr(34))}"]', "role+name", True
     if el["testid"]:  # only a testid with a record id in it: works here, not after a data reset or in another environment

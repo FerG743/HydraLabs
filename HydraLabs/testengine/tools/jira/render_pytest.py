@@ -21,7 +21,7 @@ overrides the guessed values (and drops their TODO) and switches a select to a c
 
     python3 render_pytest.py --cases out/jira [--include-review] --app CobroOrdenes --out automation
 """
-import argparse, csv, glob, json, os, re, shutil, unicodedata
+import argparse, csv, glob, io, json, os, re, shutil, unicodedata
 from urllib.parse import urlparse
 
 # ---- grammar -------------------------------------------------------------------------------
@@ -36,6 +36,7 @@ ACTIONS = [  # (regex, op) - first match wins; groups become the op's arguments
     (r'^Upload that file via the drop zone\.?$', "upload_prev"),
     (r'^Wait for the response\.?$', "wait_response"),
     (r'^Enter (.+?) (\S+?)\.?$', "fill"),
+    (r'^(?:Select|Choose) "(.+?)" in "(.+?)"\.?$', "select_in"),  # a value with spaces or commas: quoted, field named after it
     (r'^Select (.+?) (\S+?)\.?$', "select"),
 ]
 PRECONDITIONS = [  # searched anywhere in the precondition text
@@ -91,11 +92,17 @@ def analyse(case):
     for s in case["steps"]:
         text = plain(s["action"])
         op, g = parse(ACTIONS, text)
+        if op == "select_in":  # the same step as "Select <field> <value>", only the value may have spaces
+            op, g = "select", (g[1], g[0])
         if op is None:
             pending.append(f"{s['n']}: {text}")
-        if op in ("fill", "select"):
-            data[slug(g[0])] = g[1]
-        steps.append({"n": s["n"], "text": text, "op": op, "g": g})
+        col = None
+        if op in ("fill", "select"):  # one data column per step: a second pick in the same field is its own value
+            col, k = slug(g[0]), 2
+            while col in data:
+                col, k = f"{slug(g[0])}_{k}", k + 1
+            data[col] = g[1]
+        steps.append({"n": s["n"], "text": text, "op": op, "g": g, "col": col})
     expected = []
     for e in case.get("expected", []):
         text = plain(e["text"])
@@ -244,7 +251,7 @@ def build_calls(app, a, defaults):
             n = app.flujo(f"capturar_{f}{on(ctx['page'])}_flujo", f'''def capturar_{f}{on(ctx['page'])}_flujo(driver, {f}):
     """Captura el campo {g[0]}."""
     DriverWrapper(driver).send_keys(L.{L}, {f}, description="el campo {g[0]}")''')
-            line = f"co.{n}(driver, {f})"
+            line = f"co.{n}(driver, {st['col']})"
         elif op == "select":
             ctx["first_input"] = i if ctx["first_input"] is None else ctx["first_input"]
             f = slug(g[0])
@@ -260,7 +267,7 @@ def build_calls(app, a, defaults):
     """Selecciona {g[0]}."""
     add_step("Seleccionando {g[0]}.")
     driver.page.select_option(L.{L}, value={f})''')
-            line = f"co.{n}(driver, {f})"
+            line = f"co.{n}(driver, {st['col']})"
         elif op in ("upload_prev", "upload_binary", "upload_csv"):
             st["loc"] = app.loc("INPUT_ARCHIVO", "input[type='file']", "confirmar el selector de la zona de carga (drop zone)")
             if op == "upload_prev":
@@ -502,13 +509,14 @@ def main():
         exp = build_expected(app, an, ctx)
         write(os.path.join(tests_dir, f"test_{an['token']}.py"), render_test(case, an, calls, ctx, exp, a.app))
         if an["data"]:
-            write(os.path.join(app_dir, "data", f"{an['token']}_data.csv"),
-                  "caso_id," + ",".join(an["data"]) + "\n" + ",".join([case["id"]] + [v for v in an["data"].values()]) + "\n")
+            buf = io.StringIO()  # quoted: an option like "Plan 08 (Compra Normal, Dptal SBIA, con CVV)" has commas
+            csv.writer(buf, lineterminator="\n").writerows([["caso_id", *an["data"]], [case["id"], *an["data"].values()]])
+            write(os.path.join(app_dir, "data", f"{an['token']}_data.csv"), buf.getvalue())
         expected_rows.append((case["id"], " ".join(e["text"] for e in an["expected"])))
         # per step, what it was mapped to: the locator in force (confirmed on the real app, or still a guess)
         # "column": the data CSV column this step reads (fill/select), so a person can see which step a value is for
         step_map = [{"n": s["n"], "text": s["text"], "mapped": bool(s["op"]), "locator": app.located(s.get("loc"))[0],
-                     "confirmed": app.located(s.get("loc"))[1], "column": slug(s["g"][0]) if s["op"] in ("fill", "select") else None}
+                     "confirmed": app.located(s.get("loc"))[1], "column": s["col"]}
                     for s, _ in calls]
         report.append({"case": case["id"], "map": step_map, "steps_mapped": sum(1 for s, _ in calls if s["op"]), "steps": len(calls),
                        "expected_asserted": len({id(e) for e, l, _ in exp if l}), "expected": len(an["expected"]),

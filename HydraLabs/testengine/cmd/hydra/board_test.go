@@ -37,6 +37,12 @@ func TestTheBoardSaysWhichResultsMayNoLongerHold(t *testing.T) {
 	crawled := time.Now().Add(-30 * time.Minute)
 	os.Chtimes(c.crawlPath(), crawled, crawled)
 
+	for _, k := range []string{"SHOP-1", "SHOP-2"} { // both have a test; SHOP-2's is for its old text
+		f := filepath.Join(c.bundleDir(k), c.testFile(k))
+		os.MkdirAll(filepath.Dir(f), 0o755)
+		os.WriteFile(f, nil, 0o644)
+	}
+
 	b := c.board()
 	got := map[string]BoardCase{}
 	for _, bc := range b.Board {
@@ -50,6 +56,9 @@ func TestTheBoardSaysWhichResultsMayNoLongerHold(t *testing.T) {
 	}
 	if s := got["SHOP-3"].Stale; len(s) != 1 || s[0] != "not run yet" || got["SHOP-3"].Status != "" {
 		t.Errorf("SHOP-3 never ran: %+v", got["SHOP-3"])
+	}
+	if n := got["SHOP-1"].Next + " " + got["SHOP-2"].Next + " " + got["SHOP-3"].Next; n != "execute automate automate" {
+		t.Errorf("a built case offers Execute; an edited or never-built one offers Automate: %s", n)
 	}
 	if b.CrawlPages != 2 || b.Source != "local" || b.Passing != 2 {
 		t.Errorf("header: %+v", b)

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -25,6 +26,7 @@ type BoardCase struct {
 	Runs    int      `json:"runs"`
 	RunsOK  int      `json:"runsPassed"`
 	Stale   []string `json:"stale"` // why the last result may no longer hold
+	Next    string   `json:"next"`  // the one action its row offers: "automate" until it has a test for its current text, then "execute"
 }
 
 type Board struct {
@@ -86,6 +88,10 @@ func (c Config) board() Board {
 		}
 	}
 	for _, bc := range byKey {
+		bc.Next = "execute"
+		if !c.built(bc.Key) || slices.Contains(bc.Stale, "edited after its last run") {
+			bc.Next = "automate"
+		}
 		b.Board = append(b.Board, *bc)
 	}
 	sort.Slice(b.Board, func(i, j int) bool { return keyLess(b.Board[i].Key, b.Board[j].Key) })
@@ -264,7 +270,7 @@ $('srcinfo').textContent='from '+(b.source=='local'?'cases/ files':'Jira + cases
 const st=[[b.board.length,'cases'],[b.passing,'passing'],[b.needsPerson,'need a person'],[b.board.filter(c=>c.stale.length).length,'stale'],[b.testsOnBase,'tests on '+(b.base||'main')],[(b.awaitingReview||[]).length,'awaiting review']];
 $('stats').innerHTML=st.map(([n,l])=>'<span class=stat><b>'+n+'</b><span>'+l+'</span></span>').join('')+'<span class=stat><span>crawl '+(b.crawlAt?esc(b.crawlAt)+' · '+b.crawlPages+' pages':'never')+'</span></span>';
 $('cases').innerHTML=b.board.length?'<table><thead><tr><th>Case</th><th>Last result</th><th>History</th><th></th></tr></thead><tbody>'+b.board.map(c=>
-'<tr><td><b>'+esc(c.key)+'</b> '+esc(c.name)+(c.stale.length?'<small class=stale>⚠ '+c.stale.map(esc).join(' · ')+'</small>':'')+'</td><td>'+pill(c.status)+'<small>'+esc(c.tier)+' '+esc(c.updated)+'</small></td><td>'+(c.runs?c.runsPassed+' / '+c.runs+' passed':'—')+'</td><td style="white-space:nowrap"><button type=button class=data data-key="'+esc(c.key)+'" aria-label="Data of '+esc(c.key)+'">✎ Data</button> <button type=button class=run data-a=automate data-key="'+esc(c.key)+'" aria-label="Automate '+esc(c.key)+'" title="Build its test from the case text (walks the case on the app if a locator is missing)"'+(busy?' disabled':'')+'>⚙ Automate</button> <button type=button class=run data-a=execute data-key="'+esc(c.key)+'" aria-label="Execute '+esc(c.key)+'" title="Run its test as it is, with the test repo\'s data"'+(busy?' disabled':'')+'>▶ Execute</button></td></tr>').join('')+'</tbody></table>'
+'<tr><td><b>'+esc(c.key)+'</b> '+esc(c.name)+(c.stale.length?'<small class=stale>⚠ '+c.stale.map(esc).join(' · ')+'</small>':'')+'</td><td>'+pill(c.status)+'<small>'+esc(c.tier)+' '+esc(c.updated)+'</small></td><td>'+(c.runs?c.runsPassed+' / '+c.runs+' passed':'—')+'</td><td style="white-space:nowrap"><button type=button class=data data-key="'+esc(c.key)+'" aria-label="Data of '+esc(c.key)+'">✎ Data</button> '+(c.next==='execute'?'<button type=button class=run data-a=execute data-key="'+esc(c.key)+'" aria-label="Execute '+esc(c.key)+'" title="Run its test as it is, with the test repo\'s data"'+(busy?' disabled':'')+'>▶ Execute</button>'+(c.status&&c.status!=='passed'?' <button type=button class=run data-a=automate data-key="'+esc(c.key)+'" aria-label="Rebuild '+esc(c.key)+'" title="Its last run did not pass: build its test again from the case text"'+(busy?' disabled':'')+'>↻ Rebuild</button>':''):'<button type=button class=run data-a=automate data-key="'+esc(c.key)+'" aria-label="Automate '+esc(c.key)+'" title="Build its test from the case text (walks the case on the app if a locator is missing)"'+(busy?' disabled':'')+'>⚙ Automate</button>')+'</td></tr>').join('')+'</tbody></table>'
 :'<p class=empty>No cases yet.'+' Write one in the Write a case tab.'+'</p>'}catch(e){}setTimeout(load,3000)}
 load()
 const tabs=[$('t-status'),$('t-write')];

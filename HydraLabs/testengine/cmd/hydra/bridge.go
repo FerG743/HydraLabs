@@ -82,7 +82,7 @@ func tokens(s string) []string {
 
 func (b *Bridge) variants(w string) map[string]bool {
 	v := map[string]bool{w: true}
-	for _, x := range append(syn[w], b.Extra[w]...) {
+	for _, x := range append(append(syn[w], syn[w+"s"]...), b.Extra[w]...) { // tokens() trims a plural s: "proces" is "process"
 		v[strings.TrimSuffix(fold(x), "s")] = true
 	}
 	return v
@@ -118,7 +118,9 @@ var guess = regexp.MustCompile(`^role=(\w+)\[name="(.*?)"( i)?\]$`)
 
 // non-greedy, then an optional trailing comment: the comment may itself contain quotes ("# TODO: ... 'order number'")
 var locLine = regexp.MustCompile(`^\s{4}([A-Z][A-Z0-9_]*) = (?:'(.*?)'|"(.*?)")(?:\s+#.*)?$`)
-var roleOK = map[string][]string{"textbox": {"textbox", "spinbutton"}, "combobox": {"combobox"}, "button": {"button"}}
+
+// a Click step's guess is a button, but what the page has may be any clickable thing (the "Adquirente" tab)
+var roleOK = map[string][]string{"textbox": {"textbox", "spinbutton"}, "combobox": {"combobox"}, "button": {"button", "tab", "link", "menuitem"}}
 
 func inRoles(role string, el CrawlElement) bool {
 	for _, r := range roleOK[role] {
@@ -131,8 +133,7 @@ func inRoles(role string, el CrawlElement) bool {
 
 // Resolve settles one guessed locator. ok=false means "leave the guess".
 func (b *Bridge) Resolve(role, want string) (el CrawlElement, ok bool) {
-	var full []CrawlElement
-	var near []CrawlElement
+	var full, exact, near []CrawlElement // exact: the same words and nothing more ("Enviar" is not "Enviar 1 Orden")
 	seen := map[string]bool{}
 	for _, pg := range b.Crawl.Pages {
 		for _, e := range pg.Elements {
@@ -143,12 +144,18 @@ func (b *Bridge) Resolve(role, want string) (el CrawlElement, ok bool) {
 			if n > 0 && g == n {
 				full = append(full, e)
 				seen[e.Locator] = true
+				if len(wordRe.FindAllString(fold(e.Name), -1)) == n { // every word counts here: "Orden A" is not "orden"
+					exact = append(exact, e)
+				}
 			} else if g > 0 {
 				near = append(near, e)
 			}
 		}
 	}
-	if len(full) == 1 {
+	if len(exact) == 1 {
+		return exact[0], true
+	}
+	if len(full) == 1 && role != "button" { // a field's label is wordy; a button that only contains the words is another button
 		return full[0], true
 	}
 	cands := full // several equally good, or none: let the model choose among them (or among the near ones)

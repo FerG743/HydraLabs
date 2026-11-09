@@ -138,8 +138,7 @@ func (c Config) BoardUI(addr string) error {
 			json.NewEncoder(w).Encode(map[string]bool{"stopped": run.stop()})
 			return
 		}
-		built := req.Key != "" && c.built(req.Key)
-		args, err := boardArgs(req.Action, c.Project, registry, req.Key, built)
+		args, err := boardArgs(req.Action, c.Project, registry, req.Key)
 		if err == nil {
 			label := req.Action
 			if req.Key != "" {
@@ -265,7 +264,7 @@ $('srcinfo').textContent='from '+(b.source=='local'?'cases/ files':'Jira + cases
 const st=[[b.board.length,'cases'],[b.passing,'passing'],[b.needsPerson,'need a person'],[b.board.filter(c=>c.stale.length).length,'stale'],[b.testsOnBase,'tests on '+(b.base||'main')],[(b.awaitingReview||[]).length,'awaiting review']];
 $('stats').innerHTML=st.map(([n,l])=>'<span class=stat><b>'+n+'</b><span>'+l+'</span></span>').join('')+'<span class=stat><span>crawl '+(b.crawlAt?esc(b.crawlAt)+' · '+b.crawlPages+' pages':'never')+'</span></span>';
 $('cases').innerHTML=b.board.length?'<table><thead><tr><th>Case</th><th>Last result</th><th>History</th><th></th></tr></thead><tbody>'+b.board.map(c=>
-'<tr><td><b>'+esc(c.key)+'</b> '+esc(c.name)+(c.stale.length?'<small class=stale>⚠ '+c.stale.map(esc).join(' · ')+'</small>':'')+'</td><td>'+pill(c.status)+'<small>'+esc(c.tier)+' '+esc(c.updated)+'</small></td><td>'+(c.runs?c.runsPassed+' / '+c.runs+' passed':'—')+'</td><td style="white-space:nowrap"><button type=button class=data data-key="'+esc(c.key)+'" aria-label="Data of '+esc(c.key)+'">✎ Data</button> <button type=button class=run data-key="'+esc(c.key)+'" aria-label="Run '+esc(c.key)+'"'+(busy?' disabled':'')+'>▶ Run</button></td></tr>').join('')+'</tbody></table>'
+'<tr><td><b>'+esc(c.key)+'</b> '+esc(c.name)+(c.stale.length?'<small class=stale>⚠ '+c.stale.map(esc).join(' · ')+'</small>':'')+'</td><td>'+pill(c.status)+'<small>'+esc(c.tier)+' '+esc(c.updated)+'</small></td><td>'+(c.runs?c.runsPassed+' / '+c.runs+' passed':'—')+'</td><td style="white-space:nowrap"><button type=button class=data data-key="'+esc(c.key)+'" aria-label="Data of '+esc(c.key)+'">✎ Data</button> <button type=button class=run data-a=automate data-key="'+esc(c.key)+'" aria-label="Automate '+esc(c.key)+'" title="Build its test from the case text (walks the case on the app if a locator is missing)"'+(busy?' disabled':'')+'>⚙ Automate</button> <button type=button class=run data-a=execute data-key="'+esc(c.key)+'" aria-label="Execute '+esc(c.key)+'" title="Run its test as it is, with the test repo\'s data"'+(busy?' disabled':'')+'>▶ Execute</button></td></tr>').join('')+'</tbody></table>'
 :'<p class=empty>No cases yet.'+' Write one in the Write a case tab.'+'</p>'}catch(e){}setTimeout(load,3000)}
 load()
 const tabs=[$('t-status'),$('t-write')];
@@ -274,11 +273,11 @@ function tab(t){tabs.forEach(x=>{const on=x===t;x.setAttribute('aria-selected',o
 tabs.forEach((t,i)=>{t.onclick=()=>tab(t);t.onkeydown=e=>{if(e.key=='ArrowRight'||e.key=='ArrowLeft'){const n=tabs[(i+(e.key=='ArrowRight'?1:tabs.length-1))%tabs.length];tab(n);n.focus()}}});
 let busy=false,logOpen=false;
 async function run(action,key){
-  if(action=='deliver'&&!confirm('Deliver runs the whole suite in the real framework and puts the tests that pass on a review branch in the test repo (nothing is pushed). Go?'))return;
+  if(action=='execute'&&!key)return;if(action=='deliver'&&!confirm('Deliver runs the whole suite in the real framework and puts the tests that pass on a review branch in the test repo (nothing is pushed). Go?'))return;
   const r=await fetch('api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,key:key||''})});
   const j=await r.json();if(!r.ok){alert(j.error);return}if(!logOpen)$('logbtn').click();runState()}
 document.querySelectorAll('.actions [data-a]').forEach(b=>b.onclick=()=>run(b.dataset.a));
-$('cases').addEventListener('click',e=>{const b=e.target.closest('button.run');if(b)run('poll',b.dataset.key);const d=e.target.closest('button.data');if(d)openData(d.dataset.key)});
+$('cases').addEventListener('click',e=>{const b=e.target.closest('button.run');if(b)run(b.dataset.a,b.dataset.key);const d=e.target.closest('button.data');if(d)openData(d.dataset.key)});
 let dkey='';
 async function openData(key){dkey=key;$('dmsg').textContent='';$('dmsg').className='';const d=await (await fetch('api/data?key='+encodeURIComponent(key))).json();showData(d);$('data').showModal()}
 function showData(d){$('dtitle').textContent=d.key+' · test data';$('dfile').textContent=d.delivered?'Saved in the test repo: '+d.file+' (committed), used by every run':'';

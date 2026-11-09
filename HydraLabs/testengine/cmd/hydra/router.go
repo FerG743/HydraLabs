@@ -138,6 +138,30 @@ func (c Config) loadCases() ([]*Case, error) {
 	return out, nil
 }
 
+func (c Config) canWalk() bool {
+	return c.hasAddon("labs") && c.PortalURL != "" && c.Crawler != "" && fileExists(c.Crawler)
+}
+
+// walkCase runs the crawler over one case's navigation and clicks (read-only) and adds what each reveals to the app map.
+// shortcut: a later full crawl replaces the map and drops these pages; the next build of the case walks it again.
+func (c Config) walkCase(cs *Case) error {
+	var steps []string
+	for _, s := range cs.Steps {
+		steps = append(steps, s.Action)
+	}
+	guide := filepath.Join(c.Out, "stage", cs.ID+".walk.json")
+	if err := writeJSON(guide, steps); err != nil {
+		return err
+	}
+	dir := filepath.Join(c.Out, "crawl")
+	os.MkdirAll(filepath.Join(dir, "shots"), 0o755)
+	args := append(c.crawlArgs(filepath.Join(dir, "events.jsonl"), c.crawlPath(), false), "--guide", guide)
+	if out, err := exec.Command(c.Python, args...).CombinedOutput(); err != nil {
+		return fmt.Errorf("%v: %.300s", err, out)
+	}
+	return nil
+}
+
 // useRepoData: an execute runs the stored test with the data a person keeps in the test repo, not the copy made when
 // the test was built (a used-up boleta number is changed there, once). Not delivered yet: the bundle's own data stays.
 func (c Config) useRepoData(key string) (string, error) {
@@ -317,9 +341,21 @@ func (c Config) render(cs *Case, all []*Case) (pending []string, tokens int, ste
 	if err != nil {
 		return nil, 0, nil, err
 	}
-	changed, spent, left, err := c.bridge(filepath.Join(bundle, "apps", c.App, "locators", appSlug(c.App)+"_locators.py"))
+	locs := filepath.Join(bundle, "apps", c.App, "locators", appSlug(c.App)+"_locators.py")
+	changed, spent, left, err := c.bridge(locs)
 	if err != nil {
 		return nil, spent, nil, err
+	}
+	if len(left) > 0 && c.canWalk() { // not in the app map: walk this case's own steps (tabs, buttons) and look again
+		if werr := c.walkCase(cs); werr != nil {
+			left = append(left, "walking the case's steps failed: "+werr.Error())
+		} else {
+			more, s2, l2, err := c.bridge(locs)
+			if err != nil {
+				return nil, spent, nil, err
+			}
+			changed, spent, left = changed || more, spent+s2, l2
+		}
 	}
 	if changed {
 		if pending, steps, err = c.renderOnce(stage, bundle, cs.ID); err != nil {

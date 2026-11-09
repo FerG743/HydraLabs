@@ -55,3 +55,27 @@ def test_says_why_when_there_is_no_sign_in(page):
     assert not r["found"] and "no password field" in r["why"]
     page.set_content("<form><input name=e><input type=password><input type=password><button>Create account</button></form>")
     assert "several password fields" in find_login(page, wait_ms=200)["why"]
+
+
+TABBED = """<div role=tablist><button role=tab onclick="document.getElementById('f').hidden=false">Adquirente</button></div>
+<div id=f hidden><label for=m>Mensaje</label><select id=m><option>Greet</option></select><button>Enviar</button>
+<button onclick="window.deleted=true">Eliminar todo</button></div>"""
+
+
+def test_walking_a_case_maps_what_its_clicks_reveal_and_never_types(page):
+    from crawl import walk_case, EXTRACT
+
+    class Ev:
+        def __init__(self): self.got = []
+        def emit(self, kind, **d): self.got.append((kind, d.get("text", "")))
+
+    page.set_content(TABBED)
+    mapped, ev = [], Ev()
+    steps = ['Click "Adquirente".', "Enter order number `98`.", 'Click "Eliminar todo".', 'Click "Nada".']
+    walk_case(page, "http://x", steps, lambda url=None: True,
+              lambda settled, after=None: mapped.append((after, [e["name"] for e in page.evaluate(EXTRACT)])), ev)
+    assert [a for a, _ in mapped] == ['Click "Adquirente".'], mapped  # only the safe click with a real target was walked
+    assert "Mensaje" in mapped[0][1] and "Enviar" in mapped[0][1], mapped  # what the tab revealed is in the map now
+    assert not page.evaluate("window.deleted"), "a destructive-looking click must never be made"
+    skipped = " ".join(t for k, t in ev.got if k == "skip")
+    assert "Enter order number" in skipped and "Eliminar todo" in skipped and "Nada" in skipped, ev.got

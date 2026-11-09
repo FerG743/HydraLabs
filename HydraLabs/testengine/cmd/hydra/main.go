@@ -200,6 +200,22 @@ func pollMulti(args []string) (handled bool, code int) {
 
 var jsonOut bool
 
+// oneCase: "automate KEY [flags]" -> the poll arguments that build (or run) exactly that case, now.
+func oneCase(intent string, args []string) ([]string, error) {
+	key, rest := "", []string{}
+	for _, a := range args {
+		if k := strings.ToUpper(a); key == "" && !strings.HasPrefix(a, "-") && caseKey.MatchString(k) {
+			key = k
+		} else {
+			rest = append(rest, a)
+		}
+	}
+	if key == "" {
+		return nil, fmt.Errorf("usage: hydra %s <CASE-KEY> [--project KEY]   e.g. hydra %s DWQ-L1", intent, intent)
+	}
+	return append(rest, "--only", key, "--intent", intent), nil
+}
+
 func report(r Run) {
 	if jsonOut {
 		b, _ := json.Marshal(r)
@@ -219,6 +235,14 @@ func main() {
 	}
 	// the pipeline's secrets (Jira, chat), as n8n/start.sh loads them, so a plain terminal works the same
 	loadHydraEnv("~/.hydra.env", filepath.Join(engineDir(), "..", ".hydra.env"))
+	if os.Args[1] == "automate" || os.Args[1] == "execute" { // hydra automate DWQ-L1: one case, its project found from its key
+		args, err := oneCase(os.Args[1], os.Args[2:])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "hydra:", err)
+			os.Exit(2)
+		}
+		os.Args = append([]string{os.Args[0], "poll"}, args...)
+	}
 	if os.Args[1] == "poll" {
 		if handled, code := pollMulti(os.Args[2:]); handled {
 			os.Exit(code)

@@ -92,3 +92,43 @@ func TestHumanFileWinsOverLearned(t *testing.T) {
 		t.Errorf("%v", got)
 	}
 }
+
+func TestAClickFindsATabOrALinkNotOnlyAButton(t *testing.T) {
+	cr := &Crawl{}
+	cr.Pages = append(cr.Pages, struct {
+		URL      string
+		Elements []CrawlElement
+	}{URL: "/SPDH", Elements: []CrawlElement{
+		{Role: "tab", Name: "Adquirente", Locator: `role=tab[name="Adquirente"]`, Stable: true},
+		{Role: "textbox", Name: "Adquirente id", Locator: "#adq", Stable: true}}})
+	b := &Bridge{Crawl: cr}
+	if el, ok := b.Resolve("button", "Adquirente"); !ok || el.Locator != `role=tab[name="Adquirente"]` {
+		t.Errorf(`Click "Adquirente" must find the tab: %+v %v`, el, ok)
+	}
+}
+
+func TestAClickIsNotResolvedToAButtonThatOnlyContainsItsWords(t *testing.T) {
+	page := func(els ...CrawlElement) *Bridge {
+		cr := &Crawl{}
+		cr.Pages = append(cr.Pages, struct {
+			URL      string
+			Elements []CrawlElement
+		}{Elements: els})
+		return &Bridge{Crawl: cr}
+	}
+	other := CrawlElement{Role: "button", Name: "Enviar 1 Orden", Locator: `role=button[name="Enviar 1 Orden"]`, Stable: true}
+	mine := CrawlElement{Role: "button", Name: "Enviar", Locator: `role=button[name="Enviar"]`, Stable: true}
+	if el, ok := page(other).Resolve("button", "Enviar"); ok {
+		t.Errorf(`"Enviar" alone must not become another button: %+v`, el)
+	}
+	if el, ok := page(other, mine).Resolve("button", "Enviar"); !ok || el.Locator != mine.Locator {
+		t.Errorf("the exact name wins over a longer one: %+v %v", el, ok)
+	}
+	if el, ok := page(CrawlElement{Role: "button", Name: "Procesar", Locator: "#p", Stable: true}).Resolve("button", "Process"); !ok || el.Locator != "#p" {
+		t.Errorf("one word for one word through the synonyms still resolves: %+v %v", el, ok)
+	}
+	field := CrawlElement{Role: "textbox", Name: "Ingresa el número de orden", Locator: "#orderNumber", Stable: true}
+	if el, ok := page(field).Resolve("textbox", "order number"); !ok || el.Locator != "#orderNumber" {
+		t.Errorf("a field's wordy label still matches: %+v %v", el, ok)
+	}
+}

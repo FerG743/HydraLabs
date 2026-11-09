@@ -47,18 +47,31 @@ func TestTheBoardRunsOneCommandAtATimeAndKeepsItsOutput(t *testing.T) {
 }
 
 func TestOnlyTheBoardsOwnCommandsCanRun(t *testing.T) {
-	if a, err := boardArgs("poll", "SHOP", "/r/projects.json", "SHOP-4", false); err != nil || strings.Join(a, " ") != "poll --project SHOP --registry /r/projects.json --only SHOP-4" {
-		t.Errorf("a case never built is built: %v %v", a, err)
+	for _, tc := range [][3]string{
+		{"automate", "SHOP-4", "poll --project SHOP --registry /r --only SHOP-4 --intent automate"},
+		{"execute", "SHOP-4", "poll --project SHOP --registry /r --only SHOP-4 --intent execute"},
+		{"deliver", "", "deliver --project SHOP --registry /r"},
+		{"poll", "", "poll --project SHOP --registry /r"},
+	} {
+		if a, err := boardArgs(tc[0], "SHOP", "/r", tc[1]); err != nil || strings.Join(a, " ") != tc[2] {
+			t.Errorf("%s %s: %v %v", tc[0], tc[1], a, err)
+		}
 	}
-	if a, _ := boardArgs("poll", "SHOP", "/r", "SHOP-4", true); strings.Join(a, " ") != "poll --project SHOP --registry /r --only SHOP-4 --intent execute" {
-		t.Errorf("Run on a built case runs it as it is, with the repo's data, not rebuilt from the case text: %v", a)
-	}
-	if a, _ := boardArgs("deliver", "SHOP", "/r", "", false); strings.Join(a, " ") != "deliver --project SHOP --registry /r" {
-		t.Errorf("%v", a)
-	}
-	for _, bad := range [][2]string{{"init", ""}, {"poll", "SHOP-1 --force"}, {"poll", "--registry=/etc"}, {"rm", ""}} {
-		if _, err := boardArgs(bad[0], "SHOP", "/r", bad[1], false); err == nil {
+	for _, bad := range [][2]string{{"init", ""}, {"automate", "SHOP-1 --force"}, {"execute", "--registry=/etc"}, {"execute", ""}, {"rm", ""}} {
+		if _, err := boardArgs(bad[0], "SHOP", "/r", bad[1]); err == nil {
 			t.Errorf("must refuse %q %q", bad[0], bad[1])
 		}
+	}
+}
+
+func TestTheCLIAutomatesOrExecutesOneCaseByItsKey(t *testing.T) {
+	if a, err := oneCase("execute", []string{"dwq-l1", "--json"}); err != nil || strings.Join(a, " ") != "--json --only DWQ-L1 --intent execute" {
+		t.Errorf("%v %v", a, err)
+	}
+	if a, _ := oneCase("automate", []string{"--project", "DWQ", "DWQ-131"}); strings.Join(a, " ") != "--project DWQ --only DWQ-131 --intent automate" {
+		t.Errorf("%v", a)
+	}
+	if _, err := oneCase("automate", []string{"--json"}); err == nil || !strings.Contains(err.Error(), "usage") {
+		t.Errorf("no case key: say how to call it: %v", err)
 	}
 }

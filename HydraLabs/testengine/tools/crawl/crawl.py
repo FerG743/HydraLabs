@@ -240,6 +240,44 @@ def record_options(page, el, ev):
         return []
 
 
+STEP_NAV = re.compile(r'^Navigate to (/\S*?)\.?$')  # the renderer's own wording (tools/jira/render_pytest.py ACTIONS)
+STEP_CLICK = re.compile(r'^(?:Click|Press) "(.+?)"\.?$')
+
+
+def clickable(page, name):
+    """The one visible tab, button, link or menu item with exactly this name; None if there is none or several."""
+    for role in ("tab", "button", "link", "menuitem"):
+        loc = page.get_by_role(role, name=name, exact=True)
+        if loc.count() == 1 and loc.is_visible():
+            return loc
+    return None
+
+
+def walk_case(page, base, steps, settle, map_here, ev):
+    """Follow a case's navigation and clicks (read-only: a click that would send a form is aborted by the route) and map
+    the screen after each one. Other steps (typing, choosing) are skipped: nothing is ever typed into the app."""
+    for text in steps:
+        t = text.replace("`", "").strip()
+        nav, click = STEP_NAV.match(t), STEP_CLICK.match(t)
+        try:
+            if nav:
+                settled = settle(base + nav.group(1))
+            elif click and not AVOID.search(click.group(1)):
+                target = clickable(page, click.group(1))
+                if target is None:
+                    ev.emit("skip", text=f"{t} nothing clickable has that exact name on this screen")
+                    continue
+                target.click(timeout=5000)
+                settled = settle()
+            else:
+                ev.emit("skip", text=f"{t} not walked (only navigation and safe clicks)")
+                continue
+        except Exception as e:
+            ev.emit("error", text=f"{t} {type(e).__name__}")
+            continue
+        map_here(settled, after=t)
+
+
 def crawl(a):
     load_env(a.env_file)
     ev = Events(a.events)
@@ -290,22 +328,8 @@ def crawl(a):
                     ev.emit("login", action="click", selector=step["click"])
             login_now["on"] = False
             settle()
-        reuse = bool(a.login)  # after sign-in, the page already on screen is not reloaded: on some apps (the POS) that drops the session
-        while queue and len(pages) < a.max_pages:
-            url = urldefrag(queue.pop(0))[0]
-            if url in seen:
-                continue
-            seen.add(url)
-            try:
-                # reuse it only when it is the page asked for; any other first path (/orders after landing on /home) is opened
-                settled = settle(None if reuse and urldefrag(page.url)[0] == url else url)
-                reuse = False
-                if urldefrag(page.url)[0] in seen - {url}:  # a redirect to a page already mapped (back to /home, or to the login)
-                    continue
-                seen.add(urldefrag(page.url)[0])
-            except Exception as e:
-                ev.emit("error", url=url, text=f"{type(e).__name__}")
-                continue
+        def map_here(settled, after=None):
+            """Every element on screen now -> a page entry of the app map (after: the case step that revealed it)."""
             els = page.evaluate(EXTRACT)
             for el in els:
                 el["locator"], el["strategy"], el["stable"] = best_locator(el)
@@ -330,11 +354,34 @@ def crawl(a):
             for el in els:
                 el.pop("rect", None)  # positions are for the picture only; the map stays compact
             pages.append({"url": page.url, "title": page.title(), "hash": sig, "shot": shot, "settled": settled, "elements": els,
-                          "headings": [h.strip() for h in page.locator("h1,h2,h3").all_inner_texts() if h.strip()][:10]})
+                          "headings": [h.strip() for h in page.locator("h1,h2,h3").all_inner_texts() if h.strip()][:10],
+                          **({"after": after} if after else {})})
             by = {}
             for el in els:
                 by[el["strategy"]] = by.get(el["strategy"], 0) + 1
             ev.emit("page", url=page.url, title=page.title(), elements=len(els), strategies=by, shot=shot, settled=settled)
+            return els
+
+        if a.guide:  # walk one case's steps instead of following links: what a tab or button reveals gets mapped too
+            walk_case(page, base, json.load(open(a.guide, encoding="utf-8")), settle, map_here, ev)
+            queue = []
+        reuse = bool(a.login)  # after sign-in, the page already on screen is not reloaded: on some apps (the POS) that drops the session
+        while queue and len(pages) < a.max_pages:
+            url = urldefrag(queue.pop(0))[0]
+            if url in seen:
+                continue
+            seen.add(url)
+            try:
+                # reuse it only when it is the page asked for; any other first path (/orders after landing on /home) is opened
+                settled = settle(None if reuse and urldefrag(page.url)[0] == url else url)
+                reuse = False
+                if urldefrag(page.url)[0] in seen - {url}:  # a redirect to a page already mapped (back to /home, or to the login)
+                    continue
+                seen.add(urldefrag(page.url)[0])
+            except Exception as e:
+                ev.emit("error", url=url, text=f"{type(e).__name__}")
+                continue
+            els = map_here(settled)
             for el in els:
                 if el["href"] and not AVOID.search(el["href"] + " " + el["name"]):
                     nxt = urldefrag(urljoin(page.url, el["href"]))[0]
@@ -351,6 +398,10 @@ def crawl(a):
         os.replace(video, final)
         ev.emit("video", path=final, mb=round(os.path.getsize(final) / 1e6, 1))
     out = {"baseUrl": base, "crawledAt": time.strftime("%Y-%m-%dT%H:%M:%S"), "readOnly": True, "pages": pages}
+    if a.guide and os.path.exists(a.out):  # a walk adds to the app map; a page it mapped again replaces the old entry
+        old = json.load(open(a.out, encoding="utf-8"))
+        merged = {(pg["url"], pg.get("after")): pg for pg in old["pages"] + pages}  # same screen again: the newest wins
+        out = {**old, "pages": list(merged.values())}
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     json.dump(out, open(a.out, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
     total = sum(len(pg["elements"]) for pg in pages)
@@ -373,6 +424,7 @@ if __name__ == "__main__":
     ap.add_argument("--login", default="")
     ap.add_argument("--login-path", default="")
     ap.add_argument("--env-file", default="")
+    ap.add_argument("--guide", default="", help="JSON list of one case's steps: walk them instead of following links, add to --out")
     ap.add_argument("--detect-login", action="store_true", help="only find the sign-in form and print its locators as JSON")
     args = ap.parse_args()
     if args.detect_login:

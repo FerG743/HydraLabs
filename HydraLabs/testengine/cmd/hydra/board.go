@@ -138,7 +138,7 @@ func (c Config) BoardUI(addr string) error {
 			json.NewEncoder(w).Encode(map[string]bool{"stopped": run.stop()})
 			return
 		}
-		built := req.Key != "" && fileExists(filepath.Join(c.bundleDir(req.Key), "tests"))
+		built := req.Key != "" && c.built(req.Key)
 		args, err := boardArgs(req.Action, c.Project, registry, req.Key, built)
 		if err == nil {
 			label := req.Action

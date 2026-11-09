@@ -15,6 +15,11 @@ func (c Config) testFile(key string) string {
 	return filepath.Join("tests", c.App, "test_"+token(key)+".py")
 }
 
+// built: the case has a generated test to run. Not just a tests/ folder: a case that ended at review has one, empty.
+func (c Config) built(key string) bool {
+	return fileExists(filepath.Join(c.bundleDir(key), c.testFile(key)))
+}
+
 func (c Config) runOf(key string) Run {
 	var r Run
 	if b, err := os.ReadFile(filepath.Join(c.Out, "runs", key+".json")); err == nil {

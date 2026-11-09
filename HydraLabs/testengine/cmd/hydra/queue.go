@@ -66,7 +66,7 @@ func classify(c *Config, key, intent string) (int, string) {
 	if err := c.requireHome(); err != nil {
 		return classFree, "the app's repo does not exist yet: reported at once"
 	}
-	if intent == "execute" && fileExists(filepath.Join(c.bundleDir(key), "tests")) {
+	if intent == "execute" && c.built(key) {
 		return classFree, "runs its stored test"
 	}
 	cs, cases, err := c.resolved(key)

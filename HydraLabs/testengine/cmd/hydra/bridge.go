@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -131,11 +132,26 @@ func inRoles(role string, el CrawlElement) bool {
 	return false
 }
 
-// Resolve settles one guessed locator. ok=false means "leave the guess".
-func (b *Bridge) Resolve(role, want string) (el CrawlElement, ok bool) {
+// pageOf: "/SPDH?x=1" -> "SPDH", the renderer's page_token: the same page whatever its query or case.
+func pageOf(rawURL string) string {
+	path := rawURL
+	if u, err := url.Parse(rawURL); err == nil {
+		path = u.Path
+	}
+	if p := strings.ToUpper(strings.Join(wordRe.FindAllString(fold(path), -1), "_")); p != "" {
+		return p
+	}
+	return "INICIO"
+}
+
+// Resolve settles one guessed locator, looking only at the screens of page (all of them when page is ""). ok=false means "leave the guess".
+func (b *Bridge) Resolve(role, want, page string) (el CrawlElement, ok bool) {
 	var full, exact, near []CrawlElement // exact: the same words and nothing more ("Enviar" is not "Enviar 1 Orden")
 	seen := map[string]bool{}
 	for _, pg := range b.Crawl.Pages {
+		if page != "" && pageOf(pg.URL) != page { // another page's "Enviar" is not this one
+			continue
+		}
 		for _, e := range pg.Elements {
 			if !inRoles(role, e) || !e.Stable || seen[e.Locator] {
 				continue
@@ -193,18 +209,22 @@ func (b *Bridge) Run(locatorsPy string, already Confirmed) (Confirmed, []string,
 		if _, done := already.Locators[name]; done {
 			continue
 		}
+		page, base, scoped := strings.Cut(name, "__") // SPDH__BOTON_ENVIAR: the renderer put the step's page in the name
+		if !scoped {
+			page, base = "", name
+		}
 		g := guess.FindStringSubmatch(strings.ReplaceAll(val, `\"`, `"`))
-		if g == nil || !(strings.HasPrefix(name, "INPUT_") || strings.HasPrefix(name, "SELECT_") || strings.HasPrefix(name, "BOTON_")) {
+		if g == nil || !(strings.HasPrefix(base, "INPUT_") || strings.HasPrefix(base, "SELECT_") || strings.HasPrefix(base, "BOTON_")) {
 			continue
 		}
-		el, ok := b.Resolve(g[1], g[2])
+		el, ok := b.Resolve(g[1], g[2], page)
 		if !ok {
 			left = append(left, fmt.Sprintf("%s (%s %q)", name, g[1], g[2]))
 			continue
 		}
 		out.Locators[name] = el.Locator
-		if strings.HasPrefix(name, "SELECT_") && el.Tag != "select" {
-			out.Widgets[strings.ToLower(strings.TrimPrefix(name, "SELECT_"))] = "combobox" // custom widget: open, then pick an option
+		if strings.HasPrefix(base, "SELECT_") && el.Tag != "select" {
+			out.Widgets[strings.ToLower(strings.TrimPrefix(base, "SELECT_"))] = "combobox" // custom widget: open, then pick an option
 		}
 	}
 	sort.Strings(left)

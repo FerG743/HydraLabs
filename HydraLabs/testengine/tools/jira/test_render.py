@@ -77,13 +77,13 @@ class ButtonStateTest(unittest.TestCase):
     def test_enabled_wording_still_maps_to_enabled(self):
         rep, test = self.render_with("The button returns to the enabled state with no stuck spinner.")
         self.assertEqual(rep["pending"], [])
-        self.assertIn("verificar_subir_y_procesar_enabled_flujo", test)
+        self.assertIn("verificar_subir_y_procesar_en_cobro_ordenes_enabled_flujo", test)
 
     def test_disabled_wording_maps_to_disabled(self):
         rep, test = self.render_with("The button returns to the disabled state with no stuck spinner.")
         self.assertEqual(rep["pending"], [])
-        self.assertIn("verificar_subir_y_procesar_disabled_flujo", test)
-        self.assertNotIn("verificar_subir_y_procesar_enabled_flujo", test.split("def test_")[1])  # the check itself changed
+        self.assertIn("verificar_subir_y_procesar_en_cobro_ordenes_disabled_flujo", test)
+        self.assertNotIn("verificar_subir_y_procesar_en_cobro_ordenes_enabled_flujo", test.split("def test_")[1])  # the check itself changed
 
 
 class AppSlugTest(unittest.TestCase):
@@ -110,8 +110,8 @@ class StateAfterWithoutClickTest(unittest.TestCase):
             test = open(os.path.join(d, "tests", "App", "test_demo_1.py"), encoding="utf-8").read()
         self.assertEqual((report[0]["expected_asserted"], report[0]["expected"]), (1, 1))
         body = test.split("def test_")[1]
-        self.assertLess(body.index("verificar_procesar_disabled_flujo"), body.index("capturar_order_number_flujo"))
-        self.assertGreater(body.index("verificar_procesar_enabled_flujo"), body.index("hacer_clic_agregar_flujo"))
+        self.assertLess(body.index("verificar_procesar_en_cobro_ordenes_disabled_flujo"), body.index("capturar_order_number_en_cobro_ordenes_flujo"))
+        self.assertGreater(body.index("verificar_procesar_en_cobro_ordenes_enabled_flujo"), body.index("hacer_clic_agregar_en_cobro_ordenes_flujo"))
 
 
 class NoLocatorsTest(unittest.TestCase):
@@ -125,6 +125,27 @@ class NoLocatorsTest(unittest.TestCase):
             subprocess.check_output([sys.executable, os.path.join(HERE, "render_pytest.py"), "--cases", os.path.join(d, "cases"), "--app", "App", "--out", d])
             src = open(os.path.join(d, "apps", "App", "locators", "app_locators.py"), encoding="utf-8").read()
         compile(src, "app_locators.py", "exec")  # an empty class body is a SyntaxError
+
+
+class PerPageLocatorsTest(unittest.TestCase):
+    """The same button text on two pages is two locators and two functions; a case that never navigates keeps plain names."""
+
+    def test_two_pages_two_enviar(self):
+        cases = {"DEMO-1": ["Navigate to `/SPDH`.", 'Click "Enviar".'], "DEMO-2": ["Navigate to `/ordenes`.", 'Click "Enviar".'],
+                 "DEMO-3": ['Click "Enviar".']}
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "cases"))
+            for k, steps in cases.items():
+                with open(os.path.join(d, "cases", k + ".case.json"), "w") as f:
+                    json.dump({"id": k, "name": "TC", "language": "en", "precondition": "", "expected": [],
+                               "steps": [{"n": str(i + 1), "action": a} for i, a in enumerate(steps)]}, f)
+            subprocess.check_output([sys.executable, os.path.join(HERE, "render_pytest.py"), "--cases", os.path.join(d, "cases"), "--app", "App", "--out", d])
+            loc = open(os.path.join(d, "apps", "App", "locators", "app_locators.py"), encoding="utf-8").read()
+            mod = open(os.path.join(d, "apps", "App", "modules", "app_module.py"), encoding="utf-8").read()
+        for name in ("SPDH__BOTON_ENVIAR", "ORDENES__BOTON_ENVIAR", "    BOTON_ENVIAR"):
+            self.assertIn(name, loc)
+        self.assertIn("L.SPDH__BOTON_ENVIAR", mod.split("def hacer_clic_enviar_en_spdh_flujo")[1].split("def ")[0])
+        self.assertIn("L.ORDENES__BOTON_ENVIAR", mod.split("def hacer_clic_enviar_en_ordenes_flujo")[1].split("def ")[0])
 
 
 class SignedOutTest(unittest.TestCase):
@@ -259,14 +280,14 @@ class RenderTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as out:
             os.makedirs(os.path.join(out, "apps", "CobroOrdenes"))
             with open(os.path.join(out, "apps", "CobroOrdenes", "locators.confirmed.json"), "w") as f:
-                json.dump({"locators": {"INPUT_ORDER_NUMBER": "#orderNumber", "API_POST_PATRON": "**/uploadFile"},
+                json.dump({"locators": {"COBRO_ORDENES__INPUT_ORDER_NUMBER": "#orderNumber", "API_POST_PATRON": "**/uploadFile"},
                            "widgets": {"store": "combobox"}}, f)
             subprocess.check_call([sys.executable, os.path.join(HERE, "render_pytest.py"), "--cases", os.path.join(self.tmp.name, "cases"),
                                    "--app", "CobroOrdenes", "--out", out], stdout=subprocess.DEVNULL)
             loc = open(os.path.join(out, "apps/CobroOrdenes/locators/cobro_ordenes_locators.py"), encoding="utf-8").read()
-            self.assertIn("INPUT_ORDER_NUMBER = '#orderNumber'  # confirmado en el portal real", loc)
+            self.assertIn("COBRO_ORDENES__INPUT_ORDER_NUMBER = '#orderNumber'  # confirmado en el portal real", loc)
             self.assertIn("API_POST_PATRON = '**/uploadFile'  # confirmado", loc)
-            self.assertIn("SELECT_STORE = 'role=combobox[name=\"store\" i]'  # TODO", loc)  # not confirmed: still a flagged guess
+            self.assertIn("COBRO_ORDENES__SELECT_STORE = 'role=combobox[name=\"store\" i]'  # TODO", loc)  # not confirmed: still a flagged guess
             mod = open(os.path.join(out, "apps/CobroOrdenes/modules/cobro_ordenes_module.py"), encoding="utf-8").read()
             self.assertIn('get_by_role("option", name=store, exact=True).click()', mod)
             self.assertNotIn("select_option", mod)

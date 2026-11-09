@@ -22,6 +22,7 @@ overrides the guessed values (and drops their TODO) and switches a select to a c
     python3 render_pytest.py --cases out/jira [--include-review] --app CobroOrdenes --out automation
 """
 import argparse, csv, glob, json, os, re, shutil, unicodedata
+from urllib.parse import urlparse
 
 # ---- grammar -------------------------------------------------------------------------------
 ACTIONS = [  # (regex, op) - first match wins; groups become the op's arguments
@@ -133,12 +134,26 @@ def q(s):  # selector value safe inside a double-quoted role selector
     return s.replace('"', '\\"')
 
 
-def button(app, label):
-    return app.loc(f"BOTON_{slug(label).upper()}", f"role=button[name=\"{q(label)}\"]")
+def page_token(path):
+    """"/SPDH" -> "SPDH": the page a step is on (its last Navigate). The bridge reads it back from the locator name and
+    looks only at that page's elements, so "Enviar" on one page is never another page's "Enviar 1 Orden"."""
+    return slug(urlparse(path).path).upper() or "INICIO"  # the query is not another page (the bridge drops it too)
 
 
-def state_flujo(app, label, state):
-    L, base = button(app, label), slug(label)
+def scoped(page, name):  # SPDH__BOTON_ENVIAR; a case that never navigates keeps the plain name
+    return f"{page}__{name}" if page else name
+
+
+def on(page):  # the same page in function names: two pages' "Enviar" are two functions
+    return f"_en_{page.lower()}" if page else ""
+
+
+def button(app, label, page=None):
+    return app.loc(scoped(page, f"BOTON_{slug(label).upper()}"), f"role=button[name=\"{q(label)}\"]")
+
+
+def state_flujo(app, label, state, page=None):
+    L, base = button(app, label, page), slug(label) + on(page)
     return app.flujo(f"verificar_{base}_{state}_flujo", f'''def verificar_{base}_{state}_flujo(driver):
     """Verifica que el botón {label} esté {'habilitado' if state == 'enabled' else 'deshabilitado'}."""
     assert driver.page.locator(L.{L}).is_{state}(), "El botón '{label}' debería estar {state}."
@@ -168,7 +183,7 @@ def csv_rows(items_text, defaults):
 def build_calls(app, a, defaults):
     """-> (calls, ctx). calls = [(step dict, python call line or None)]. Registers locators/functions on the way."""
     ctx = {"has_download": False, "has_mock": False, "last_button": None, "pre_line": None, "anchor_index": {},
-           "first_input": None, "click_index": {}}
+           "first_input": None, "click_index": {}, "page": None}
     pre = a["pre"]
     if pre["op"] == "mock_post":
         app.loc("API_POST_PATRON", "**/*", "por defecto se simulan TODOS los POST (seguro); acotar al endpoint real")
@@ -184,13 +199,14 @@ def build_calls(app, a, defaults):
     for i, st in enumerate(a["steps"]):
         op, g, line = st["op"], st["g"], None
         if op == "nav":
+            ctx["page"] = page_token(g[0])
             n = app.flujo(f"navegar_a_{slug(g[0])}_flujo", f'''def navegar_a_{slug(g[0])}_flujo(driver):
     """Navega a {g[0]}."""
     driver.get(Config.BASE_URL.rstrip("/") + {g[0]!r})
     add_step("El sistema muestra la pantalla {g[0]}.", "Exitoso")''')
             line = f"co.{n}(driver)"
         elif op in ("click", "dblclick", "state", "download"):
-            L, base = button(app, g[0]), slug(g[0])
+            L, base = button(app, g[0], ctx["page"]), slug(g[0]) + on(ctx["page"])
             st["loc"] = L
             if op in ("click", "dblclick"):
                 ctx["last_button"] = g[0]
@@ -207,7 +223,7 @@ def build_calls(app, a, defaults):
     driver.page.dblclick(L.{L})''')
                 line = f"co.{n}(driver)"
             elif op == "state":
-                line = f"co.{state_flujo(app, g[0], g[1])}(driver)"
+                line = f"co.{state_flujo(app, g[0], g[1], ctx['page'])}(driver)"
             else:
                 ctx["has_download"] = True
                 n = app.flujo(f"descargar_con_{base}_flujo", f'''def descargar_con_{base}_flujo(driver, downloads_dir, file_base_name):
@@ -224,23 +240,23 @@ def build_calls(app, a, defaults):
         elif op == "fill":
             ctx["first_input"] = i if ctx["first_input"] is None else ctx["first_input"]
             f = slug(g[0])
-            L = st["loc"] = app.loc(f"INPUT_{f.upper()}", f"role=textbox[name=\"{q(g[0])}\" i]", f"confirmar el selector del campo '{g[0]}'")
-            n = app.flujo(f"capturar_{f}_flujo", f'''def capturar_{f}_flujo(driver, {f}):
+            L = st["loc"] = app.loc(scoped(ctx["page"], f"INPUT_{f.upper()}"), f"role=textbox[name=\"{q(g[0])}\" i]", f"confirmar el selector del campo '{g[0]}'")
+            n = app.flujo(f"capturar_{f}{on(ctx['page'])}_flujo", f'''def capturar_{f}{on(ctx['page'])}_flujo(driver, {f}):
     """Captura el campo {g[0]}."""
     DriverWrapper(driver).send_keys(L.{L}, {f}, description="el campo {g[0]}")''')
             line = f"co.{n}(driver, {f})"
         elif op == "select":
             ctx["first_input"] = i if ctx["first_input"] is None else ctx["first_input"]
             f = slug(g[0])
-            L = st["loc"] = app.loc(f"SELECT_{f.upper()}", f"role=combobox[name=\"{q(g[0])}\" i]", f"confirmar el selector de '{g[0]}' y si la opción va por value o por label")
+            L = st["loc"] = app.loc(scoped(ctx["page"], f"SELECT_{f.upper()}"), f"role=combobox[name=\"{q(g[0])}\" i]", f"confirmar el selector de '{g[0]}' y si la opción va por value o por label")
             if app.widgets.get(f) == "combobox":  # custom (non-<select>) widget: open the list, pick the option
-                n = app.flujo(f"seleccionar_{f}_flujo", f'''def seleccionar_{f}_flujo(driver, {f}):
+                n = app.flujo(f"seleccionar_{f}{on(ctx['page'])}_flujo", f'''def seleccionar_{f}{on(ctx['page'])}_flujo(driver, {f}):
     """Selecciona {g[0]} (combobox personalizado: abre la lista y elige la opción)."""
     add_step("Seleccionando {g[0]}.")
     driver.page.click(L.{L})
     driver.page.get_by_role("option", name={f}, exact=True).click()''')
             else:
-                n = app.flujo(f"seleccionar_{f}_flujo", f'''def seleccionar_{f}_flujo(driver, {f}):
+                n = app.flujo(f"seleccionar_{f}{on(ctx['page'])}_flujo", f'''def seleccionar_{f}{on(ctx['page'])}_flujo(driver, {f}):
     """Selecciona {g[0]}."""
     add_step("Seleccionando {g[0]}.")
     driver.page.select_option(L.{L}, value={f})''')
@@ -317,9 +333,9 @@ def build_expected(app, a, ctx):
         elif op == "state_before_after":  # two checks at two moments: before any input, and right before clicking it
             before, after = ctx["first_input"], ctx["click_index"].get(g[0])
             if before and after != 0:  # both need a step before them to anchor to (index 0 has none)
-                out.append((e, f"co.{state_flujo(app, g[0], g[1])}(driver)", before - 1))
+                out.append((e, f"co.{state_flujo(app, g[0], g[1], ctx['page'])}(driver)", before - 1))
                 # never clicked in this case: "after" is the end of the test
-                out.append((e, f"co.{state_flujo(app, g[0], g[2])}(driver)", None if after is None else after - 1))
+                out.append((e, f"co.{state_flujo(app, g[0], g[2], ctx['page'])}(driver)", None if after is None else after - 1))
                 continue
         elif op == "order_in_section" and a["data"].get("order_number"):
             n = app.flujo("verificar_valor_en_seccion_flujo", TEXT_CHECKS["in_section"])
@@ -331,7 +347,7 @@ def build_expected(app, a, ctx):
         elif op == "download_ok" and ctx["has_download"]:
             line = 'assert archivo_descargado and os.path.exists(archivo_descargado), "La descarga no generó un archivo."'
         elif op == "rejected_client":
-            line = f"co.{state_flujo(app, g[0], g[1])}(driver)"
+            line = f"co.{state_flujo(app, g[0], g[1], ctx['page'])}(driver)"
             if ctx["has_mock"]:
                 line += '\n    assert mock.count == 0, "Se envió una petición aunque el archivo debía rechazarse en el cliente."'
         elif op == "max_posts" and ctx["has_mock"]:
@@ -351,7 +367,7 @@ def build_expected(app, a, ctx):
     """Verifica que no quede un indicador de carga atascado."""
     expect(driver.page.locator(L.SPINNER).first).to_be_hidden()
     add_step("No hay indicador de carga atascado.", "Exitoso")''')
-            line = f"co.{state_flujo(app, ctx['last_button'], g[0])}(driver)\n    co.{m}(driver)"  # g[0]: enabled | disabled, as the case says
+            line = f"co.{state_flujo(app, ctx['last_button'], g[0], ctx['page'])}(driver)\n    co.{m}(driver)"  # g[0]: enabled | disabled, as the case says
         anchor = ctx["anchor_index"].get(ANCHORS.get(op)) if op in ANCHORS else None
         out.append((e, line, anchor))
     return out

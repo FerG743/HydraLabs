@@ -13,7 +13,7 @@ func fakeEnv(t *testing.T, pending, runner string) Config {
 	tools := filepath.Join(dir, "tools")
 	os.MkdirAll(tools, 0o755)
 	w := func(name, body string) { os.WriteFile(filepath.Join(tools, name), []byte(body), 0o644) }
-	w("render_pytest.py", "import json,sys,os\na=sys.argv; out=a[a.index('--out')+1]\nos.makedirs(out+'/tests/App',exist_ok=True)\nprint(json.dumps([{'pending':"+pending+"}]))")
+	w("render_pytest.py", "import json,sys,os\na=sys.argv; out=a[a.index('--out')+1]\nos.makedirs(out+'/tests/App',exist_ok=True)\nk=a[a.index('--only')+1].lower().replace('-','_'); open(out+'/tests/App/test_'+k+'.py','w').close()\nprint(json.dumps([{'pending':"+pending+"}]))")
 	w("run_generated.py", runner)
 	w("agent.py", "import json,os,sys; os.makedirs(sys.argv[sys.argv.index('--repo')+1],exist_ok=True); print(json.dumps({'finished':True,'problems':[],'summary':'ok','tokens':1234}))")
 	c := Config{Out: filepath.Join(dir, "out"), ToolsDir: tools, AppMap: dir, Python: "python3", App: "App", Lang: "en",
@@ -137,11 +137,23 @@ func TestAppSlugMatchesTheRenderer(t *testing.T) { // same table as AppSlugTest 
 	}
 }
 
+func TestExecuteOfACaseThatEndedAtReviewBuildsItInstead(t *testing.T) {
+	c := fakeEnv(t, "[]", passes)
+	os.MkdirAll(filepath.Join(c.bundleDir("ABC-1"), "tests", "App"), 0o755) // what a needs-review render leaves: the folder, no test
+	if c.built("ABC-1") {
+		t.Fatal("an empty tests/ folder is not a built test")
+	}
+	if r := c.Route("ABC-1", "execute"); r.Tier == "T0-existing" {
+		t.Errorf("there is no test to execute: it must be automated first, not run and fail on a missing file: %+v", r)
+	}
+}
+
 func TestExecuteUsesTheDataKeptInTheTestRepo(t *testing.T) {
 	// the stub runner reports what the bundle's data file holds, as the stored test would read it
 	c := fakeEnv(t, "[]", "import json,sys,os\nd=sys.argv[sys.argv.index('--out')+1]+'/apps/App/data/abc_1_data.csv'\n"+
 		"print(json.dumps({'status':'passed' if 'B-00456' in open(d).read() else 'failed','error':open(d).read()}))")
-	os.MkdirAll(filepath.Join(c.bundleDir("ABC-1"), "tests"), 0o755)
+	os.MkdirAll(filepath.Join(c.bundleDir("ABC-1"), "tests", "App"), 0o755)
+	os.WriteFile(filepath.Join(c.bundleDir("ABC-1"), c.testFile("ABC-1")), nil, 0o644)
 	writeData := func(dir, boleta string) {
 		p := filepath.Join(dir, "apps", "App", "data", "abc_1_data.csv")
 		os.MkdirAll(filepath.Dir(p), 0o755)

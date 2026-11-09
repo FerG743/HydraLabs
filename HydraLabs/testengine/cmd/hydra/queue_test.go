@@ -56,7 +56,7 @@ func TestClassifyKnowsTheCostBeforeItIsPaid(t *testing.T) {
 		t.Errorf("an incomplete case costs nothing: %s (%s)", classNames[cl], why)
 	}
 	// a stored test: free, and classification must not touch the stored bundle
-	marker := filepath.Join(c.bundleDir("ABC-1"), "tests", "keep.txt")
+	marker := filepath.Join(c.bundleDir("ABC-1"), c.testFile("ABC-1"))
 	os.MkdirAll(filepath.Dir(marker), 0o755)
 	os.WriteFile(marker, []byte("stored"), 0o644)
 	if cl, _ := classify(&c, "ABC-1", "execute"); cl != classFree || !fileExists(marker) {
@@ -132,7 +132,8 @@ func TestPollRunsEverythingCheapestFirstAndHoldsBackTheSecondModelCase(t *testin
 	t.Setenv("ORDER_LOG", log)
 	a, b := fakeProject(t, "A", "['1: weird step']"), fakeProject(t, "B", "[]") // A needs the model, B maps cleanly
 	// B-9 is an execute that already has its test
-	os.MkdirAll(filepath.Join(b.bundleDir("B-9"), "tests"), 0o755)
+	os.MkdirAll(filepath.Dir(filepath.Join(b.bundleDir("B-9"), b.testFile("B-9"))), 0o755)
+	os.WriteFile(filepath.Join(b.bundleDir("B-9"), b.testFile("B-9")), nil, 0o644)
 	fakeJira(t, map[string][]string{"A": {"A-1", "A-2"}, "B": {"B-1", "B-9"}})
 
 	if _, err := Poll([]*Config{a, b}, PollOpts{ModelCases: 1}); err != nil {

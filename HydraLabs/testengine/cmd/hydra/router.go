@@ -179,7 +179,7 @@ func (c Config) Route(key, intent string) (r Run) {
 	}
 	c.live("case", key, map[string]any{"intent": intent, "title": c.caseTitle(key)})
 	if intent == "execute" {
-		if _, err := os.Stat(filepath.Join(c.bundleDir(key), "tests")); err == nil {
+		if c.built(key) {
 			r.Tier = "T0-existing"
 			from, err := c.useRepoData(key)
 			if err != nil {

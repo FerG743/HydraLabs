@@ -1,5 +1,5 @@
 """Playlist checks and value passing, with a fake runner (no browser). Run: python3 -m unittest test_playlist"""
-import csv, os, shutil, sys, tempfile, unittest
+import csv, json, os, shutil, sys, tempfile, unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "support"))
@@ -163,3 +163,25 @@ class OverrideRow(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RenderFlow(unittest.TestCase):
+    """A playlist renders all its cases into one folder: --only takes a comma-separated list."""
+
+    def test_only_renders_every_listed_case_into_one_folder(self):
+        import subprocess
+        d = tempfile.mkdtemp()
+        try:
+            cases = os.path.join(d, "cases")
+            os.makedirs(cases)
+            for i in (1, 2, 3):
+                with open(os.path.join(cases, f"c{i}.case.json"), "w", encoding="utf-8") as f:
+                    json.dump({"id": f"DWQ-90{i}", "name": f"TC-{i} - caso {i}", "status": "ready",
+                               "steps": [{"n": "1", "action": "Navigate to /x"}], "expected": [{"text": "ok"}]}, f)
+            out = os.path.join(d, "out")
+            subprocess.run([sys.executable, "render_pytest.py", "--cases", cases, "--only", "DWQ-901,DWQ-903",
+                            "--app", "App", "--out", out], check=True, capture_output=True)
+            tests = sorted(os.listdir(os.path.join(out, "tests", "App")))
+            self.assertEqual(tests, ["test_dwq_901.py", "test_dwq_903.py"])
+        finally:
+            shutil.rmtree(d, ignore_errors=True)

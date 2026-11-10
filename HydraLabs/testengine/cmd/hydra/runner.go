@@ -25,6 +25,11 @@ func boardArgs(action, project, registry, key string) ([]string, error) {
 			return nil, fmt.Errorf("%q is not a case key", key)
 		}
 		return append([]string{"poll"}, append(base, "--only", key, "--intent", action)...), nil
+	case "playlist-check", "playlist-run": // the flow's name is the key: hydra/playlists/<name>.json
+		if !playlistName.MatchString(key) {
+			return nil, fmt.Errorf("%q is not a playlist name", key)
+		}
+		return append([]string{"playlist", strings.TrimPrefix(action, "playlist-"), "--name", key}, base...), nil
 	}
 	return nil, fmt.Errorf("unknown action %q", action)
 }

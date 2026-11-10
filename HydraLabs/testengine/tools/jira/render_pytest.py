@@ -481,7 +481,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cases", required=True, help="directory with *.case.json (cmd output of the Jira workflow)")
     ap.add_argument("--include-review", action="store_true", help="also read <cases>/review")
-    ap.add_argument("--only", default="", help="render just this case id; the other cases in --cases still supply the default values")
+    ap.add_argument("--only", default="", help="render just these case ids (comma-separated); the other cases in --cases still supply the default values")
     ap.add_argument("--app", required=True, help="app folder name, e.g. CobroOrdenes")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
@@ -497,8 +497,9 @@ def main():
         for k, v in an["data"].items():
             defaults.setdefault(k, v)
 
-    if a.only:  # defaults above came from every case; from here on only the requested one is written
-        keep = [i for i, c in enumerate(cases) if c["id"] == a.only]
+    if a.only:  # defaults above came from every case; from here on only the requested ones are written
+        wanted = set(a.only.split(","))  # a playlist renders its whole flow into one folder: one shared locators file
+        keep = [i for i, c in enumerate(cases) if c["id"] in wanted]
         cases, analyses = [cases[i] for i in keep], [analyses[i] for i in keep]
     app_dir, tests_dir = os.path.join(a.out, "apps", a.app), os.path.join(a.out, "tests", a.app)
     confirmed_path = os.path.join(app_dir, "locators.confirmed.json")

@@ -194,6 +194,13 @@ func (c Config) BoardUI(addr string) error {
 	mux.Handle("/crawl/", http.StripPrefix("/crawl", crawlView(filepath.Join(c.Out, "crawl", "events.jsonl"))))
 	mux.Handle("/cases/", http.StripPrefix("/cases", c.casesView()))
 	mux.Handle("/help/", http.StripPrefix("/help", helpView()))
+	mux.HandleFunc("/playlists/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, playlistsPage)
+	})
+	mux.HandleFunc("/api/playlists", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(c.playlistNames())
+	})
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("cannot serve on %s (%v): pick another port with --addr 127.0.0.1:8091", addr, err)
@@ -260,6 +267,7 @@ dialog footer button{font:inherit;padding:7px 14px;border-radius:6px;border:1px 
 <section class=tile><h2>Live pipeline<span class=sp></span><a href="live/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe src="live/" title="Live pipeline"></iframe></section>
 <section class=tile><h2>Last crawl<span class=sp></span><a href="crawl/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe src="crawl/" title="Last crawl"></iframe></section>
 <section class=tile><h2>Commands<span class=sp></span><a href="help/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe src="help/" title="Command reference"></iframe></section>
+<section class=tile><h2>Playlists<span class=sp></span><a href="playlists/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe src="playlists/" title="Playlists"></iframe></section>
 </main>
 <script>
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));

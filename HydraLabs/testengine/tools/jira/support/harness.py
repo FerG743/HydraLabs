@@ -51,10 +51,15 @@ def _sign_in(page, base_url, login):
     mod.sign_in(page, base_url, login)
 
 
-def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=None, slow_ms=0, login=None):
+def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=None, slow_ms=0, login=None,
+        overrides=None, captures=None):
+    """overrides: {column: value} written into this case's data row (a playlist's `with`).
+    captures: {name: css selector} read from the page after the test passes; result["captured"] holds them."""
     from playwright.sync_api import sync_playwright
     work = tempfile.mkdtemp(prefix="hydra_run_")
     shutil.copytree(out_dir, work, dirs_exist_ok=True)
+    if overrides:
+        _override_row(os.path.join(work, "apps"), token, overrides)
     for rel, src in STUBS.items():
         path = os.path.join(work, rel)
         if not os.path.exists(path):  # never clobber generated utils (test_files, network_mock)
@@ -64,7 +69,7 @@ def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=No
     for m in [m for m in sys.modules if m.split(".")[0] in ("apps", "utils", "config")]:
         del sys.modules[m]
     sys.path.insert(0, work)
-    result = {"test": token, "status": None, "error": None, "aborted_writes": [], "steps": []}
+    result = {"test": token, "status": None, "error": None, "aborted_writes": [], "steps": [], "captured": {}}
     try:
         import config.settings as settings
         settings.Config.BASE_URL = base_url
@@ -93,6 +98,12 @@ def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=No
                     _sign_in(page, base_url, login)  # before the guard: signing in is the one write a read-only run makes
                 page.route("**/*", net)
                 fn(Driver(page))
+                for name, selector in (captures or {}).items():  # the end state of this case, read before the browser closes
+                    try:
+                        result["captured"][name] = page.locator(selector).first.evaluate(
+                            "e => 'value' in e ? e.value : e.innerText", timeout=8000)  # the stub Config's PLAYWRIGHT_TIMEOUT
+                    except Exception as e:
+                        raise RuntimeError(f"capture {name}: could not read {selector}: {str(e).strip()[:200]}")
                 result["status"] = "passed"
             except Skipped as e:
                 result["status"], result["error"] = "skipped", str(e)
@@ -113,6 +124,21 @@ def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=No
         sys.path.remove(work)
         shutil.rmtree(work, ignore_errors=True)
     return result
+
+
+def _override_row(apps_dir, token, overrides):
+    """Rewrite the one data row of this case's CSV (in the work copy only). Columns come from the generated header."""
+    import csv, glob
+    path = glob.glob(os.path.join(apps_dir, "*", "data", f"{token}_data.csv"))[0]
+    with open(path, newline="", encoding="utf-8") as f:
+        rows = list(csv.reader(f))
+    header = rows[0]
+    for col, value in overrides.items():
+        if col not in header:
+            raise KeyError(f"{token}: no data column {col!r} (columns: {', '.join(header[1:])})")
+        rows[1][header.index(col)] = value
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        csv.writer(f, lineterminator="\n").writerows(rows)
 
 
 def _tests_dir(work):

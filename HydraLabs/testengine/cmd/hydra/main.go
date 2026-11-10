@@ -223,6 +223,9 @@ func report(r Run) {
 		return
 	}
 	fmt.Printf("%-10s %-8s %-12s %-13s tokens=%d %dms\n", r.Key, r.Intent, r.Tier, r.Status, r.Tokens, r.Millis)
+	if r.Title != "" {
+		fmt.Println("           " + r.Title)
+	}
 	for _, d := range r.Detail {
 		fmt.Println("           " + d)
 	}
@@ -360,6 +363,8 @@ func main() {
 		addr := fs.String("addr", ":8099", "where to serve the page")
 		fs.Parse(os.Args[2:])
 		err = cfg.Watch(*addr)
+	case "playlist": // an ordered flow of cases with values passed forward: check it, or run it (testengine/PLAYLISTS.md)
+		err = cfg.playlistCmd(os.Args[2:])
 	case "history": // read-only: every recorded execution of a project, or of one case
 		key, last, asJSON := fs.String("key", "", "only this case"), fs.Int("last", 30, "newest N (0 = all)"), fs.Bool("json", false, "machine-readable")
 		fs.Parse(os.Args[2:])

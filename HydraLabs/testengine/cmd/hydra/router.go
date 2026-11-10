@@ -73,6 +73,7 @@ type Config struct {
 
 type Run struct {
 	Key     string   `json:"key"`
+	Title   string   `json:"title,omitempty"` // the case's name, so a log line says what it is, not just its ID
 	Intent  string   `json:"intent"`
 	Tier    string   `json:"tier"`
 	Status  string   `json:"status"` // passed | failed | rendered | needs-review
@@ -183,7 +184,7 @@ func (c Config) useRepoData(key string) (string, error) {
 // Route resolves references across everything stored, then runs the cheapest tier for this issue.
 func (c Config) Route(key, intent string) (r Run) {
 	t0 := time.Now()
-	r = Run{Key: key, Intent: intent}
+	r = Run{Key: key, Intent: intent, Title: c.caseTitle(key)}
 	defer func() {
 		r.Millis = time.Since(t0).Milliseconds()
 		writeJSON(filepath.Join(c.Out, "runs", key+".json"), r)

@@ -308,7 +308,7 @@ func Poll(cfgs []*Config, o PollOpts) (gated bool, err error) {
 		}
 	}
 	for _, jb := range deferred { // not recorded as seen: the next poll picks them up
-		report(Run{Key: jb.key, Intent: jb.intent, Tier: "queue", Status: "deferred",
+		report(Run{Key: jb.key, Title: jb.cfg.caseTitle(jb.key), Intent: jb.intent, Tier: "queue", Status: "deferred",
 			Detail: []string{fmt.Sprintf("%s: waits for the next poll (model cap is %d per poll)", jb.why, max(o.ModelCases, 1))}})
 	}
 	for cfg, seen := range states {

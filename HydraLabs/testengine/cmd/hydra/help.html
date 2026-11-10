@@ -1,0 +1,253 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Hydra Command Reference</title>
+<style>
+/* Layout: one column of reference sections, a filter box at the top, flat rows per command. */
+:root {
+  --bg: #f7f7f5; --fg: #1d1f23; --muted: #5d636d; --line: #d9dbe0;
+  --card: #ffffff; --code: #eef0f3; --accent: #1f6feb; --warn: #9a5b00;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171b; --fg: #e8eaed; --muted: #9aa1ab; --line: #2c3038;
+    --card: #1d2026; --code: #252a33; --accent: #6aa5ff; --warn: #e0a84f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171b; --fg: #e8eaed; --muted: #9aa1ab; --line: #2c3038;
+  --card: #1d2026; --code: #252a33; --accent: #6aa5ff; --warn: #e0a84f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+main { max-width: 760px; margin: 0 auto; }
+h1 { font-size: 26px; margin: 0 0 4px; text-wrap: balance; }
+h2 { font-size: 18px; margin: 36px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+p { margin: 8px 0; max-width: 65ch; }
+.lede { color: var(--muted); margin-bottom: 16px; }
+input[type="search"] {
+  width: 100%; font: inherit; color: var(--fg); background: var(--card);
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 12px 0 4px;
+}
+input[type="search"]:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+.cmd {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; margin: 12px 0; min-width: 0;
+}
+.cmd h3 { font: 600 15px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 0 0 6px; overflow-wrap: anywhere; }
+.usage {
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code);
+  border-radius: 6px; padding: 8px 10px; overflow-x: auto; white-space: pre; margin: 8px 0;
+}
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 8px 0 0; }
+dt { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent); overflow-wrap: anywhere; }
+dd { margin: 0; color: var(--fg); min-width: 0; }
+@media (max-width: 480px) {
+  dl { grid-template-columns: 1fr; gap: 2px 0; }
+  dd { margin-bottom: 8px; }
+}
+.tag { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; margin-right: 4px; }
+.warn { color: var(--warn); }
+table { width: 100%; border-collapse: collapse; margin: 8px 0; display: block; overflow-x: auto; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 13px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+.hidden-by-filter { display: none; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+  <h1>Hydra Command Reference</h1>
+  <p class="lede">Every <code>hydra</code> command, what it does and its flags. Run them from <code>HydraLabs/testengine</code> with <code>go run ./cmd/hydra &lt;command&gt;</code>, or with the built binary. Hydra loads your secrets from <code>~/.hydra.env</code> and <code>HydraLabs/.hydra.env</code> on its own.</p>
+
+  <label for="filter" class="tag">Filter</label>
+  <input id="filter" type="search" placeholder="Search commands, e.g. deliver, Jira, runs" aria-label="Filter commands">
+
+  <h2>Common flags</h2>
+  <dl>
+    <dt>--project KEY</dt><dd>A project registered in <code>projects.json</code>, e.g. <code>DWQ</code>. Most commands need one, or they run for every registered project.</dd>
+    <dt>--registry FILE</dt><dd>Path to <code>projects.json</code>. Found automatically in the default location.</dd>
+    <dt>--profile FILE</dt><dd>A profile file for one app, used without a registry (the older single-app layout).</dd>
+  </dl>
+
+  <h2>Use it day to day</h2>
+
+  <div class="cmd" data-search="board page buttons crawl deliver poll automate execute stop">
+    <h3>hydra board</h3>
+    <p>One page with every view of a project side by side, and buttons for each action. Start here.</p>
+    <div class="usage">hydra board --project DWQ [--addr 127.0.0.1:8090]</div>
+    <dl>
+      <dt>--addr</dt><dd>Where to serve the page. Localhost only by default.</dd>
+    </dl>
+    <p>Buttons: <strong>Crawl</strong>, <strong>Poll</strong>, <strong>Deliver</strong>, <strong>Automate</strong> or <strong>Execute</strong> one case, and <strong>Stop</strong> the running action.</p>
+  </div>
+
+  <div class="cmd" data-search="cases write test cases page markdown">
+    <h3>hydra cases</h3>
+    <p>A local page to write the app's test cases into <code>cases/&lt;KEY&gt;.md</code>, which you commit. No repository editing needed.</p>
+    <div class="usage">hydra cases --project DWQ [--addr 127.0.0.1:8098]</div>
+  </div>
+
+  <div class="cmd" data-search="watch live view runs read only">
+    <h3>hydra watch</h3>
+    <p>Read-only live view of every stage the app's runs go through. Changes nothing.</p>
+    <div class="usage">hydra watch --project DWQ [--addr :8099]</div>
+  </div>
+
+  <div class="cmd" data-search="run one case route key intent html summary">
+    <h3>hydra run</h3>
+    <p>Routes one case through the pipeline: automate or execute it, and record the result. Use <code>--html</code> to ingest a rendered description first.</p>
+    <div class="usage">hydra run --project DWQ --key DWQ-132 [--intent automate|execute] [--html FILE] [--summary TEXT]</div>
+  </div>
+
+  <div class="cmd" data-search="automate build case from its text jira">
+    <h3>hydra automate &lt;CASE-KEY&gt;</h3>
+    <p>Build the automated test for one case from its Jira text, then run it against the app. The project is found from the key prefix, so <code>--project</code> is optional.</p>
+    <div class="usage">hydra automate DWQ-L1 [--project DWQ]</div>
+  </div>
+
+  <div class="cmd" data-search="execute run existing test stored case">
+    <h3>hydra execute &lt;CASE-KEY&gt;</h3>
+    <p>Run a case's test as it is already built, using the test repo's data. Nothing is generated.</p>
+    <div class="usage">hydra execute DWQ-L1 [--project DWQ]</div>
+  </div>
+
+  <div class="cmd" data-search="poll jira labels automate execute process issues">
+    <h3>hydra poll</h3>
+    <p>Look at Jira issues labeled <code>automate</code> or <code>execute</code> and process each one. Without <code>--project</code>, it polls every registered project.</p>
+    <div class="usage">hydra poll [--project DWQ] [--only DWQ-139] [--intent automate|execute] [--force] [--comment] [--jql QUERY] [--json] [--model-cases N]</div>
+    <dl>
+      <dt>--only KEY</dt><dd>Process just this issue, e.g. for a manual trigger.</dd>
+      <dt>--intent</dt><dd>With <code>--only</code>: treat the issue as <code>automate</code> or <code>execute</code> even without the label.</dd>
+      <dt>--force</dt><dd>Run again even if the issue was already seen.</dd>
+      <dt>--comment</dt><dd>Post outcomes that need a person to the Jira issue. Off by default until results are trusted.</dd>
+      <dt>--jql</dt><dd>Which issues to look at. Default: issues labeled <code>automate</code> or <code>execute</code>.</dd>
+      <dt>--json</dt><dd>One JSON object per run, for n8n or scripts.</dd>
+      <dt>--model-cases</dt><dd>Cases allowed to use the model per poll. The rest wait for the next poll.</dd>
+    </dl>
+  </div>
+
+  <div class="cmd" data-search="deliver commit review branch runs stability">
+    <h3>hydra deliver</h3>
+    <p>Run each passing case several times in the real framework, then commit the ones that passed every run on a local review branch in the app's repo. Nothing is pushed or merged.</p>
+    <div class="usage">hydra deliver --project DWQ [--only DWQ-130,DWQ-131] [--exclude KEY,...] [--repo PATH] [--runs 3]</div>
+    <dl>
+      <dt>--only / --exclude</dt><dd>Comma-separated case keys to include or leave out.</dd>
+      <dt>--runs</dt><dd>Consecutive passes a case needs. Default 3. A flaky case blocks the whole delivery.</dd>
+      <dt>--repo</dt><dd>The framework repo that receives the tests.</dd>
+    </dl>
+    <p class="warn">A case that writes data writes once per run, so use a QA environment that can take it.</p>
+  </div>
+
+  <h2>Set up and check</h2>
+
+  <div class="cmd" data-search="init onboard team questions answers">
+    <h3>hydra init</h3>
+    <p>Set up a new team by answering questions one at a time. Nothing is written until you confirm at the end.</p>
+    <div class="usage">hydra init [--answers team.json] [--yes] [--no-preview]</div>
+    <dl>
+      <dt>--answers FILE</dt><dd>Answers in a file, for CI. Questions covered by the file are not asked.</dd>
+      <dt>--yes</dt><dd>No prompts. Missing answers take their defaults.</dd>
+      <dt>--no-preview</dt><dd>Skip the one-page preview crawl.</dd>
+    </dl>
+  </div>
+
+  <div class="cmd" data-search="onboard project repo create hydra app repository">
+    <h3>hydra onboard</h3>
+    <p>Create the <code>Hydra-&lt;App&gt;</code> repository for a registered project, if it does not exist yet. A second run changes nothing.</p>
+    <div class="usage">hydra onboard --project DWQ</div>
+    <p>Exits with code 3 if a setting is still missing (for example the app URL).</p>
+  </div>
+
+  <div class="cmd" data-search="status projects read only overview">
+    <h3>hydra status</h3>
+    <p>Read-only, no Jira calls. Shows the state of every tracked project.</p>
+    <div class="usage">hydra status [--json]</div>
+  </div>
+
+  <div class="cmd" data-search="history executions past runs case">
+    <h3>hydra history</h3>
+    <p>Read-only list of past executions for a project, or for one case.</p>
+    <div class="usage">hydra history --project DWQ [--key DWQ-132] [--last 30] [--json]</div>
+    <dl>
+      <dt>--last</dt><dd>Show the newest N. Use 0 for all.</dd>
+    </dl>
+  </div>
+
+  <h2>Crawl, design and announce</h2>
+
+  <div class="cmd" data-search="crawl app pages elements locators labs addon">
+    <h3>hydra crawl</h3>
+    <p>Visit the app, record its pages and elements, and find the best locator for each. Needs the <code>labs</code> add-on enabled for the project.</p>
+    <div class="usage">hydra crawl --project DWQ [--watch :8099] [--headed] [--store] [--video] [--slow MS]</div>
+    <dl>
+      <dt>--store</dt><dd>Save the crawl in the app's repo, on a review branch.</dd>
+      <dt>--watch</dt><dd>Serve a live view of the crawl at this address.</dd>
+      <dt>--headed / --video / --slow</dt><dd>Show the browser, record a video, or slow each step down for demos.</dd>
+    </dl>
+  </div>
+
+  <div class="cmd" data-search="design draft cases requirement jira create story">
+    <h3>hydra design</h3>
+    <p>Draft test cases from a requirement. Drafts go to Jira only after you review them and confirm.</p>
+    <div class="usage">hydra design --project DWQ --from requirement.txt [--max 3]
+hydra design --project DWQ --story DWQ-129 [--max 3]
+hydra design --project DWQ --create last --parent DWQ-129 [--type Task] [--yes]</div>
+    <dl>
+      <dt>--from / --story</dt><dd>The requirement, as a text file or as a Jira story key.</dd>
+      <dt>--max</dt><dd>The most cases to draft. Default 3.</dd>
+      <dt>--create</dt><dd>Create the drafts that passed in a saved run (a folder, or <code>last</code>) in Jira, under <code>--parent</code>. Asks first unless <code>--yes</code>.</dd>
+    </dl>
+  </div>
+
+  <div class="cmd" data-search="announce backfill comment jira delivered post">
+    <h3>hydra announce</h3>
+    <p>Backfill: post Jira comments on cases delivered before write-back existed. Dry run by default.</p>
+    <div class="usage">hydra announce --project DWQ [--keys DWQ-1,DWQ-2] [--post]</div>
+    <p>Without <code>--post</code>, it only prints what would be posted.</p>
+  </div>
+
+  <h2>Playlists (new, script only)</h2>
+  <div class="cmd" data-search="playlist flow check run capture values">
+    <h3>playlist.py check / run</h3>
+    <p>Run an ordered flow of ready cases where later steps use values captured earlier, such as an order number. This is a separate script, not yet a <code>hydra</code> command. See <code>testengine/PLAYLISTS.md</code>.</p>
+    <div class="usage">python3 tools/jira/playlist.py check --playlist flow.json --cases cases.json --out automation
+python3 tools/jira/playlist.py run   --playlist flow.json --cases cases.json --out automation --base-url http://host:3000 [--allow-writes] [--record out/playlist.json]</div>
+  </div>
+
+  <h2>Exit codes</h2>
+  <table>
+    <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>0</td><td>Done. A passing run also exits 0.</td></tr>
+      <tr><td>1</td><td>An error, or a test run failed.</td></tr>
+      <tr><td>2</td><td>Wrong usage: a missing argument or flag.</td></tr>
+      <tr><td>3</td><td>The pipeline stopped and needs a person (for example <code>poll</code>, <code>deliver</code> or <code>onboard</code> waiting on a decision).</td></tr>
+    </tbody>
+  </table>
+
+  <p class="lede">Not sure where to start? Run <code>hydra board --project KEY</code> and use the buttons.</p>
+</main>
+
+<script>
+(function () {
+  var input = document.getElementById("filter");
+  var cards = Array.prototype.slice.call(document.querySelectorAll(".cmd"));
+  input.addEventListener("input", function () {
+    var q = input.value.trim().toLowerCase();
+    cards.forEach(function (c) {
+      var text = (c.textContent + " " + (c.getAttribute("data-search") || "")).toLowerCase();
+      c.classList.toggle("hidden-by-filter", q !== "" && text.indexOf(q) === -1);
+    });
+  });
+})();
+</script>

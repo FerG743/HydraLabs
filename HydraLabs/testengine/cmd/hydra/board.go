@@ -193,6 +193,7 @@ func (c Config) BoardUI(addr string) error {
 	mux.Handle("/live/", http.StripPrefix("/live", c.liveView()))
 	mux.Handle("/crawl/", http.StripPrefix("/crawl", crawlView(filepath.Join(c.Out, "crawl", "events.jsonl"))))
 	mux.Handle("/cases/", http.StripPrefix("/cases", c.casesView()))
+	mux.Handle("/help/", http.StripPrefix("/help", helpView()))
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("cannot serve on %s (%v): pick another port with --addr 127.0.0.1:8091", addr, err)
@@ -258,6 +259,7 @@ dialog footer button{font:inherit;padding:7px 14px;border-radius:6px;border:1px 
 <section class="tile cases"><h2>Cases<span class=tabs role=tablist aria-label="Cases"><button type=button role=tab id=t-status aria-controls=cases aria-selected=true>Status</button><button type=button role=tab id=t-write aria-controls=p-write aria-selected=false tabindex=-1>Write a case</button></span><span class=sp></span><span id=srcinfo style="text-transform:none;letter-spacing:0"></span><a id=writeopen href="cases/" target=_blank hidden>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><div class=body id=cases role=tabpanel aria-labelledby=t-status></div><iframe id=p-write role=tabpanel aria-labelledby=t-write title="Write a case" hidden></iframe></section>
 <section class=tile><h2>Live pipeline<span class=sp></span><a href="live/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe src="live/" title="Live pipeline"></iframe></section>
 <section class=tile><h2>Last crawl<span class=sp></span><a href="crawl/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe src="crawl/" title="Last crawl"></iframe></section>
+<section class=tile><h2>Commands<span class=sp></span><a href="help/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe src="help/" title="Command reference"></iframe></section>
 </main>
 <script>
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));

@@ -52,9 +52,10 @@ def _sign_in(page, base_url, login):
 
 
 def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=None, slow_ms=0, login=None,
-        overrides=None, captures=None):
+        overrides=None, captures=None, video_dir=None):
     """overrides: {column: value} written into this case's data row (a playlist's `with`).
-    captures: {name: css selector} read from the page after the test passes; result["captured"] holds them."""
+    captures: {name: css selector} read from the page after the test passes; result["captured"] holds them.
+    video_dir: save a .webm of the test's browser there (for people watching a demo)."""
     from playwright.sync_api import sync_playwright
     work = tempfile.mkdtemp(prefix="hydra_run_")
     shutil.copytree(out_dir, work, dirs_exist_ok=True)
@@ -84,7 +85,8 @@ def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=No
         from _pytest.outcomes import Skipped
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=not headed, slow_mo=slow_ms)
-            page = browser.new_context(viewport={"width": 1280, "height": 900}).new_page()
+            ctx_opts = {"record_video_dir": video_dir, "record_video_size": {"width": 1280, "height": 800}} if video_dir else {}
+            page = browser.new_context(viewport={"width": 1280, "height": 900}, **ctx_opts).new_page()
             extra = [h for h in os.environ.get("HYDRA_WRITE_HOSTS", "").split(",") if h]
 
             def net(route, request):  # registered first = lowest priority, so a test's own RequestMock wins
@@ -119,6 +121,8 @@ def run(out_dir, token, base_url, allow_writes=False, headed=False, shots_dir=No
                         pass
                 import utils.templete_report as tr
                 result["steps"] = list(getattr(tr, "STEPS", []))
+                if video_dir:  # a video is written when its context closes; close it before the browser goes
+                    page.context.close()
                 browser.close()
     finally:
         sys.path.remove(work)

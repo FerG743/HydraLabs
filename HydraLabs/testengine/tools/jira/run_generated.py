@@ -20,8 +20,10 @@ if __name__ == "__main__":
     ap.add_argument("--shots", default="")
     ap.add_argument("--login", default="", help="the crawl's sign-in steps (ENV: tokens); the test signs in first")
     ap.add_argument("--login-path", default="/")
+    ap.add_argument("--video", default="", help="save a .webm of the browser in this folder (for demos)")
     a = ap.parse_args()
     login = {"path": a.login_path or "/", "steps": json.load(open(a.login, encoding="utf-8"))} if a.login else None
-    r = harness.run(a.out, a.test, a.base_url, a.allow_writes, a.headed, a.shots or None, a.slow, login)
+    r = harness.run(a.out, a.test, a.base_url, a.allow_writes, a.headed, a.shots or None, a.slow, login,
+                    video_dir=a.video or None)
     print(json.dumps(r, indent=2, ensure_ascii=False))
     sys.exit(0 if r["status"] == "passed" else 1)

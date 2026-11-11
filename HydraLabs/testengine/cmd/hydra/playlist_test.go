@@ -51,3 +51,31 @@ func TestBoardRunsAPlaylistThroughTheSameCommand(t *testing.T) {
 		t.Fatal("a playlist name with a path was accepted")
 	}
 }
+
+func TestSavePlaylistWritesAndCommitsTheFlowInOrder(t *testing.T) {
+	c := casesRepo(t)
+	c.Out = filepath.Join(t.TempDir(), "out")
+	os.MkdirAll(c.caseDir(), 0o755)
+	for _, id := range []string{"SHOP-1", "SHOP-2"} {
+		body := `{"id":"` + id + `","name":"case ` + id + `","status":"ready","steps":[{"n":"1","action":"Navigate to /x"}],"expected":[{"text":"ok"}]}`
+		os.WriteFile(filepath.Join(c.caseDir(), id+".case.json"), []byte(body), 0o644)
+	}
+	if err := c.savePlaylist("flow-a", []string{"SHOP-2", "SHOP-1"}); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(c.durable("playlists", "flow-a.json"))
+	if s := string(b); strings.Index(s, "SHOP-2") > strings.Index(s, "SHOP-1") {
+		t.Fatalf("steps not in the order picked: %s", s)
+	}
+	if st, _ := git(c.Home, "status", "--porcelain"); st != "" {
+		t.Errorf("saved means committed: %q", st)
+	}
+	if got := c.playlistNames(); len(got) != 1 || got[0] != "flow-a" {
+		t.Errorf("the board does not list the new flow: %v", got)
+	}
+	for name, ids := range map[string][]string{"flow-a": {"SHOP-1"}, "flow-b": {"SHOP-9"}, "flow-c": nil, "../x": {"SHOP-1"}} {
+		if err := c.savePlaylist(name, ids); err == nil {
+			t.Errorf("savePlaylist(%q, %v) was accepted", name, ids)
+		}
+	}
+}

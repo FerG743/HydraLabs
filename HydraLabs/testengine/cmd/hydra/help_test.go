@@ -15,7 +15,7 @@ func TestHelpPageIsServedAndLinkedFromTheBoard(t *testing.T) {
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Hydra Command Reference") {
 		t.Fatalf("help page not served: %d", rec.Code)
 	}
-	if !strings.Contains(boardPage, `src="help/"`) {
+	if !strings.Contains(boardPage, `'help/'`) { // the board's pipeline tile lists it as a tab
 		t.Fatal("the board does not embed the help page")
 	}
 }

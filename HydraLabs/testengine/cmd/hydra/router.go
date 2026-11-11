@@ -445,6 +445,9 @@ func (c Config) verifyRun(key string) Verdict {
 	if c.Show {
 		args = append(args, "--headed", "--slow", strconv.Itoa(c.showSlow()))
 	}
+	if c.RecordVideo { // poll --video: a .webm of each verified run, for demos
+		args = append(args, "--video", filepath.Join(c.Out, "verify", "videos"))
+	}
 	var out, errb bytes.Buffer
 	cmd := exec.Command(c.Python, args...)
 	cmd.Stdout, cmd.Stderr = &out, &errb

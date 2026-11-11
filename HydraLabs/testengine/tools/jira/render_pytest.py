@@ -120,6 +120,7 @@ class App:
         self.flujos = {}    # function name -> source
         self.confirmed = (confirmed or {}).get("locators", {})  # NAME -> value verified on the real app
         self.widgets = (confirmed or {}).get("widgets", {})     # field slug -> "combobox"
+        self.sections = (confirmed or {}).get("sections", {})   # role -> section title on the real page, e.g. "results"
 
     def loc(self, name, value, todo=""):
         self.locators.setdefault(name, (value, todo))
@@ -349,8 +350,13 @@ def build_expected(app, a, ctx):
             line = f"co.{n}(driver, {g[0]!r}, order_number)"
         elif op == "numbers_visible":
             nums = re.findall(r"\b\d{6,}\b", e["text"])
-            n = app.flujo("verificar_texto_visible_flujo", TEXT_CHECKS["visible"])
-            line = "\n    ".join(f"co.{n}(driver, {x!r})" for x in nums) if nums else None
+            results = app.sections.get("results") if re.search(r"results table|tabla de resultados", e["text"], re.I) else None
+            if results and nums:  # "in the results table": only after the results section's title, never the example table
+                n = app.flujo("verificar_valor_en_seccion_flujo", TEXT_CHECKS["in_section"])
+                line = "\n    ".join(f"co.{n}(driver, {results!r}, {x!r})" for x in nums)
+            else:
+                n = app.flujo("verificar_texto_visible_flujo", TEXT_CHECKS["visible"])
+                line = "\n    ".join(f"co.{n}(driver, {x!r})" for x in nums) if nums else None
         elif op == "download_ok" and ctx["has_download"]:
             line = 'assert archivo_descargado and os.path.exists(archivo_descargado), "La descarga no generó un archivo."'
         elif op == "rejected_client":

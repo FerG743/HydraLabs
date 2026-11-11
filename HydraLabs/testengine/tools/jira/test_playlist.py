@@ -185,3 +185,31 @@ class RenderFlow(unittest.TestCase):
             self.assertEqual(tests, ["test_dwq_901.py", "test_dwq_903.py"])
         finally:
             shutil.rmtree(d, ignore_errors=True)
+
+
+class ResultsTable(unittest.TestCase):
+    """'appear in the results table' checks the numbers after the results section's title, not anywhere on the page
+    (an example table with the same numbers would make the check pass before any result exists)."""
+
+    def test_results_table_numbers_are_checked_after_the_results_section(self):
+        import subprocess
+        d = tempfile.mkdtemp()
+        try:
+            cases = os.path.join(d, "cases")
+            os.makedirs(cases)
+            with open(os.path.join(cases, "c.case.json"), "w", encoding="utf-8") as f:
+                json.dump({"id": "DWQ-931", "name": "TC - resultados", "status": "ready",
+                           "steps": [{"n": "1", "action": "Navigate to /x"}],
+                           "expected": [{"text": "Orders 9800074297 (LIVR) appear in the results table."}]}, f)
+            out = os.path.join(d, "out")
+            os.makedirs(os.path.join(out, "apps", "App"))
+            with open(os.path.join(out, "apps", "App", "locators.confirmed.json"), "w", encoding="utf-8") as f:
+                json.dump({"locators": {}, "sections": {"results": "Un vistazo a tus ordenes"}}, f)
+            subprocess.run([sys.executable, "render_pytest.py", "--cases", cases, "--app", "App", "--out", out],
+                           check=True, capture_output=True)
+            with open(os.path.join(out, "tests", "App", "test_dwq_931.py"), encoding="utf-8") as f:
+                test = f.read()
+            self.assertIn("verificar_valor_en_seccion_flujo(driver, 'Un vistazo a tus ordenes', '9800074297')", test)
+            self.assertNotIn("verificar_texto_visible_flujo(driver, '9800074297')", test)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)

@@ -33,6 +33,12 @@ header .hint { margin-left:auto; font-size:12px }
 #stage { flex:1; position:relative; min-width:0; overflow:hidden }
 #graph { position:absolute; inset:0; width:100%; height:100%; cursor:grab; touch-action:none }
 #empty { padding:24px; color:var(--mute) }
+#state { position:absolute; top:12px; left:12px; z-index:1; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 18px; max-width:calc(100% - 24px); box-shadow:0 4px 18px rgba(0,0,0,.12) }
+#state .row { display:flex; gap:28px; flex-wrap:wrap }
+#state .big { font-size:40px; font-weight:700; line-height:1.05; color:var(--warn); font-variant-numeric:tabular-nums }
+#state .big.ok { color:var(--ok) }
+#state .lbl { color:var(--mute); font-size:12px; margin-top:6px }
+#state .stat { min-width:150px }
 #detail { width:340px; border-left:1px solid var(--line); background:var(--card); overflow:auto; padding:14px 16px; font-size:13px }
 #detail h2 { font-size:17px; margin:0 0 2px; word-break:break-all }
 #detail .sub { color:var(--mute); font-size:13px }
@@ -58,7 +64,7 @@ header .hint { margin-left:auto; font-size:12px }
 </style>
 <header><span id="meta">Loading the site map…</span><span class="hint">drag a dot · scroll to zoom · drag the background to pan · click a page</span></header>
 <div class="wrap">
-  <div id="stage"><canvas id="graph" aria-label="Graph of pages and the links between them"></canvas><p id="empty" hidden></p></div>
+  <div id="stage"><canvas id="graph" aria-label="Graph of pages and the links between them"></canvas><p id="empty" hidden></p><div id="state" hidden></div></div>
   <aside id="detail"></aside>
 </div>
 <script>
@@ -305,6 +311,28 @@ function addFlows(cov) {
   G.nodes = G.nodes.concat(G.flows);
 }
 
+// renderState is the coverage card on the graph: the numbers that say how much of the app no built test reaches.
+function renderState() {
+  var box = document.getElementById("state");
+  if (!G.hasCoverage) { box.hidden = true; return; }
+  box.hidden = false; box.innerHTML = "";
+  function stat(big, label) {
+    var d = el("div", null, "stat");
+    d.appendChild(el("div", big, "big" + (big.split(" / ")[0] === "0" ? " ok" : "")));
+    d.appendChild(el("div", label, "lbl"));
+    return d;
+  }
+  var row = el("div", null, "row");
+  row.appendChild(stat(G.gapEls + " / " + G.totalEls, "elements not reached by a built test"));
+  row.appendChild(stat(G.gapPages + " / " + G.pages.length, "pages not reached"));
+  box.appendChild(row);
+  if (G.flows.length) {
+    var full = G.flows.filter(function (n) { return !n.gap; }).length;
+    box.appendChild(el("div", full + " of " + G.flows.length + " playlists exercise every element they reach", "lbl"));
+  }
+  box.appendChild(el("div", "green: a built test reaches it · amber: none does", "lbl"));
+}
+
 function start(data, cov) {
   var pages = data.pages || [];
   if (!pages.length) {
@@ -317,9 +345,8 @@ function start(data, cov) {
   build(data);
   applyCoverage(cov);
   var meta = document.getElementById("meta");
-  meta.textContent = pages.length + " pages · " + G.links + " links" + (data.crawledAt ? " · crawled " + data.crawledAt : "") +
-    (G.hasCoverage ? " · not reached by a built test: " + G.gapPages + " pages, " + G.gapEls + " of " + G.totalEls + " elements · green links lead to a page a built test reaches, amber to one none reaches" : "") +
-    (G.flows.length ? " · " + G.flows.length + " playlists (squares), green when they exercise every element of the pages they reach" : "");
+  meta.textContent = pages.length + " pages · " + G.links + " links" + (data.crawledAt ? " · crawled " + data.crawledAt : "");
+  renderState();
   select(G.start.node);
   kick();
 }

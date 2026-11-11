@@ -205,17 +205,15 @@ func mapAllProjects(reg *Registry, gaps bool, page string, asJSON bool) error {
 	return nil
 }
 
-func (c Config) printMap(gaps bool, page string, asJSON bool) error {
-	if c.App == "" {
-		return fmt.Errorf("say which project: hydra map --project KEY (for example DWQ)")
-	}
+// loadMapView reads the app map and the gap report (if any) of this project.
+func (c Config) loadMapView() (mapView, error) {
 	b, err := os.ReadFile(c.crawlPath())
 	if err != nil {
-		return fmt.Errorf("no app map for %s yet: run hydra crawl first", c.App)
+		return mapView{}, fmt.Errorf("no app map for %s yet: run hydra crawl first", c.App)
 	}
 	var crawl crawlFile
 	if err := json.Unmarshal(b, &crawl); err != nil {
-		return fmt.Errorf("%s: %w", c.crawlPath(), err)
+		return mapView{}, fmt.Errorf("%s: %w", c.crawlPath(), err)
 	}
 	var cov *covFile
 	if cb, err := os.ReadFile(filepath.Join(c.Out, "coverage.json")); err == nil {
@@ -224,7 +222,17 @@ func (c Config) printMap(gaps bool, page string, asJSON bool) error {
 			cov = &f
 		}
 	}
-	v := buildMapView(c.App, crawl, cov)
+	return buildMapView(c.App, crawl, cov), nil
+}
+
+func (c Config) printMap(gaps bool, page string, asJSON bool) error {
+	if c.App == "" {
+		return fmt.Errorf("say which project: hydra map --project KEY (for example DWQ)")
+	}
+	v, err := c.loadMapView()
+	if err != nil {
+		return err
+	}
 	switch {
 	case asJSON:
 		out, _ := json.MarshalIndent(v, "", "  ")

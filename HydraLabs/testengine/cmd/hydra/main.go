@@ -444,6 +444,7 @@ func main() {
 		jql := fs.String("jql", cfg.JQL, "which issues to look at (profile: jql)")
 		comment := fs.Bool("comment", cfg.JiraComments, "post outcomes that need a person to the issue (off until results are trusted)")
 		intent, only, force, asJSON := fs.String("intent", "", "with --only: treat the issue as automate|execute even without the label"), fs.String("only", "", "process just this issue key (for a manual trigger)"), fs.Bool("force", false, "ignore the seen-state: run it again"), fs.Bool("json", false, "one JSON object per run (for n8n)")
+		fs.BoolVar(&cfg.RecordVideo, "video", false, "with --only: save a .webm of the verification run (out/hydra/verify/videos), for demos")
 		modelCases := fs.Int("model-cases", 1, "cases that need the model allowed per poll; the rest wait for the next one")
 		if cfg.Registry != nil {
 			*modelCases = cfg.Registry.ModelCases()

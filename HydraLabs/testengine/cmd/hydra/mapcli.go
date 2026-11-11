@@ -179,6 +179,9 @@ func sortedKeys(m map[int]bool) []int {
 }
 
 func (c Config) printMap(gaps bool, page string, asJSON bool) error {
+	if c.App == "" {
+		return fmt.Errorf("say which project: hydra map --project KEY (for example DWQ)")
+	}
 	b, err := os.ReadFile(c.crawlPath())
 	if err != nil {
 		return fmt.Errorf("no app map for %s yet: run hydra crawl first", c.App)

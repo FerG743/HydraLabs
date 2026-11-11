@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -23,5 +24,16 @@ func TestProjectFirstPagesCommandRunsTheMap(t *testing.T) {
 	}
 	if _, ok := projectPagesArgs(reg, []string{"DWQ", "poll"}); ok {
 		t.Fatal("another command was rewritten")
+	}
+}
+
+func TestBoardReadsTheSameKPIsAsTheMap(t *testing.T) {
+	out := t.TempDir()
+	c := Config{App: "X", Out: out, AppMap: filepath.Join(out, "appmap")}
+	writeFile(t, c.crawlPath(), `{"pages":[{"url":"http://h/a","elements":[{"locator":"role=button[name=\"Go\"]","role":"button"}]}]}`)
+	writeFile(t, filepath.Join(out, "coverage.json"), `{"pages":[{"url":"http://h/a","covered":false,"gaps":["role=button[name=\"Go\"]"]}]}`)
+	v, err := c.loadMapView()
+	if err != nil || v.KPIs == nil || v.KPIs.CoveredLocators != 0 || v.KPIs.UniqueLocators != 1 {
+		t.Fatalf("kpis: %v %+v", err, v.KPIs)
 	}
 }

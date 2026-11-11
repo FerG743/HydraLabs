@@ -72,6 +72,7 @@ type mapView struct {
 	ReportedAt string        `json:"reportedAt"`
 	Links      int           `json:"links"`
 	Pages      []mapPageView `json:"pages"`
+	KPIs       *mapKPIs      `json:"kpis,omitempty"`
 }
 
 func mapNorm(u string) string {
@@ -167,6 +168,10 @@ func buildMapView(app string, crawl crawlFile, cov *covFile) mapView {
 		}
 		v.Pages = append(v.Pages, vp)
 	}
+	if v.Reported {
+		k := computeKPIs(v)
+		v.KPIs = &k
+	}
 	return v
 }
 
@@ -200,17 +205,15 @@ func mapAllProjects(reg *Registry, gaps bool, page string, asJSON bool) error {
 	return nil
 }
 
-func (c Config) printMap(gaps bool, page string, asJSON bool) error {
-	if c.App == "" {
-		return fmt.Errorf("say which project: hydra map --project KEY (for example DWQ)")
-	}
+// loadMapView reads the app map and the gap report (if any) of this project.
+func (c Config) loadMapView() (mapView, error) {
 	b, err := os.ReadFile(c.crawlPath())
 	if err != nil {
-		return fmt.Errorf("no app map for %s yet: run hydra crawl first", c.App)
+		return mapView{}, fmt.Errorf("no app map for %s yet: run hydra crawl first", c.App)
 	}
 	var crawl crawlFile
 	if err := json.Unmarshal(b, &crawl); err != nil {
-		return fmt.Errorf("%s: %w", c.crawlPath(), err)
+		return mapView{}, fmt.Errorf("%s: %w", c.crawlPath(), err)
 	}
 	var cov *covFile
 	if cb, err := os.ReadFile(filepath.Join(c.Out, "coverage.json")); err == nil {
@@ -219,7 +222,17 @@ func (c Config) printMap(gaps bool, page string, asJSON bool) error {
 			cov = &f
 		}
 	}
-	v := buildMapView(c.App, crawl, cov)
+	return buildMapView(c.App, crawl, cov), nil
+}
+
+func (c Config) printMap(gaps bool, page string, asJSON bool) error {
+	if c.App == "" {
+		return fmt.Errorf("say which project: hydra map --project KEY (for example DWQ)")
+	}
+	v, err := c.loadMapView()
+	if err != nil {
+		return err
+	}
 	switch {
 	case asJSON:
 		out, _ := json.MarshalIndent(v, "", "  ")
@@ -252,6 +265,17 @@ func printMapSummary(v mapView) {
 		fmt.Printf("built tests reach %d of %d pages and %d of %d elements (report %s)\n", reached, pages, covEls, els, v.ReportedAt)
 	} else {
 		fmt.Println("no coverage report yet: a poll writes it")
+	}
+	if k := v.KPIs; k != nil {
+		fmt.Printf("unique locators reached   %d of %d\n", k.CoveredLocators, k.UniqueLocators)
+		fmt.Printf("interactive reached       %d of %d (buttons, inputs, tabs)\n", k.InteractiveCovered, k.Interactive)
+		var parts []string
+		for _, g := range k.BiggestGaps {
+			parts = append(parts, fmt.Sprintf("%s %d", g.Path, g.Uncovered))
+		}
+		if len(parts) > 0 {
+			fmt.Printf("biggest gaps (uncovered elements)  %s\n", strings.Join(parts, " · "))
+		}
 	}
 	for _, p := range v.Pages {
 		mark := " "

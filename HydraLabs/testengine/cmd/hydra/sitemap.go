@@ -6,7 +6,8 @@ import (
 
 // The site map: the app map (the crawl's pages, links and elements, <App>.crawl.json) drawn for people as a graph in the
 // style of Obsidian's: a dot per page, a line per link the crawl found, pulled into shape by a small force layout. The
-// board's Site map tab shows it; the page reads the data from /api/sitemap.
+// board's Site map tab shows it; the page reads the data from /api/sitemap. Each playlist is a square, linked to the
+// pages it reaches, and coloured by whether it exercises every element of them (out/coverage.json, from /api/coverage).
 
 // sitemapData is the crawl the app map was built from, or an empty map when no crawl has run yet.
 func (c Config) sitemapData() []byte {
@@ -95,7 +96,7 @@ function build(data) {
       p.node.deg++; q.node.deg++; p.node.nbr.add(q.node); q.node.nbr.add(p.node);
     });
   });
-  G = { pages: pages, nodes: pages.map(function (p) { return p.node; }), edges: edges, links: edges.length,
+  G = { pages: pages, byUrl: byUrl, nodes: pages.map(function (p) { return p.node; }), edges: edges, links: edges.length,
     s: 1, tx: canvas.clientWidth / 2, ty: canvas.clientHeight / 2, alpha: 1, sel: null, hover: null, drag: null, pan: null, moved: false,
     start: byUrl[norm(data.baseUrl || pages[0].url)] || pages[0] };
 }
@@ -137,11 +138,18 @@ function draw() {
     var hot = focus && (e.a === focus || e.b === focus), known = e.cov !== undefined;
     ctx.globalAlpha = focus ? (hot ? 0.95 : 0.1) : (known ? 0.7 : 0.35);
     ctx.strokeStyle = known ? (e.cov ? C.ok : C.warn) : (hot ? C.on : C.mute); ctx.lineWidth = (hot ? 2.2 : 1.2) / s;
+    ctx.setLineDash(e.flow ? [5 / s, 4 / s] : []); // a playlist's link is dashed
     ctx.beginPath(); ctx.moveTo(e.a.x, e.a.y); ctx.lineTo(e.b.x, e.b.y); ctx.stroke();
   });
   G.nodes.forEach(function (n) {
     var isF = n === focus, hot = nb && nb.has(n);
     ctx.globalAlpha = !focus || isF || hot ? 1 : 0.22;
+    if (n.flow) { // a playlist is a square: green when it exercises every element of the pages it reaches
+      var r = nodeR(n);
+      ctx.fillStyle = n === G.sel ? C.on : (n.gap ? C.warn : C.ok);
+      ctx.fillRect(n.x - r, n.y - r, 2 * r, 2 * r);
+      return;
+    }
     ctx.fillStyle = n === G.sel ? C.on : (isF || hot ? C.fg : (n.gap ? C.warn : C.mute));
     ctx.beginPath(); ctx.arc(n.x, n.y, nodeR(n), 0, 2 * Math.PI); ctx.fill();
   });
@@ -149,9 +157,9 @@ function draw() {
   ctx.font = "12px system-ui,sans-serif"; ctx.fillStyle = C.fg;
   G.nodes.forEach(function (n) { // labels stay in screen space, so they do not grow when you zoom
     var isF = n === focus, hot = nb && nb.has(n);
-    if (!(s > 0.6 || isF || hot || n === G.sel)) return;
+    if (!(s > 0.6 || n.flow || isF || hot || n === G.sel)) return;
     ctx.globalAlpha = !focus || isF || hot ? 1 : 0.3;
-    ctx.fillText(pathOf(n.p.url), n.x * s + G.tx + nodeR(n) * s + 5, n.y * s + G.ty + 4);
+    ctx.fillText(n.flow ? "▸ " + n.flow.name : pathOf(n.p.url), n.x * s + G.tx + nodeR(n) * s + 5, n.y * s + G.ty + 4);
   });
   ctx.globalAlpha = 1;
 }
@@ -201,7 +209,19 @@ canvas.addEventListener("wheel", function (e) {
   G.s = ns; G.tx = m.x - wx * ns; G.ty = m.y - wy * ns; draw();
 }, { passive: false });
 
-function select(n) { G.sel = n; showDetail(n ? n.p : null); draw(); }
+function select(n) { G.sel = n; if (n && n.flow) showFlow(n); else showDetail(n ? n.p : null); draw(); }
+
+function showFlow(n) {
+  var box = document.getElementById("detail"), f = n.flow, pages = [];
+  box.innerHTML = "";
+  n.nbr.forEach(function (q) { pages.push(q.p); });
+  pages.sort(function (a, b) { return a.url < b.url ? -1 : 1; });
+  box.appendChild(el("h2", f.name));
+  box.appendChild(el("div", "Playlist · " + f.tests + " tests", "sub"));
+  box.appendChild(el("div", pages.length ? n.covered + " of " + n.elements + " elements exercised on the " + pages.length + " pages it reaches" : "Reaches no page on the map",
+    n.gap ? "warnline" : "sub"));
+  chips(box, "Pages it reaches", pages);
+}
 
 function chips(box, title, list) {
   box.appendChild(el("h3", title + " (" + list.length + ")"));
@@ -263,6 +283,26 @@ function applyCoverage(cov) {
   G.hasCoverage = pages.length > 0;
   // a link is covered when the page it leads to is reached by a built test
   G.edges.forEach(function (e) { e.cov = e.b.gap === undefined ? undefined : !e.b.gap; });
+  addFlows(cov);
+}
+
+// addFlows adds each playlist as a square with a dashed link to every page it reaches. A link is green when the playlist
+// exercises all of that page's elements, amber when some are left out; the square is green when all its links are.
+function addFlows(cov) {
+  G.flows = ((cov && cov.flows) || []).map(function (f, i) {
+    var ang = i * 2.399 + 1, rad = 60 * Math.sqrt(i + 1);
+    var n = { flow: f, x: Math.cos(ang) * rad, y: Math.sin(ang) * rad, vx: 0, vy: 0, deg: 0, nbr: new Set(), elements: 0, covered: 0 };
+    (f.pages || []).forEach(function (r) {
+      var q = G.byUrl[norm(r.url)];
+      if (!q) return;
+      n.elements += r.elements; n.covered += r.covered_elements;
+      G.edges.push({ a: n, b: q.node, flow: true, cov: r.covered_elements === r.elements });
+      n.deg++; q.node.deg++; n.nbr.add(q.node); q.node.nbr.add(n);
+    });
+    n.gap = n.nbr.size === 0 || n.covered < n.elements;
+    return n;
+  });
+  G.nodes = G.nodes.concat(G.flows);
 }
 
 function start(data, cov) {
@@ -278,7 +318,8 @@ function start(data, cov) {
   applyCoverage(cov);
   var meta = document.getElementById("meta");
   meta.textContent = pages.length + " pages · " + G.links + " links" + (data.crawledAt ? " · crawled " + data.crawledAt : "") +
-    (G.hasCoverage ? " · not reached by a built test: " + G.gapPages + " pages, " + G.gapEls + " of " + G.totalEls + " elements · green links lead to a page a built test reaches, amber to one none reaches" : "");
+    (G.hasCoverage ? " · not reached by a built test: " + G.gapPages + " pages, " + G.gapEls + " of " + G.totalEls + " elements · green links lead to a page a built test reaches, amber to one none reaches" : "") +
+    (G.flows.length ? " · " + G.flows.length + " playlists (squares), green when they exercise every element of the pages they reach" : "");
   select(G.start.node);
   kick();
 }

@@ -27,6 +27,11 @@ func (c Config) coverageGapsWith(tool string) error {
 	for _, b := range bundles {
 		argv = append(argv, "--suite", b)
 	}
+	for _, name := range c.playlistNames() { // a flow is reported on its own: its folder is built from its cases
+		if folder, _, _, err := c.buildPlaylist(name); err == nil {
+			argv = append(argv, "--flow", name+"="+folder)
+		}
+	}
 	out := filepath.Join(c.Out, "coverage.json")
 	os.MkdirAll(c.Out, 0o755)
 	argv = append(argv, "--app", c.App, "--crawl", crawl, "--out", out)

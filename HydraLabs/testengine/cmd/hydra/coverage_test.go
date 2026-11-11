@@ -61,6 +61,40 @@ func TestCoverageGapsNameTheElementsAndPagesNoBuiltTestReaches(t *testing.T) {
 	}
 }
 
+func TestCoverageReportsEachPlaylistOnItsOwn(t *testing.T) {
+	home := t.TempDir()
+	c := Config{Home: home, Out: filepath.Join(home, "out"), AppMap: filepath.Join(home, "appmap"), App: "App",
+		Python: "python3", ToolsDir: "../../tools/jira"}
+	os.MkdirAll(c.caseDir(), 0o755)
+	os.MkdirAll(c.durable("playlists"), 0o755)
+	for _, id := range []string{"DWQ-901", "DWQ-902"} {
+		body := `{"id":"` + id + `","name":"TC - caso ` + id + `","status":"ready","steps":[{"n":"1","action":"Navigate to /x"}],"expected":[{"text":"ok"}]}`
+		os.WriteFile(filepath.Join(c.caseDir(), id+".case.json"), []byte(body), 0o644)
+	}
+	os.WriteFile(c.durable("playlists", "flow.json"), []byte(`{"id":"flow","steps":[{"case":"DWQ-901"},{"case":"DWQ-902"}]}`), 0o644)
+	writeFile(t, c.crawlPath(), `{"pages":[{"url":"http://h/x","elements":[{"locator":"role=button[name=\"A\"]"}]}]}`)
+
+	if err := c.coverageGapsWith("../../tools/coverage.py"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(c.Out, "coverage.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rep struct {
+		Flows []struct {
+			Name  string `json:"name"`
+			Tests int    `json:"tests"`
+		} `json:"flows"`
+	}
+	if err := json.Unmarshal(b, &rep); err != nil {
+		t.Fatalf("%v: %s", err, b)
+	}
+	if len(rep.Flows) != 1 || rep.Flows[0].Name != "flow" || rep.Flows[0].Tests != 2 {
+		t.Fatalf("the flow should be reported with its two tests, got %s", b)
+	}
+}
+
 func TestCoverageGapsWaitForACrawl(t *testing.T) {
 	c := Config{App: "X", Out: t.TempDir(), AppMap: t.TempDir(), Python: "python3"}
 	if err := c.coverageGapsWith("../../tools/coverage.py"); err != nil {

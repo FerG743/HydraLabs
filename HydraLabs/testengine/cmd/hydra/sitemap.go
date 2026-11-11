@@ -119,6 +119,7 @@ function tick() {
   });
   for (n of N) {
     n.vx -= n.x * 0.012 * a; n.vy -= n.y * 0.012 * a; // a weak pull to the middle keeps the graph on screen
+    if (n === G.start.node && n !== G.drag) { n.x = n.y = n.vx = n.vy = 0; continue; } // the root sits at the centre
     if (n === G.drag) { n.vx = n.vy = 0; continue; }
     n.vx *= 0.7; n.vy *= 0.7; n.x += n.vx; n.y += n.vy;
   }

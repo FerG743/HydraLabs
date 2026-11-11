@@ -363,6 +363,16 @@ def crawl(a):
             page.evaluate("() => window.scrollTo(0, 0)")
             page.screenshot(path=os.path.join(shots, shot), full_page=True)
             page.evaluate("() => document.querySelectorAll('.__hydra').forEach(e => e.remove())")
+            for i, el in enumerate(els):  # a picture of each element (shots/NN-iii.png) for the site map; the rest stay text
+                r = el.get("rect")
+                if r and r["w"] > 0 and r["h"] > 0 and i < 200:
+                    name = f"{shot[:-4]}-{i:03d}.png"
+                    try:
+                        page.screenshot(path=os.path.join(shots, name), full_page=True,
+                                        clip={"x": r["x"], "y": r["y"], "width": r["w"], "height": r["h"]})
+                        el["pic"] = name
+                    except Exception:  # shortcut: an element Playwright cannot clip keeps its text row only, no picture
+                        pass
             for el in els:
                 el.pop("rect", None)  # positions are for the picture only; the map stays compact
             pages.append({"url": page.url, "title": page.title(), "hash": sig, "shot": shot, "settled": settled, "elements": els,

@@ -194,6 +194,7 @@ func (c Config) BoardUI(addr string) error {
 	mux.Handle("/crawl/", http.StripPrefix("/crawl", crawlView(filepath.Join(c.Out, "crawl", "events.jsonl"))))
 	mux.Handle("/cases/", http.StripPrefix("/cases", c.casesView()))
 	mux.Handle("/help/", http.StripPrefix("/help", helpView()))
+	mux.Handle("/shots/", http.StripPrefix("/shots/", http.FileServer(http.Dir(filepath.Join(c.Out, "crawl", "shots")))))
 	mux.HandleFunc("/sitemap/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, sitemapPage)
 	})

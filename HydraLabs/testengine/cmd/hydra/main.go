@@ -365,6 +365,10 @@ func main() {
 		err = cfg.Watch(*addr)
 	case "playlist": // an ordered flow of cases with values passed forward: check it, or run it (testengine/PLAYLISTS.md)
 		err = cfg.playlistCmd(os.Args[2:])
+	case "map": // read-only: the site map of the app, and the gaps the built tests leave (--gaps, --page, --json)
+		gaps, page, asJSON := fs.Bool("gaps", false, "only what no built test reaches"), fs.String("page", "", "one page, by path or URL"), fs.Bool("json", false, "machine-readable")
+		fs.Parse(os.Args[2:])
+		err = cfg.printMap(*gaps, *page, *asJSON)
 	case "history": // read-only: every recorded execution of a project, or of one case
 		key, last, asJSON := fs.String("key", "", "only this case"), fs.Int("last", 30, "newest N (0 = all)"), fs.Bool("json", false, "machine-readable")
 		fs.Parse(os.Args[2:])

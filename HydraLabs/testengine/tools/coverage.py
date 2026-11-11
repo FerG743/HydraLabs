@@ -119,36 +119,62 @@ def suite_reach(root, app):
     return values, paths, n
 
 
-def analyse(roots, app, crawl):
+def reach(roots, app):
+    """Locator values, normalised paths and test count that the suite roots reach together."""
     values, paths, tests = set(), set(), 0
     for root in roots:
         v, p, n = suite_reach(root, app)
-        values |= v; paths |= p; tests += n
+        values |= v; paths |= {norm_path(x) for x in p}; tests += n
+    return values, paths, tests
+
+
+def judge(page, values, paths):
+    """Whether a crawled page is covered, how many of its elements, and the elements no test reaches."""
+    covered_path = norm_path(urlparse(page["url"]).path) in paths
+    els = page.get("elements", [])
+    gaps = [e.get("locator") for e in els if e.get("locator") not in values]
+    covered_els = len(els) - len(gaps)
+    return covered_path or covered_els > 0, covered_els, gaps
+
+
+def analyse(roots, app, crawl, flows=()):
+    values, paths, tests = reach(roots, app)
+    crawled = json.load(open(crawl, encoding="utf-8")).get("pages", [])
     pages, n_el, c_el, c_pg = [], 0, 0, 0
-    for p in json.load(open(crawl, encoding="utf-8")).get("pages", []):
-        covered_path = norm_path(urlparse(p["url"]).path) in {norm_path(x) for x in paths}
+    for p in crawled:
+        covered, covered_els, gaps = judge(p, values, paths)
         els = p.get("elements", [])
-        gaps = [e.get("locator") for e in els if e.get("locator") not in values]
-        covered_els = len(els) - len(gaps)
-        n_el += len(els); c_el += covered_els
-        covered = covered_path or covered_els > 0
-        c_pg += covered
+        n_el += len(els); c_el += covered_els; c_pg += covered
         pages.append({"url": p["url"], "covered": covered, "elements": len(els), "covered_elements": covered_els,
                       "gaps": gaps})
     return {"app": app, "generatedAt": datetime.now().isoformat(timespec="seconds"), "tests": tests,
             "summary": {"pages": len(pages), "coveredPages": c_pg, "elements": n_el, "coveredElements": c_el},
-            "pages": pages}
+            "pages": pages, "flows": [flow_report(name, root, app, crawled) for name, root in flows]}
+
+
+def flow_report(name, root, app, crawled):
+    """A playlist's own suite root: the pages it reaches, and how many of each page's elements it exercises."""
+    values, paths, tests = reach([root], app)
+    reached = []
+    for p in crawled:
+        covered, covered_els, _ = judge(p, values, paths)
+        if covered:
+            reached.append({"url": p["url"], "elements": len(p.get("elements", [])), "covered_elements": covered_els})
+    return {"name": name, "tests": tests, "pages": reached}
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--suite", action="append", default=[],
                     help="a root with apps/<App> and tests/<App> (a bundle, or the app repo); repeat for each. None: every element is a gap")
+    ap.add_argument("--flow", action="append", default=[], metavar="NAME=ROOT",
+                    help="a playlist's suite root (out/playlists/<NAME>); reported under flows, not in the gaps")
     ap.add_argument("--app", required=True)
     ap.add_argument("--crawl", required=True, help="the app map (<App>.crawl.json)")
     ap.add_argument("--out", help="write here instead of stdout")
     a = ap.parse_args(argv)
-    result = analyse(a.suite, a.app, a.crawl)
+    flows = [tuple(f.split("=", 1)) for f in a.flow]
+    result = analyse(a.suite, a.app, a.crawl, flows)
     text = json.dumps(result, ensure_ascii=False, indent=2)
     if a.out:
         os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)

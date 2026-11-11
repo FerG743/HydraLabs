@@ -199,7 +199,36 @@ func (c Config) BoardUI(addr string) error {
 	})
 	mux.HandleFunc("/api/playlists", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodPost {
+			if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+				w.WriteHeader(405)
+				return
+			}
+			var req struct {
+				Name  string
+				Steps []string
+			}
+			if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&req); err != nil {
+				w.WriteHeader(400)
+				json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+				return
+			}
+			if err := c.savePlaylist(req.Name, req.Steps); err != nil {
+				w.WriteHeader(409)
+				json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+				return
+			}
+		}
 		json.NewEncoder(w).Encode(c.playlistNames())
+	})
+	mux.HandleFunc("/api/playlist-cases", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		cases, _ := c.loadCases()
+		out := []map[string]string{}
+		for _, x := range cases {
+			out = append(out, map[string]string{"id": x.ID, "name": x.Name})
+		}
+		json.NewEncoder(w).Encode(out)
 	})
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -218,13 +247,12 @@ const boardPage = `<!doctype html><meta charset=utf-8><meta name=viewport conten
 header{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--card)}
 header h1{font-size:17px;margin:0}header .url{color:var(--mute)}.stats{display:flex;flex-wrap:wrap;gap:6px 16px;margin-left:auto}
 .stat b{font-size:16px;font-variant-numeric:tabular-nums}.stat span{color:var(--mute);margin-left:4px}
-main{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px;padding:12px;min-height:0}
+main{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr;gap:12px;padding:12px;min-height:0}
 .tile{background:var(--card);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .tile h2{font-size:13px;margin:0;padding:8px 12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;text-transform:uppercase;letter-spacing:.04em;color:var(--mute)}
 .tile h2 .sp{flex:1}.tile h2 button,.tile h2 a{font:12px system-ui;text-transform:none;letter-spacing:0;color:var(--fg);background:none;border:1px solid var(--line);border-radius:5px;padding:2px 8px;cursor:pointer;text-decoration:none}
 .tile iframe{flex:1;border:0;width:100%;min-height:0;background:var(--card)}.body{flex:1;overflow:auto}
 main.one{grid-template-columns:1fr;grid-template-rows:1fr}main.one .tile:not(.big){display:none}
-.tile.cases{grid-row:span 2}main.one .tile.cases{grid-row:auto}
 .tabs{display:flex;gap:2px;margin-left:4px}.tile h2 .tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;padding:2px 10px;color:var(--mute);font-weight:600}
 .tile h2 .tabs button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--on)}
 table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 12px;border-bottom:1px solid var(--line);vertical-align:top}
@@ -248,7 +276,7 @@ dialog .steps{padding:8px 18px;overflow:auto;max-height:55vh}.ds{display:grid;gr
 .ds .col{grid-column:2;font:12px ui-monospace,monospace;color:var(--on)}dialog footer{display:flex;gap:10px;align-items:center;padding:12px 18px;border-top:1px solid var(--line)}
 dialog footer button{font:inherit;padding:7px 14px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:inherit;cursor:pointer}dialog footer button.go{background:var(--on);border-color:var(--on);color:#fff;font-weight:600}
 #dmsg{flex:1;font-size:13px}#dmsg.bad{color:var(--bad)}#dmsg.ok{color:var(--ok)}.dnote{padding:10px 18px;color:var(--mute);font-size:13px;margin:0}
-@media (max-width:900px){main{grid-template-columns:1fr;grid-template-rows:repeat(3,80vh)}.tile.cases{grid-row:auto}}
+@media (max-width:900px){main{grid-template-columns:1fr;grid-template-rows:repeat(2,80vh)}}
 </style>
 <header><h1>{{APP}} <small style="font-weight:400;color:var(--mute)">{{PROJECT}}</small></h1><span class=url id=url></span><div class=stats id=stats></div></header>
 <div class=actions role=toolbar aria-label="Run">
@@ -264,10 +292,7 @@ dialog footer button{font:inherit;padding:7px 14px;border-radius:6px;border:1px 
 <footer><span id=dmsg role=status></span><button type=button onclick="$('data').close()">Close</button><button type=button class=go id=dsave>Save</button></footer></dialog>
 <main id=grid>
 <section class="tile cases"><h2>Cases<span class=tabs role=tablist aria-label="Cases"><button type=button role=tab id=t-status aria-controls=cases aria-selected=true>Status</button><button type=button role=tab id=t-write aria-controls=p-write aria-selected=false tabindex=-1>Write a case</button></span><span class=sp></span><span id=srcinfo style="text-transform:none;letter-spacing:0"></span><a id=writeopen href="cases/" target=_blank hidden>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><div class=body id=cases role=tabpanel aria-labelledby=t-status></div><iframe id=p-write role=tabpanel aria-labelledby=t-write title="Write a case" hidden></iframe></section>
-<section class=tile><h2>Live pipeline<span class=sp></span><a href="live/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe src="live/" title="Live pipeline"></iframe></section>
-<section class=tile><h2>Last crawl<span class=sp></span><a href="crawl/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe src="crawl/" title="Last crawl"></iframe></section>
-<section class=tile><h2>Commands<span class=sp></span><a href="help/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe src="help/" title="Command reference"></iframe></section>
-<section class=tile><h2>Playlists<span class=sp></span><a href="playlists/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe src="playlists/" title="Playlists"></iframe></section>
+<section class=tile id=side><h2><span class=tabs role=tablist aria-label="Pipeline and tools"><button type=button role=tab id=s-live aria-controls=sp-live aria-selected=true>Live pipeline</button><button type=button role=tab id=s-crawl aria-controls=sp-crawl aria-selected=false tabindex=-1>Last crawl</button><button type=button role=tab id=s-play aria-controls=sp-play aria-selected=false tabindex=-1>Playlists</button><button type=button role=tab id=s-help aria-controls=sp-help aria-selected=false tabindex=-1>Commands</button></span><span class=sp></span><a id=sideopen href="live/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe id=sp-live role=tabpanel aria-labelledby=s-live title="Live pipeline"></iframe><iframe id=sp-crawl role=tabpanel aria-labelledby=s-crawl title="Last crawl" hidden></iframe><iframe id=sp-play role=tabpanel aria-labelledby=s-play title="Playlists" hidden></iframe><iframe id=sp-help role=tabpanel aria-labelledby=s-help title="Command reference" hidden></iframe></section>
 </main>
 <script>
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -287,6 +312,12 @@ const tabs=[$('t-status'),$('t-write')];
 function tab(t){tabs.forEach(x=>{const on=x===t;x.setAttribute('aria-selected',on);x.tabIndex=on?0:-1;$(x.getAttribute('aria-controls')).hidden=!on});
   if(t.id=='t-write'&&!$('p-write').src)$('p-write').src='cases/';$('writeopen').hidden=t.id!='t-write'}
 tabs.forEach((t,i)=>{t.onclick=()=>tab(t);t.onkeydown=e=>{if(e.key=='ArrowRight'||e.key=='ArrowLeft'){const n=tabs[(i+(e.key=='ArrowRight'?1:tabs.length-1))%tabs.length];tab(n);n.focus()}}});
+// the right tile: one tab per page; a page loads the first time its tab opens
+const sideTabs=[['s-live','sp-live','live/'],['s-crawl','sp-crawl','crawl/'],['s-play','sp-play','playlists/'],['s-help','sp-help','help/']];
+function sideTab(id){sideTabs.forEach(([t,p,path])=>{const on=t==id,tb=$(t),pn=$(p);tb.setAttribute('aria-selected',on);tb.tabIndex=on?0:-1;pn.hidden=!on;
+  if(on){if(!pn.getAttribute('src'))pn.src=path;$('sideopen').href=path}})}
+sideTabs.forEach(([t],i)=>{const tb=$(t);tb.onclick=()=>sideTab(t);tb.onkeydown=e=>{if(e.key=='ArrowRight'||e.key=='ArrowLeft'){const n=sideTabs[(i+(e.key=='ArrowRight'?1:sideTabs.length-1))%sideTabs.length][0];sideTab(n);$(n).focus()}}});
+sideTab('s-live');
 let busy=false,logOpen=false;
 async function run(action,key){
   if(action=='execute'&&!key)return;if(action=='deliver'&&!confirm('Deliver runs the whole suite in the real framework and puts the tests that pass on a review branch in the test repo (nothing is pushed). Go?'))return;

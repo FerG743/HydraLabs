@@ -36,6 +36,73 @@ func (c Config) playlistNames() []string {
 	return names
 }
 
+// savePlaylist writes a new flow of ids, in order, to hydra/playlists/<name>.json and commits it, as the case editor
+// does. It never overwrites: a flow someone wrote by hand is edited in the repo, not replaced from the board.
+func (c Config) savePlaylist(name string, ids []string) error {
+	path, err := c.playlistFile(name)
+	if err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return fmt.Errorf("add at least one case to the flow")
+	}
+	stored, err := c.loadCases()
+	if err != nil {
+		return err
+	}
+	known := map[string]bool{}
+	for _, x := range stored {
+		known[x.ID] = true
+	}
+	type step struct {
+		Case string `json:"case"`
+	}
+	flow := struct {
+		ID    string `json:"id"`
+		Name  string `json:"name"`
+		Stop  bool   `json:"stopOnFailure"`
+		Steps []step `json:"steps"`
+	}{ID: name, Name: name, Stop: true}
+	for _, id := range ids {
+		if !known[id] {
+			return fmt.Errorf("case %s is not stored in this app", id)
+		}
+		flow.Steps = append(flow.Steps, step{id})
+	}
+	repo := c.Home
+	if b, _ := git(repo, "branch", "--show-current"); b != c.BaseBranch {
+		return fmt.Errorf("the test repo is on %q, not %q (a delivery running?): try again when it is back", b, c.BaseBranch)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		if os.IsExist(err) {
+			return fmt.Errorf("%s already exists: pick another name", name)
+		}
+		return err
+	}
+	b, _ := json.MarshalIndent(flow, "", "  ")
+	_, werr := f.Write(append(b, '\n'))
+	if cerr := f.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr != nil {
+		return werr
+	}
+	rel, _ := filepath.Rel(repo, path)
+	_, err = git(repo, "add", rel)
+	if err == nil {
+		_, err = git(repo, append(gitIdentity(repo), "commit", "-q", "-m", "playlist "+name, "--", rel)...)
+	}
+	if err != nil {
+		git(repo, "rm", "--cached", "-q", "--ignore-unmatch", "--", rel) // unstage it too
+		os.Remove(path)                                                  // so the name is free to try again
+	}
+	return err
+}
+
 // buildPlaylist renders the flow's cases into out/playlists/<name>/ and writes the cases file playlist.py checks against.
 func (c Config) buildPlaylist(name string) (folder, casesFile, flowFile string, err error) {
 	if flowFile, err = c.playlistFile(name); err != nil {

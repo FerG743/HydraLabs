@@ -202,6 +202,10 @@ func (c Config) BoardUI(addr string) error {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(c.sitemapData())
 	})
+	mux.HandleFunc("/api/coverage", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(c.coverageData())
+	})
 	mux.HandleFunc("/playlists/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, playlistsPage)
 	})

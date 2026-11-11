@@ -22,8 +22,8 @@ const sitemapPage = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Site map</title>
 <style>
-:root { --bg:#fbfbfa; --fg:#1d1d1f; --mute:#8a8a8f; --card:#ffffff; --line:#e4e4e8; --on:#7c3aed; color-scheme: light }
-@media (prefers-color-scheme: dark) { :root { --bg:#1b1b1d; --fg:#dcdcdf; --mute:#7c7c84; --card:#242427; --line:#353539; --on:#a78bfa; color-scheme: dark } }
+:root { --bg:#fbfbfa; --fg:#1d1d1f; --mute:#8a8a8f; --card:#ffffff; --line:#e4e4e8; --on:#7c3aed; --warn:#b45309; color-scheme: light }
+@media (prefers-color-scheme: dark) { :root { --bg:#1b1b1d; --fg:#dcdcdf; --mute:#7c7c84; --card:#242427; --line:#353539; --on:#a78bfa; --warn:#f59e0b; color-scheme: dark } }
 * { box-sizing:border-box }
 body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; height:100vh; display:flex; flex-direction:column }
 header { padding:8px 12px; border-bottom:1px solid var(--line); background:var(--card); color:var(--mute); font-size:13px; display:flex; gap:12px; flex-wrap:wrap; align-items:baseline }
@@ -50,7 +50,9 @@ header .hint { margin-left:auto; font-size:12px }
 .el code { font:11px ui-monospace,Menlo,monospace; word-break:break-all }
 .el small { color:var(--mute); font-size:11px }
 .el img.pic { display:block; max-width:100%; max-height:72px; object-fit:contain; background:#fff; border:1px solid var(--line); border-radius:6px; margin-bottom:4px }
-.tag { font-size:11px; color:var(--mute) }
+.tag { display:block; font-size:11px; color:var(--mute); margin-bottom:2px }
+.tag.gap { color:var(--warn) }
+.warnline { color:var(--warn); font-size:12px; margin-top:6px }
 @media (max-width:700px) { .wrap { flex-direction:column } #detail { width:auto; border-left:0; border-top:1px solid var(--line); max-height:50vh } }
 </style>
 <header><span id="meta">Loading the site map…</span><span class="hint">drag a dot · scroll to zoom · drag the background to pan · click a page</span></header>
@@ -66,7 +68,7 @@ function norm(u) { var x = new URL(u); x.hash = ""; return x.href.replace(/\/$/,
 function label(e) { return e.name || e.placeholder || e.byLabel || e.testid || e.id || e.tag || "element"; }
 function pathOf(u) { try { var x = new URL(u); return x.pathname + x.search || "/"; } catch (err) { return u; } }
 function nodeR(n) { return 5 + Math.min(n.deg, 10) * 0.8; }
-function readColors() { var s = getComputedStyle(document.documentElement); ["fg", "mute", "on"].forEach(function (k) { C[k] = s.getPropertyValue("--" + k).trim(); }); }
+function readColors() { var s = getComputedStyle(document.documentElement); ["fg", "mute", "on", "warn"].forEach(function (k) { C[k] = s.getPropertyValue("--" + k).trim(); }); }
 
 function resize() {
   var r = canvas.parentNode.getBoundingClientRect();
@@ -140,7 +142,7 @@ function draw() {
   G.nodes.forEach(function (n) {
     var isF = n === focus, hot = nb && nb.has(n);
     ctx.globalAlpha = !focus || isF || hot ? 1 : 0.22;
-    ctx.fillStyle = n === G.sel ? C.on : (isF || hot ? C.fg : C.mute);
+    ctx.fillStyle = n === G.sel ? C.on : (isF || hot ? C.fg : (n.gap ? C.warn : C.mute));
     ctx.beginPath(); ctx.arc(n.x, n.y, nodeR(n), 0, 2 * Math.PI); ctx.fill();
   });
   ctx.restore();
@@ -222,6 +224,7 @@ function showDetail(p) {
   box.appendChild(el("h2", pathOf(p.url)));
   box.appendChild(el("div", p.title || "(no title)", "sub"));
   box.appendChild(el("div", p.url, "url"));
+  if (p.node.gap) box.appendChild(el("div", "Not reached by any built test", "warnline"));
   if (p.shot) { // the top of the page; the link opens the whole page
     var a = el("a"), pic = el("img", null, "page");
     a.href = "../shots/" + p.shot; a.target = "_blank"; a.rel = "noopener";
@@ -235,14 +238,32 @@ function showDetail(p) {
     var row = el("div", null, "el"), info = el("div");
     if (e.pic) { var im = el("img", null, "pic"); im.src = "../shots/" + e.pic; im.alt = label(e); im.loading = "lazy"; im.onerror = function () { im.remove(); }; info.appendChild(im); }
     info.appendChild(el("div", label(e)));
-    info.appendChild(el("span", (e.role || e.tag || "") + (e.stable ? "" : " · fragile locator"), "tag"));
+    var gap = !!(p.gaps && p.gaps.has(e.locator));
+    info.appendChild(el("span", (e.role || e.tag || "") + (e.stable ? "" : " · fragile locator") + (gap ? " · not covered" : ""), gap ? "tag gap" : "tag"));
     info.appendChild(el("code", e.locator || "no locator"));
     row.appendChild(info); box.appendChild(row);
   });
   if (p.elements.length > 300) box.appendChild(el("p", "Showing 300 of " + p.elements.length + " elements.", "none"));
 }
 
-function start(data) {
+// applyCoverage marks the pages and elements that no built test reaches (out/coverage.json, written by poll)
+function applyCoverage(cov) {
+  var rec = {}, pages = (cov && cov.pages) || [];
+  pages.forEach(function (r) { rec[norm(r.url)] = r; });
+  G.gapPages = 0; G.gapEls = 0; G.totalEls = 0;
+  G.pages.forEach(function (p) {
+    var r = rec[norm(p.url)];
+    G.totalEls += p.elements.length;
+    if (!r) return;
+    p.gaps = new Set(r.gaps || []);
+    p.node.gap = !r.covered;
+    if (p.node.gap) G.gapPages++;
+    G.gapEls += p.elements.filter(function (e) { return p.gaps.has(e.locator); }).length; // per element, as the total is
+  });
+  G.hasCoverage = pages.length > 0;
+}
+
+function start(data, cov) {
   var pages = data.pages || [];
   if (!pages.length) {
     document.getElementById("empty").textContent = "No crawl yet. Run hydra crawl, then this map fills in.";
@@ -252,13 +273,18 @@ function start(data) {
   }
   resize();
   build(data);
+  applyCoverage(cov);
   var meta = document.getElementById("meta");
-  meta.textContent = pages.length + " pages · " + G.links + " links" + (data.crawledAt ? " · crawled " + data.crawledAt : "");
+  meta.textContent = pages.length + " pages · " + G.links + " links" + (data.crawledAt ? " · crawled " + data.crawledAt : "") +
+    (G.hasCoverage ? " · not reached by a built test: " + G.gapPages + " pages, " + G.gapEls + " of " + G.totalEls + " elements (amber)" : "");
   select(G.start.node);
   kick();
 }
 window.addEventListener("resize", resize);
-fetch("../api/sitemap").then(function (r) { return r.json(); }).then(start).catch(function () {
+Promise.all([
+  fetch("../api/sitemap").then(function (r) { return r.json(); }),
+  fetch("../api/coverage").then(function (r) { return r.json(); }).catch(function () { return { pages: [] }; })
+]).then(function (v) { start(v[0], v[1]); }).catch(function () {
   document.getElementById("meta").textContent = "Could not load the site map.";
 });
 </script>

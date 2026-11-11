@@ -22,8 +22,8 @@ const sitemapPage = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Site map</title>
 <style>
-:root { --bg:#fbfbfa; --fg:#1d1d1f; --mute:#8a8a8f; --card:#ffffff; --line:#e4e4e8; --on:#7c3aed; --warn:#b45309; color-scheme: light }
-@media (prefers-color-scheme: dark) { :root { --bg:#1b1b1d; --fg:#dcdcdf; --mute:#7c7c84; --card:#242427; --line:#353539; --on:#a78bfa; --warn:#f59e0b; color-scheme: dark } }
+:root { --bg:#fbfbfa; --fg:#1d1d1f; --mute:#8a8a8f; --card:#ffffff; --line:#e4e4e8; --on:#7c3aed; --warn:#b45309; --ok:#15803d; color-scheme: light }
+@media (prefers-color-scheme: dark) { :root { --bg:#1b1b1d; --fg:#dcdcdf; --mute:#7c7c84; --card:#242427; --line:#353539; --on:#a78bfa; --warn:#f59e0b; --ok:#4ade80; color-scheme: dark } }
 * { box-sizing:border-box }
 body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; height:100vh; display:flex; flex-direction:column }
 header { padding:8px 12px; border-bottom:1px solid var(--line); background:var(--card); color:var(--mute); font-size:13px; display:flex; gap:12px; flex-wrap:wrap; align-items:baseline }
@@ -68,7 +68,7 @@ function norm(u) { var x = new URL(u); x.hash = ""; return x.href.replace(/\/$/,
 function label(e) { return e.name || e.placeholder || e.byLabel || e.testid || e.id || e.tag || "element"; }
 function pathOf(u) { try { var x = new URL(u); return x.pathname + x.search || "/"; } catch (err) { return u; } }
 function nodeR(n) { return 5 + Math.min(n.deg, 10) * 0.8; }
-function readColors() { var s = getComputedStyle(document.documentElement); ["fg", "mute", "on", "warn"].forEach(function (k) { C[k] = s.getPropertyValue("--" + k).trim(); }); }
+function readColors() { var s = getComputedStyle(document.documentElement); ["fg", "mute", "on", "warn", "ok"].forEach(function (k) { C[k] = s.getPropertyValue("--" + k).trim(); }); }
 
 function resize() {
   var r = canvas.parentNode.getBoundingClientRect();
@@ -134,9 +134,9 @@ function draw() {
   var focus = G.hover || G.sel, nb = focus ? focus.nbr : null;
   ctx.save(); ctx.translate(G.tx, G.ty); ctx.scale(s, s);
   G.edges.forEach(function (e) {
-    var hot = focus && (e.a === focus || e.b === focus);
-    ctx.globalAlpha = focus ? (hot ? 0.9 : 0.08) : 0.35;
-    ctx.strokeStyle = hot ? C.on : C.mute; ctx.lineWidth = (hot ? 1.8 : 1) / s;
+    var hot = focus && (e.a === focus || e.b === focus), known = e.cov !== undefined;
+    ctx.globalAlpha = focus ? (hot ? 0.95 : 0.1) : (known ? 0.7 : 0.35);
+    ctx.strokeStyle = known ? (e.cov ? C.ok : C.warn) : (hot ? C.on : C.mute); ctx.lineWidth = (hot ? 2.2 : 1.2) / s;
     ctx.beginPath(); ctx.moveTo(e.a.x, e.a.y); ctx.lineTo(e.b.x, e.b.y); ctx.stroke();
   });
   G.nodes.forEach(function (n) {
@@ -261,6 +261,8 @@ function applyCoverage(cov) {
     G.gapEls += p.elements.filter(function (e) { return p.gaps.has(e.locator); }).length; // per element, as the total is
   });
   G.hasCoverage = pages.length > 0;
+  // a link is covered when the page it leads to is reached by a built test
+  G.edges.forEach(function (e) { e.cov = e.b.gap === undefined ? undefined : !e.b.gap; });
 }
 
 function start(data, cov) {
@@ -276,7 +278,7 @@ function start(data, cov) {
   applyCoverage(cov);
   var meta = document.getElementById("meta");
   meta.textContent = pages.length + " pages · " + G.links + " links" + (data.crawledAt ? " · crawled " + data.crawledAt : "") +
-    (G.hasCoverage ? " · not reached by a built test: " + G.gapPages + " pages, " + G.gapEls + " of " + G.totalEls + " elements (amber)" : "");
+    (G.hasCoverage ? " · not reached by a built test: " + G.gapPages + " pages, " + G.gapEls + " of " + G.totalEls + " elements · green links lead to a page a built test reaches, amber to one none reaches" : "");
   select(G.start.node);
   kick();
 }

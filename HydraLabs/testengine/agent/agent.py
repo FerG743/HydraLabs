@@ -8,7 +8,8 @@ The model never writes code or files. It fills a declarative spec (spec.py); ren
 layout. Guardrails live in code, not in the prompt: the browser blocks every non-GET request (guard.cjs), the file tools are
 read-only, run_code_unsafe is never offered, and `finish` is refused until a spec was rendered and the checks are clean.
 """
-import argparse, json, os, sys, time, urllib.request
+import argparse, json, os, re, sys, time, urllib.request
+from urllib.parse import urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -75,6 +76,16 @@ def compact(messages, budget_chars):
             messages[i]["content"] = f"[omitido: resultado de {len(messages[i]['content'])} caracteres, ya no es necesario]"
 
 
+NAVIGATE = re.compile(r"[Nn]avigate to `?(/[^`\s]*)")  # the case's first step names the page it opens
+PAGE_URL = re.compile(r"- Page URL: (\S+)")  # every browser tool answer names the page it left the browser on
+
+
+def _locator_lines(pg):
+    """One line per stable, unique, non-link element of a crawled page."""
+    return [f"{e['role']} {e['name'][:40]!r} -> {e['locator']}" + (f" opciones={e['options']}" if e.get("options") else "")
+            for e in pg["elements"] if e.get("stable") and e.get("role") != "link"]
+
+
 def map_summary(path, limit=3500):
     """The crawl, compressed for the model: stable, unique locators only, one line each. Truncated, never the whole map."""
     try:
@@ -84,15 +95,29 @@ def map_summary(path, limit=3500):
     lines, seen = [], set()
     for pg in crawl.get("pages", []):
         lines.append(f"# {pg['url'].split('//', 1)[-1].split('/', 1)[-1] or '/'}")
-        for e in pg["elements"]:
-            if e.get("stable") and e["locator"] not in seen and e.get("role") != "link":
-                seen.add(e["locator"])
-                lines.append(f"{e['role']} {e['name'][:40]!r} -> {e['locator']}" + (f" opciones={e['options']}" if e.get("options") else ""))
+        for line in _locator_lines(pg):
+            locator = line.rsplit(" -> ", 1)[-1]
+            if locator not in seen:
+                seen.add(locator)
+                lines.append(line)
     return "\n".join(lines)[:limit]
 
 
+def page_summary(path, url, limit=3500):
+    """Only the locators of the crawled page at url (matched by its path), so the model sees the page it is on."""
+    try:
+        crawl = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    want = urlparse(url).path.rstrip("/") or "/"
+    for pg in crawl.get("pages", []):
+        if (urlparse(pg["url"]).path.rstrip("/") or "/") == want:
+            return "\n".join(_locator_lines(pg))[:limit]
+    return ""
+
+
 def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", mcp=None, ctx_tokens=32000, log_path=None, notes="",
-        app_map="", max_tokens=0):
+        app_map="", max_tokens=0, crawl=""):
     sb = Sandbox(repo, app)
     state = {"case": case, "spec": None, "rendered": False}
     scaffold_warnings = render.scaffold(repo, app)
@@ -104,7 +129,13 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
     task = {"BASE_URL": base_url, "app": app, "case": {k: case[k] for k in ("id", "name", "meta", "precondition", "steps", "expected") if k in case}}
     if scaffold_warnings:
         task["avisos"] = scaffold_warnings
-    if app_map:  # what the crawler already found: the model should not rediscover it
+    sent = set()  # pages whose locators the model already has
+    if crawl:  # the crawler's locators for the page the case opens, then for each page it moves to
+        start = next((m.group(1) for s in case.get("steps", []) for m in [NAVIGATE.search(str(s))] if m), "")
+        if start:
+            sent.add(urlparse(base_url.rstrip("/") + start).path.rstrip("/") or "/")
+            task["pagina_inicial"] = {"path": start, "locators": page_summary(crawl, base_url.rstrip("/") + start)}
+    elif app_map:  # what the crawler already found: the model should not rediscover it
         task["mapa_de_la_app"] = app_map
     if notes:  # what is peculiar about this application, kept by humans in knowledge/<App>.md
         task["notas_de_la_app"] = notes
@@ -131,6 +162,7 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
             msg = chat(lm_url, model, messages, tools, effort)
             messages.append({k: v for k, v in msg.items() if k in ("role", "content", "tool_calls") and v is not None} | {"content": msg.get("content") or ""})
             calls = msg.get("tool_calls") or []
+            shown = []  # the pages the browser showed in this turn
             note("assistant", {"content": msg.get("content"), "calls": [(c["function"]["name"], c["function"]["arguments"]) for c in calls]})
             if not calls:
                 messages.append({"role": "user", "content": "Usa las herramientas. Cuando termines, llama a finish."})
@@ -163,6 +195,13 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
                 out = out if len(out) <= RESULT_CHARS else out[:RESULT_CHARS] + "\n...[truncado]"
                 note("tool", {"name": name, "args": args, "result": out[:1500]})
                 messages.append({"role": "tool", "tool_call_id": c.get("id", name), "content": out})
+                shown += PAGE_URL.findall(out)
+            for url in shown if crawl else []:  # a page the model has not seen yet: its locators go in before its next move
+                path = urlparse(url).path.rstrip("/") or "/"
+                if path not in sent:
+                    sent.add(path)
+                    pl = page_summary(crawl, url)
+                    messages.append({"role": "user", "content": f"Locators de la página {path}:\n" + (pl or "(esta página no está en el mapa de la app)")})
             if result["finished"]:
                 break
         if not result["finished"] and not result["summary"]:
@@ -264,6 +303,6 @@ if __name__ == "__main__":
     log = os.path.join(log_dir, f"{case['id']}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl")
     res = run(case, os.path.expanduser(a.repo), a.app, a.base_url, a.model, a.lm_url, a.max_turns, a.effort, ctx_tokens=ctx or 32000, log_path=log,
               notes=open(a.notes, encoding="utf-8").read() if a.notes else "",
-              app_map=map_summary(a.map) if a.map else "", max_tokens=a.max_tokens)
+              crawl=a.map, max_tokens=a.max_tokens)
     print(json.dumps({**res, "tokens": USAGE["tokens"], "log": log}, indent=2, ensure_ascii=False))
     sys.exit(0 if res["finished"] and not res["problems"] else 1)

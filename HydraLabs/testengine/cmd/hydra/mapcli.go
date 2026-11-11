@@ -72,6 +72,7 @@ type mapView struct {
 	ReportedAt string        `json:"reportedAt"`
 	Links      int           `json:"links"`
 	Pages      []mapPageView `json:"pages"`
+	KPIs       *mapKPIs      `json:"kpis,omitempty"`
 }
 
 func mapNorm(u string) string {
@@ -167,6 +168,10 @@ func buildMapView(app string, crawl crawlFile, cov *covFile) mapView {
 		}
 		v.Pages = append(v.Pages, vp)
 	}
+	if v.Reported {
+		k := computeKPIs(v)
+		v.KPIs = &k
+	}
 	return v
 }
 
@@ -252,6 +257,17 @@ func printMapSummary(v mapView) {
 		fmt.Printf("built tests reach %d of %d pages and %d of %d elements (report %s)\n", reached, pages, covEls, els, v.ReportedAt)
 	} else {
 		fmt.Println("no coverage report yet: a poll writes it")
+	}
+	if k := v.KPIs; k != nil {
+		fmt.Printf("unique locators reached   %d of %d\n", k.CoveredLocators, k.UniqueLocators)
+		fmt.Printf("interactive reached       %d of %d (buttons, inputs, tabs)\n", k.InteractiveCovered, k.Interactive)
+		var parts []string
+		for _, g := range k.BiggestGaps {
+			parts = append(parts, fmt.Sprintf("%s %d", g.Path, g.Uncovered))
+		}
+		if len(parts) > 0 {
+			fmt.Printf("biggest gaps (uncovered elements)  %s\n", strings.Join(parts, " · "))
+		}
 	}
 	for _, p := range v.Pages {
 		mark := " "

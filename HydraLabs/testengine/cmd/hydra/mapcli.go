@@ -335,3 +335,14 @@ func orNone(s []string) []string {
 	}
 	return s
 }
+
+// projectPagesArgs rewrites "DWQ pages [flags]" to "map --project DWQ [flags]", so the project comes first.
+func projectPagesArgs(reg *Registry, args []string) ([]string, bool) {
+	if reg == nil || len(args) < 2 || args[1] != "pages" {
+		return nil, false
+	}
+	if _, ok := reg.Projects[args[0]]; !ok {
+		return nil, false
+	}
+	return append([]string{"map", "--project", args[0]}, args[2:]...), true
+}

@@ -246,6 +246,11 @@ func main() {
 		}
 		os.Args = append([]string{os.Args[0], "poll"}, args...)
 	}
+	if reg, err := LoadRegistry(defaultRegistry()); err == nil { // hydra DWQ pages: the project first
+		if args, ok := projectPagesArgs(reg, os.Args[1:]); ok {
+			os.Args = append([]string{os.Args[0]}, args...)
+		}
+	}
 	if os.Args[1] == "poll" {
 		if handled, code := pollMulti(os.Args[2:]); handled {
 			os.Exit(code)

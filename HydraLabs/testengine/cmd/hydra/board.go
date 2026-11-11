@@ -194,6 +194,13 @@ func (c Config) BoardUI(addr string) error {
 	mux.Handle("/crawl/", http.StripPrefix("/crawl", crawlView(filepath.Join(c.Out, "crawl", "events.jsonl"))))
 	mux.Handle("/cases/", http.StripPrefix("/cases", c.casesView()))
 	mux.Handle("/help/", http.StripPrefix("/help", helpView()))
+	mux.HandleFunc("/sitemap/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, sitemapPage)
+	})
+	mux.HandleFunc("/api/sitemap", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(c.sitemapData())
+	})
 	mux.HandleFunc("/playlists/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, playlistsPage)
 	})
@@ -292,7 +299,7 @@ dialog footer button{font:inherit;padding:7px 14px;border-radius:6px;border:1px 
 <footer><span id=dmsg role=status></span><button type=button onclick="$('data').close()">Close</button><button type=button class=go id=dsave>Save</button></footer></dialog>
 <main id=grid>
 <section class="tile cases"><h2>Cases<span class=tabs role=tablist aria-label="Cases"><button type=button role=tab id=t-status aria-controls=cases aria-selected=true>Status</button><button type=button role=tab id=t-write aria-controls=p-write aria-selected=false tabindex=-1>Write a case</button></span><span class=sp></span><span id=srcinfo style="text-transform:none;letter-spacing:0"></span><a id=writeopen href="cases/" target=_blank hidden>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><div class=body id=cases role=tabpanel aria-labelledby=t-status></div><iframe id=p-write role=tabpanel aria-labelledby=t-write title="Write a case" hidden></iframe></section>
-<section class=tile id=side><h2><span class=tabs role=tablist aria-label="Pipeline and tools"><button type=button role=tab id=s-live aria-controls=sp-live aria-selected=true>Live pipeline</button><button type=button role=tab id=s-crawl aria-controls=sp-crawl aria-selected=false tabindex=-1>Last crawl</button><button type=button role=tab id=s-play aria-controls=sp-play aria-selected=false tabindex=-1>Playlists</button><button type=button role=tab id=s-help aria-controls=sp-help aria-selected=false tabindex=-1>Commands</button></span><span class=sp></span><a id=sideopen href="live/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe id=sp-live role=tabpanel aria-labelledby=s-live title="Live pipeline"></iframe><iframe id=sp-crawl role=tabpanel aria-labelledby=s-crawl title="Last crawl" hidden></iframe><iframe id=sp-play role=tabpanel aria-labelledby=s-play title="Playlists" hidden></iframe><iframe id=sp-help role=tabpanel aria-labelledby=s-help title="Command reference" hidden></iframe></section>
+<section class=tile id=side><h2><span class=tabs role=tablist aria-label="Pipeline and tools"><button type=button role=tab id=s-live aria-controls=sp-live aria-selected=true>Live pipeline</button><button type=button role=tab id=s-crawl aria-controls=sp-crawl aria-selected=false tabindex=-1>Last crawl</button><button type=button role=tab id=s-play aria-controls=sp-play aria-selected=false tabindex=-1>Playlists</button><button type=button role=tab id=s-map aria-controls=sp-map aria-selected=false tabindex=-1>Site map</button><button type=button role=tab id=s-help aria-controls=sp-help aria-selected=false tabindex=-1>Commands</button></span><span class=sp></span><a id=sideopen href="live/" target=_blank>Open ↗</a><button type=button class=exp onclick="big(this)">Expand</button></h2><iframe id=sp-live role=tabpanel aria-labelledby=s-live title="Live pipeline"></iframe><iframe id=sp-crawl role=tabpanel aria-labelledby=s-crawl title="Last crawl" hidden></iframe><iframe id=sp-play role=tabpanel aria-labelledby=s-play title="Playlists" hidden></iframe><iframe id=sp-map role=tabpanel aria-labelledby=s-map title="Site map" hidden></iframe><iframe id=sp-help role=tabpanel aria-labelledby=s-help title="Command reference" hidden></iframe></section>
 </main>
 <script>
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -313,7 +320,7 @@ function tab(t){tabs.forEach(x=>{const on=x===t;x.setAttribute('aria-selected',o
   if(t.id=='t-write'&&!$('p-write').src)$('p-write').src='cases/';$('writeopen').hidden=t.id!='t-write'}
 tabs.forEach((t,i)=>{t.onclick=()=>tab(t);t.onkeydown=e=>{if(e.key=='ArrowRight'||e.key=='ArrowLeft'){const n=tabs[(i+(e.key=='ArrowRight'?1:tabs.length-1))%tabs.length];tab(n);n.focus()}}});
 // the right tile: one tab per page; a page loads the first time its tab opens
-const sideTabs=[['s-live','sp-live','live/'],['s-crawl','sp-crawl','crawl/'],['s-play','sp-play','playlists/'],['s-help','sp-help','help/']];
+const sideTabs=[['s-live','sp-live','live/'],['s-crawl','sp-crawl','crawl/'],['s-map','sp-map','sitemap/'],['s-play','sp-play','playlists/'],['s-help','sp-help','help/']];
 function sideTab(id){sideTabs.forEach(([t,p,path])=>{const on=t==id,tb=$(t),pn=$(p);tb.setAttribute('aria-selected',on);tb.tabIndex=on?0:-1;pn.hidden=!on;
   if(on){if(!pn.getAttribute('src'))pn.src=path;$('sideopen').href=path}})}
 sideTabs.forEach(([t],i)=>{const tb=$(t);tb.onclick=()=>sideTab(t);tb.onkeydown=e=>{if(e.key=='ArrowRight'||e.key=='ArrowLeft'){const n=sideTabs[(i+(e.key=='ArrowRight'?1:sideTabs.length-1))%sideTabs.length][0];sideTab(n);$(n).focus()}}});

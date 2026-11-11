@@ -368,7 +368,11 @@ func main() {
 	case "map": // read-only: the site map of the app, and the gaps the built tests leave (--gaps, --page, --json)
 		gaps, page, asJSON := fs.Bool("gaps", false, "only what no built test reaches"), fs.String("page", "", "one page, by path or URL"), fs.Bool("json", false, "machine-readable")
 		fs.Parse(os.Args[2:])
-		err = cfg.printMap(*gaps, *page, *asJSON)
+		if cfg.App == "" && cfg.Registry != nil { // no project named: every project in the registry
+			err = mapAllProjects(cfg.Registry, *gaps, *page, *asJSON)
+		} else {
+			err = cfg.printMap(*gaps, *page, *asJSON)
+		}
 	case "history": // read-only: every recorded execution of a project, or of one case
 		key, last, asJSON := fs.String("key", "", "only this case"), fs.Int("last", 30, "newest N (0 = all)"), fs.Bool("json", false, "machine-readable")
 		fs.Parse(os.Args[2:])

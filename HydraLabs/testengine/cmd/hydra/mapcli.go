@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"net/url"
 	"os"
@@ -176,6 +177,27 @@ func sortedKeys(m map[int]bool) []int {
 	}
 	sort.Ints(ks)
 	return ks
+}
+
+// mapAllProjects prints the map of every project in the registry, one block each; the page and JSON views need one project.
+func mapAllProjects(reg *Registry, gaps bool, page string, asJSON bool) error {
+	if page != "" || asJSON {
+		return fmt.Errorf("--page and --json need one project: hydra map --project KEY")
+	}
+	regPath := filepath.Join(reg.dir, "projects.json")
+	for _, k := range reg.Keys() {
+		fmt.Printf("== %s\n", k)
+		cfg, err := cfgFlags(flag.NewFlagSet("map-"+k, flag.ContinueOnError), []string{"--project", k, "--registry", regPath})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "hydra: %s: %v\n", k, err)
+			continue
+		}
+		if err := cfg.printMap(gaps, "", false); err != nil {
+			fmt.Fprintf(os.Stderr, "hydra: %s: %v\n", k, err)
+		}
+		fmt.Println()
+	}
+	return nil
 }
 
 func (c Config) printMap(gaps bool, page string, asJSON bool) error {

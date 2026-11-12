@@ -39,6 +39,11 @@ header .hint { margin-left:auto; font-size:12px }
 #state .big.ok { color:var(--ok) }
 #state .lbl { color:var(--mute); font-size:12px; margin-top:6px }
 #state .stat { min-width:150px }
+#state .pages { margin-top:12px; border-top:1px solid var(--line); padding-top:6px; max-height:240px; overflow:auto; min-width:300px }
+#state .prow { display:flex; justify-content:space-between; gap:18px; padding:4px 2px; font:12px ui-monospace,Menlo,monospace; cursor:pointer; border-radius:4px }
+#state .prow:hover { background:var(--bg) }
+#state .pname { overflow-wrap:anywhere }
+#state .pnum { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap }
 #detail { width:340px; border-left:1px solid var(--line); background:var(--card); overflow:auto; padding:14px 16px; font-size:13px }
 #detail h2 { font-size:17px; margin:0 0 2px; word-break:break-all }
 #detail .sub { color:var(--mute); font-size:13px }
@@ -338,6 +343,21 @@ function renderState() {
   row.appendChild(stat(G.gapEls + " / " + G.totalEls, "elements not reached by a built test"));
   row.appendChild(stat(G.gapPages + " / " + G.pages.length, "pages not reached"));
   box.appendChild(row);
+  readColors(); // the page figures below are coloured like the dots, from the least reached
+  var pages = G.pages.filter(function (p) { return p.node.total !== undefined; }).sort(function (a, b) { return a.node.share - b.node.share; });
+  if (pages.length) {
+    var list = el("div", null, "pages");
+    pages.forEach(function (p) {
+      var r = el("div", null, "prow");
+      r.appendChild(el("span", pathOf(p.url), "pname"));
+      var n = el("span", p.node.reached + " / " + p.node.total + " elements", "pnum");
+      n.style.color = mix(C.warn, C.ok, p.node.share);
+      r.appendChild(n);
+      r.onclick = function () { select(p.node); };
+      list.appendChild(r);
+    });
+    box.appendChild(list);
+  }
   if (G.flows.length) {
     var full = G.flows.filter(function (n) { return !n.gap; }).length;
     box.appendChild(el("div", full + " of " + G.flows.length + " playlists exercise every element they reach", "lbl"));

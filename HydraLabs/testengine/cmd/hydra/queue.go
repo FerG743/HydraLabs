@@ -320,6 +320,9 @@ func Poll(cfgs []*Config, o PollOpts) (gated bool, err error) {
 		if e := cfg.coverageGaps(); e != nil {
 			fmt.Fprintln(os.Stderr, "coverage gaps not updated:", e)
 		}
+		if e := cfg.buildRoutes(); e != nil {
+			fmt.Fprintln(os.Stderr, "routes not updated:", e)
+		}
 	}
 	return gated, err
 }

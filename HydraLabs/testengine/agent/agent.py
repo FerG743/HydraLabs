@@ -16,6 +16,7 @@ sys.path.insert(0, HERE)
 import render  # noqa: E402
 import runner  # noqa: E402
 import spec as specmod  # noqa: E402
+import modindex  # noqa: E402
 import structure_check  # noqa: E402
 from mcp_client import MCPClient, playwright_command  # noqa: E402
 from sandbox import Sandbox  # noqa: E402
@@ -139,6 +140,10 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
         task["mapa_de_la_app"] = app_map
     if notes:  # what is peculiar about this application, kept by humans in knowledge/<App>.md
         task["notas_de_la_app"] = notes
+    case_paths = [m.group(1) for s in case.get("steps", []) for m in [NAVIGATE.search(str(s))] if m]
+    have = modindex.locator_lines(repo, app, case_paths)  # selectors the repo already has for these pages
+    if have:
+        task["locators_del_repo"] = {"instruccion": "Estos selectores ya existen en el repo, por página. Si un elemento del caso es el mismo, usa ese nombre y ese selector; no los dupliques con otro nombre (el generador rechaza un nombre con dos selectores).", "por_pagina": have}
     messages = [{"role": "system", "content": system},
                 {"role": "user", "content": "Automatiza este caso.\n" + json.dumps(task, ensure_ascii=False, indent=1)}]
     log = open(log_path, "w", encoding="utf-8") if log_path else None

@@ -1,6 +1,8 @@
 # Layout proposal: the app's repo and Hydra's output
 
-Status: proposal, for review. Nothing here has been moved yet.
+Status: decided in part. `cases/` and `reports/` stay at the top of the app's repo. `out/` is documented, not moved: the
+grouping below is the reference for `hydra/out/README.md`, and the move waits for a later decision. Nothing has been
+moved yet.
 
 The layout was shaped for a viewer that no longer runs. Hydra is a CI/CD pipeline, so the layout only needs to suit
 what CI runs and what a person opens. This document says what each folder is, what should change, and in what order.

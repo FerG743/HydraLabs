@@ -1,15 +1,15 @@
-package main
+package hydramaps
 
 import "testing"
 
 func TestKPIsCountUniqueLocatorsNotRepeatedNavLinks(t *testing.T) {
-	nav := mapElView{Locator: "role=link[name=\"Home\"]", Role: "link"}
-	btn := mapElView{Locator: "role=button[name=\"Go\"]", Role: "button"}
-	v := mapView{Pages: []mapPageView{
-		{Path: "/a", Elements: []mapElView{nav, {Locator: btn.Locator, Role: "button", Covered: true}}},
-		{Path: "/b", Elements: []mapElView{nav, {Locator: "role=textbox[name=\"Q\"]", Role: "textbox"}}},
+	nav := ElementView{Locator: "role=link[name=\"Home\"]", Role: "link"}
+	btn := ElementView{Locator: "role=button[name=\"Go\"]", Role: "button"}
+	v := View{Pages: []PageView{
+		{Path: "/a", Elements: []ElementView{nav, {Locator: btn.Locator, Role: "button", Covered: true}}},
+		{Path: "/b", Elements: []ElementView{nav, {Locator: "role=textbox[name=\"Q\"]", Role: "textbox"}}},
 	}}
-	k := computeKPIs(v)
+	k := ComputeKPIs(v)
 	if k.UniqueLocators != 3 || k.CoveredLocators != 1 {
 		t.Fatalf("unique: %+v", k)
 	}

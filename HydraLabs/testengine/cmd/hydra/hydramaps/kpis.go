@@ -1,4 +1,4 @@
-package main
+package hydramaps
 
 import "sort"
 
@@ -8,27 +8,27 @@ import "sort"
 var interactiveRoles = map[string]bool{"button": true, "textbox": true, "combobox": true, "checkbox": true,
 	"radio": true, "switch": true, "tab": true, "spinbutton": true, "slider": true, "searchbox": true}
 
-type pageGap struct {
+type Gap struct {
 	Path      string `json:"path"`
 	Uncovered int    `json:"uncoveredElements"`
 }
 
-type mapKPIs struct {
-	UniqueLocators     int       `json:"uniqueLocators"`
-	CoveredLocators    int       `json:"coveredLocators"`
-	Interactive        int       `json:"interactiveLocators"`
-	InteractiveCovered int       `json:"interactiveCovered"`
-	BiggestGaps        []pageGap `json:"biggestGaps"`
+type KPIs struct {
+	UniqueLocators     int   `json:"uniqueLocators"`
+	CoveredLocators    int   `json:"coveredLocators"`
+	Interactive        int   `json:"interactiveLocators"`
+	InteractiveCovered int   `json:"interactiveCovered"`
+	BiggestGaps        []Gap `json:"biggestGaps"`
 }
 
-// computeKPIs needs a report: without one nothing is covered yet, so the KPIs would only say so.
-func computeKPIs(v mapView) mapKPIs {
+// ComputeKPIs needs a report: without one nothing is covered yet, so the KPIs would only say so.
+func ComputeKPIs(v View) KPIs {
 	type seen struct {
 		role    string
 		covered bool
 	}
 	locs := map[string]*seen{}
-	var gaps []pageGap
+	var gaps []Gap
 	for _, p := range v.Pages {
 		uncovered := 0
 		for _, e := range p.Elements {
@@ -44,10 +44,10 @@ func computeKPIs(v mapView) mapKPIs {
 			}
 		}
 		if uncovered > 0 {
-			gaps = append(gaps, pageGap{Path: p.Path, Uncovered: uncovered})
+			gaps = append(gaps, Gap{Path: p.Path, Uncovered: uncovered})
 		}
 	}
-	var k mapKPIs
+	var k KPIs
 	for _, s := range locs {
 		k.UniqueLocators++
 		if s.covered {

@@ -4,185 +4,14 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
+	"testengine/cmd/hydra/hydramaps"
 )
 
 // hydra map: the site map read from the terminal. The app map (the crawl) and the gap report poll writes are read
 // as they are; nothing is run or written.
-
-type mapEl struct {
-	Role    string `json:"role"`
-	Name    string `json:"name"`
-	Tag     string `json:"tag"`
-	Locator string `json:"locator"`
-	Href    string `json:"href"`
-	Stable  bool   `json:"stable"`
-}
-
-type mapPage struct {
-	URL      string  `json:"url"`
-	Title    string  `json:"title"`
-	Shot     string  `json:"shot"`
-	Elements []mapEl `json:"elements"`
-}
-
-type crawlFile struct {
-	BaseURL   string    `json:"baseUrl"`
-	CrawledAt string    `json:"crawledAt"`
-	Pages     []mapPage `json:"pages"`
-}
-
-type covFile struct {
-	GeneratedAt string `json:"generatedAt"`
-	Pages       []struct {
-		URL     string   `json:"url"`
-		Covered bool     `json:"covered"`
-		Gaps    []string `json:"gaps"`
-	} `json:"pages"`
-}
-
-// the view: the pages with their links both ways, and what the last report says about each page and element
-type mapElView struct {
-	Label   string `json:"label"`
-	Role    string `json:"role"`
-	Locator string `json:"locator"`
-	Covered bool   `json:"covered"`
-}
-
-type mapPageView struct {
-	Path     string      `json:"path"`
-	URL      string      `json:"url"`
-	Title    string      `json:"title"`
-	Covered  bool        `json:"covered"`
-	Shot     string      `json:"shot"`
-	Links    []string    `json:"linksTo"`
-	LinkedBy []string    `json:"linkedFrom"`
-	Elements []mapElView `json:"elements"`
-}
-
-type mapView struct {
-	App        string        `json:"app"`
-	BaseURL    string        `json:"baseUrl"`
-	CrawledAt  string        `json:"crawledAt"`
-	Reported   bool          `json:"reported"`
-	ReportedAt string        `json:"reportedAt"`
-	Links      int           `json:"links"`
-	Pages      []mapPageView `json:"pages"`
-	KPIs       *mapKPIs      `json:"kpis,omitempty"`
-}
-
-func mapNorm(u string) string {
-	p, err := url.Parse(u)
-	if err != nil {
-		return u
-	}
-	p.Fragment = ""
-	return strings.TrimSuffix(p.String(), "/")
-}
-
-func pagePath(u string) string {
-	p, err := url.Parse(u)
-	if err != nil || p.Path == "" {
-		return "/"
-	}
-	return p.Path + func() string {
-		if p.RawQuery != "" {
-			return "?" + p.RawQuery
-		}
-		return ""
-	}()
-}
-
-func elLabel(e mapEl) string {
-	for _, s := range []string{e.Name, e.Tag} {
-		if s != "" {
-			return s
-		}
-	}
-	return "element"
-}
-
-// buildMapView joins the crawl with the gap report. Without a report (no poll yet) every page reads as not reached.
-func buildMapView(app string, crawl crawlFile, cov *covFile) mapView {
-	v := mapView{App: app, BaseURL: crawl.BaseURL, CrawledAt: crawl.CrawledAt, Pages: []mapPageView{}}
-	index := map[string]int{}
-	for i, p := range crawl.Pages {
-		index[mapNorm(p.URL)] = i
-	}
-	gaps := map[string]map[string]bool{} // page url -> uncovered locators (nil when no report)
-	covered := map[string]bool{}
-	if cov != nil {
-		v.Reported, v.ReportedAt = true, cov.GeneratedAt
-		for _, r := range cov.Pages {
-			covered[mapNorm(r.URL)] = r.Covered
-			gaps[mapNorm(r.URL)] = map[string]bool{}
-			for _, g := range r.Gaps {
-				gaps[mapNorm(r.URL)][g] = true
-			}
-		}
-	}
-	linked := make([]map[int]bool, len(crawl.Pages))
-	linkedBy := make([]map[int]bool, len(crawl.Pages))
-	for i := range crawl.Pages {
-		linked[i], linkedBy[i] = map[int]bool{}, map[int]bool{}
-	}
-	for i, p := range crawl.Pages {
-		base, err := url.Parse(p.URL)
-		if err != nil {
-			continue
-		}
-		for _, e := range p.Elements {
-			if e.Href == "" {
-				continue
-			}
-			ref, err := url.Parse(e.Href)
-			if err != nil {
-				continue
-			}
-			j, ok := index[mapNorm(base.ResolveReference(ref).String())]
-			if ok && j != i && !linked[i][j] {
-				linked[i][j], linkedBy[j][i] = true, true
-				v.Links++
-			}
-		}
-	}
-	for i, p := range crawl.Pages {
-		key := mapNorm(p.URL)
-		vp := mapPageView{Path: pagePath(p.URL), URL: p.URL, Title: p.Title, Shot: p.Shot, Covered: covered[key]}
-		if !v.Reported {
-			vp.Covered = false
-		}
-		for _, j := range sortedKeys(linked[i]) {
-			vp.Links = append(vp.Links, pagePath(crawl.Pages[j].URL))
-		}
-		for _, j := range sortedKeys(linkedBy[i]) {
-			vp.LinkedBy = append(vp.LinkedBy, pagePath(crawl.Pages[j].URL))
-		}
-		for _, e := range p.Elements {
-			ok := v.Reported && !gaps[key][e.Locator]
-			vp.Elements = append(vp.Elements, mapElView{Label: elLabel(e), Role: e.Role, Locator: e.Locator, Covered: ok})
-		}
-		v.Pages = append(v.Pages, vp)
-	}
-	if v.Reported {
-		k := computeKPIs(v)
-		v.KPIs = &k
-	}
-	return v
-}
-
-func sortedKeys(m map[int]bool) []int {
-	var ks []int
-	for k := range m {
-		ks = append(ks, k)
-	}
-	sort.Ints(ks)
-	return ks
-}
 
 // mapAllProjects prints the map of every project in the registry, one block each; the page and JSON views need one project.
 func mapAllProjects(reg *Registry, gaps bool, page string, asJSON bool) error {
@@ -206,23 +35,23 @@ func mapAllProjects(reg *Registry, gaps bool, page string, asJSON bool) error {
 }
 
 // loadMapView reads the app map and the gap report (if any) of this project.
-func (c Config) loadMapView() (mapView, error) {
+func (c Config) loadMapView() (hydramaps.View, error) {
 	b, err := os.ReadFile(c.crawlPath())
 	if err != nil {
-		return mapView{}, fmt.Errorf("no app map for %s yet: run hydra crawl first", c.App)
+		return hydramaps.View{}, fmt.Errorf("no app map for %s yet: run hydra crawl first", c.App)
 	}
-	var crawl crawlFile
+	var crawl hydramaps.Crawl
 	if err := json.Unmarshal(b, &crawl); err != nil {
-		return mapView{}, fmt.Errorf("%s: %w", c.crawlPath(), err)
+		return hydramaps.View{}, fmt.Errorf("%s: %w", c.crawlPath(), err)
 	}
-	var cov *covFile
+	var cov *hydramaps.Report
 	if cb, err := os.ReadFile(filepath.Join(c.Out, "coverage.json")); err == nil {
-		var f covFile
+		var f hydramaps.Report
 		if json.Unmarshal(cb, &f) == nil {
 			cov = &f
 		}
 	}
-	return buildMapView(c.App, crawl, cov), nil
+	return hydramaps.BuildView(c.App, crawl, cov), nil
 }
 
 func (c Config) printMap(gaps bool, page string, asJSON bool) error {
@@ -247,7 +76,7 @@ func (c Config) printMap(gaps bool, page string, asJSON bool) error {
 	return nil
 }
 
-func printMapSummary(v mapView) {
+func printMapSummary(v hydramaps.View) {
 	reached, pages, els, covEls := 0, len(v.Pages), 0, 0
 	for _, p := range v.Pages {
 		if p.Covered {
@@ -292,14 +121,14 @@ func printMapSummary(v mapView) {
 	}
 }
 
-func printMapGaps(v mapView) {
+func printMapGaps(v hydramaps.View) {
 	if !v.Reported {
 		fmt.Println("no coverage report yet: a poll writes it")
 		return
 	}
 	any := false
 	for _, p := range v.Pages {
-		var missing []mapElView
+		var missing []hydramaps.ElementView
 		for _, e := range p.Elements {
 			if !e.Covered {
 				missing = append(missing, e)
@@ -323,9 +152,9 @@ func printMapGaps(v mapView) {
 	}
 }
 
-func printMapPage(c Config, v mapView, want string) error {
+func printMapPage(c Config, v hydramaps.View, want string) error {
 	for _, p := range v.Pages {
-		if p.Path != want && mapNorm(p.URL) != mapNorm(want) {
+		if p.Path != want && hydramaps.Norm(p.URL) != hydramaps.Norm(want) {
 			continue
 		}
 		fmt.Printf("%s\n%s\n", p.Path, p.URL)

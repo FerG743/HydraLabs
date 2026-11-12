@@ -10,6 +10,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"testengine/cmd/hydra/hydramaps"
 	"time"
 )
 
@@ -31,13 +32,13 @@ type BoardCase struct {
 
 type Board struct {
 	ProjectStatus
-	BaseURL    string      `json:"baseUrl"`
-	Source     string      `json:"source"`
-	SignIn     bool        `json:"signIn"`
-	CrawlAt    string      `json:"crawlAt"`
-	CrawlPages int         `json:"crawlPages"`
-	Board      []BoardCase `json:"board"`
-	KPIs       *mapKPIs    `json:"kpis,omitempty"` // the site map's coverage, when a poll has written a report
+	BaseURL    string          `json:"baseUrl"`
+	Source     string          `json:"source"`
+	SignIn     bool            `json:"signIn"`
+	CrawlAt    string          `json:"crawlAt"`
+	CrawlPages int             `json:"crawlPages"`
+	Board      []BoardCase     `json:"board"`
+	KPIs       *hydramaps.KPIs `json:"kpis,omitempty"` // the site map's coverage, when a poll has written a report
 }
 
 func (c Config) board() Board {

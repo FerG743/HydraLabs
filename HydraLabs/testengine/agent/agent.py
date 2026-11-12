@@ -118,7 +118,7 @@ def page_summary(path, url, limit=3500):
 
 
 def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", mcp=None, ctx_tokens=32000, log_path=None, notes="",
-        app_map="", max_tokens=0, crawl=""):
+        app_map="", max_tokens=0, crawl="", hints=True):
     sb = Sandbox(repo, app)
     state = {"case": case, "spec": None, "rendered": False}
     scaffold_warnings = render.scaffold(repo, app)
@@ -131,6 +131,8 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
     if scaffold_warnings:
         task["avisos"] = scaffold_warnings
     sent = set()  # pages whose locators the model already has
+    if not hints:  # the bench's control run: the model gets the case and nothing the repo or the crawl already knows
+        crawl = ""
     if crawl:  # the crawler's locators for the page the case opens, then for each page it moves to
         start = next((m.group(1) for s in case.get("steps", []) for m in [NAVIGATE.search(str(s))] if m), "")
         if start:
@@ -141,7 +143,7 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
     if notes:  # what is peculiar about this application, kept by humans in knowledge/<App>.md
         task["notas_de_la_app"] = notes
     case_paths = [m.group(1) for s in case.get("steps", []) for m in [NAVIGATE.search(str(s))] if m]
-    have = modindex.locator_lines(repo, app, case_paths)  # selectors the repo already has for these pages
+    have = modindex.locator_lines(repo, app, case_paths) if hints else {}  # selectors the repo already has for these pages
     if have:
         task["locators_del_repo"] = {"instruccion": "Estos selectores ya existen en el repo, por página. Si un elemento del caso es el mismo, usa ese nombre y ese selector; no los dupliques con otro nombre (el generador rechaza un nombre con dos selectores).", "por_pagina": have}
     messages = [{"role": "system", "content": system},
@@ -296,6 +298,7 @@ if __name__ == "__main__":
     ap.add_argument("--map", default="", help="appmap/<App>.crawl.json: the crawl, given to the model so it does not re-explore")
     ap.add_argument("--log-dir", default="", help="where the transcript of this run goes (default: agent/runs); hydra points it into the app's repo")
     ap.add_argument("--max-tokens", type=int, default=0, help="hard cap on tokens for this case (0 = none)")
+    ap.add_argument("--no-hints", action="store_true", help="control run: no crawl or repo selectors in the task (for measuring)")
     ap.add_argument("--notes", default="", help="knowledge/<App>.md: peculiarities of the app, given to the model")
     a = ap.parse_args()
     ctx = loaded_context(a.lm_url, a.model)
@@ -308,6 +311,6 @@ if __name__ == "__main__":
     log = os.path.join(log_dir, f"{case['id']}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl")
     res = run(case, os.path.expanduser(a.repo), a.app, a.base_url, a.model, a.lm_url, a.max_turns, a.effort, ctx_tokens=ctx or 32000, log_path=log,
               notes=open(a.notes, encoding="utf-8").read() if a.notes else "",
-              crawl=a.map, max_tokens=a.max_tokens)
+              crawl=a.map, max_tokens=a.max_tokens, hints=not a.no_hints)
     print(json.dumps({**res, "tokens": USAGE["tokens"], "log": log}, indent=2, ensure_ascii=False))
     sys.exit(0 if res["finished"] and not res["problems"] else 1)

@@ -75,6 +75,14 @@ function norm(u) { var x = new URL(u); x.hash = ""; return x.href.replace(/\/$/,
 function label(e) { return e.name || e.placeholder || e.byLabel || e.testid || e.id || e.tag || "element"; }
 function pathOf(u) { try { var x = new URL(u); return x.pathname + x.search || "/"; } catch (err) { return u; } }
 function nodeR(n) { return 5 + Math.min(n.deg, 10) * 0.8; }
+// mix blends two #rrggbb colours: t=0 is a, t=1 is b
+function mix(a, b, t) {
+  var out = [1, 3, 5].map(function (i) {
+    var x = parseInt(a.substr(i, 2), 16), y = parseInt(b.substr(i, 2), 16);
+    return Math.round(x + (y - x) * t);
+  });
+  return "rgb(" + out.join(",") + ")";
+}
 function readColors() { var s = getComputedStyle(document.documentElement); ["fg", "mute", "on", "warn", "ok"].forEach(function (k) { C[k] = s.getPropertyValue("--" + k).trim(); }); }
 
 function resize() {
@@ -157,7 +165,7 @@ function draw() {
       ctx.fillRect(n.x - r, n.y - r, 2 * r, 2 * r);
       return;
     }
-    ctx.fillStyle = n === G.sel ? C.on : (isF || hot ? C.fg : (n.gap ? C.warn : C.mute));
+    ctx.fillStyle = n === G.sel ? C.on : (isF ? C.fg : (n.share === undefined ? C.mute : mix(C.warn, C.ok, n.share)));
     ctx.beginPath(); ctx.arc(n.x, n.y, nodeR(n), 0, 2 * Math.PI); ctx.fill();
   });
   ctx.restore();
@@ -251,6 +259,7 @@ function showDetail(p) {
   box.appendChild(el("h2", pathOf(p.url)));
   box.appendChild(el("div", p.title || "(no title)", "sub"));
   box.appendChild(el("div", p.url, "url"));
+  if (p.node.total !== undefined) box.appendChild(el("div", p.node.reached + " of " + p.node.total + " elements reached by a built test", p.node.gap ? "warnline" : "sub"));
   if (p.node.gap) box.appendChild(el("div", "Not reached by any built test", "warnline"));
   if (p.shot) { // the top of the page; the link opens the whole page
     var a = el("a"), pic = el("img", null, "page");
@@ -284,6 +293,8 @@ function applyCoverage(cov) {
     if (!r) return;
     p.gaps = new Set(r.gaps || []);
     p.node.gap = !r.covered;
+    p.node.reached = r.covered_elements; p.node.total = r.elements; // the dot's colour is the share of these reached
+    p.node.share = r.elements ? r.covered_elements / r.elements : (r.covered ? 1 : 0);
     if (p.node.gap) G.gapPages++;
     G.gapEls += p.elements.filter(function (e) { return p.gaps.has(e.locator); }).length; // per element, as the total is
   });
@@ -331,7 +342,7 @@ function renderState() {
     var full = G.flows.filter(function (n) { return !n.gap; }).length;
     box.appendChild(el("div", full + " of " + G.flows.length + " playlists exercise every element they reach", "lbl"));
   }
-  box.appendChild(el("div", "green: a built test reaches it · amber: none does", "lbl"));
+  box.appendChild(el("div", "dots: amber to green by share of their elements reached · links: green to a page reached", "lbl"));
 }
 
 function start(data, cov) {

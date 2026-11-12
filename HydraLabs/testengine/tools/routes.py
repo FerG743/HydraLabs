@@ -7,8 +7,9 @@ Each hop names the page it goes to, the link's locator and href, so a route can 
 listed as unreachable. The search is breadth-first, and neighbours are visited in URL order, so the same crawl always
 gives the same routes. It uses links only: what a button or tab reveals is not an edge here.
 """
-import argparse, json, os, sys
+import argparse, json, os, random, sys
 from collections import deque
+from itertools import islice
 from datetime import datetime
 from urllib.parse import urljoin, urlparse, urlunparse
 
@@ -18,7 +19,9 @@ def norm(u):
     return urlunparse(p._replace(fragment="")).rstrip("/")
 
 
-def routes(crawl, app):
+def routes(crawl, app, max_routes=50, rng=None):
+    """Per page: every shortest route (up to max_routes), and one of them chosen at random."""
+    rng = rng or random.Random()
     pages = crawl.get("pages", [])
     by_url = {norm(p["url"]): p for p in pages}
     if not pages:
@@ -36,26 +39,36 @@ def routes(crawl, app):
             seen.add(t)
             out.append((t, {"locator": e.get("locator"), "href": e["href"], "stable": bool(e.get("stable"))}))
         links[src] = sorted(out, key=lambda x: x[0])
-    prev = {start: None}  # page -> (where we came from, the hop that leads here)
+    # breadth-first: the distance of each page, and every edge that enters it on a shortest route
+    dist, into = {start: 0}, {start: []}
     queue = deque([start])
     while queue:
         u = queue.popleft()
         for t, hop in links.get(u, []):
-            if t not in prev:
-                prev[t] = (u, dict(hop, **{"from": u, "to": t}))
+            if t not in dist:
+                dist[t], into[t] = dist[u] + 1, []
                 queue.append(t)
+            if dist[t] == dist[u] + 1:
+                into[t].append((u, dict(hop, **{"from": u, "to": t})))
     found = []
     for url in sorted(by_url):
-        if url not in prev:
+        if url not in dist:
             continue
-        hops, node = [], url
-        while prev[node] is not None:
-            node, hop = prev[node][0], prev[node][1]
-            hops.append(hop)
-        hops.reverse()
-        found.append({"url": by_url[url]["url"], "clicks": len(hops), "hops": hops})
+        ways = list(islice(_shortest(url, start, into), max_routes))
+        chosen = ways[rng.randrange(len(ways))]
+        found.append({"url": by_url[url]["url"], "clicks": dist[url], "hops": chosen, "routes": ways})
     return {"app": app, "generatedAt": datetime.now().isoformat(timespec="seconds"), "start": start, "routes": found,
-            "unreachable": [by_url[u]["url"] for u in sorted(by_url) if u not in prev]}
+            "unreachable": [by_url[u]["url"] for u in sorted(by_url) if u not in dist]}
+
+
+def _shortest(node, start, into):
+    """Every hop list from start to node that uses only shortest-route edges, in a stable order."""
+    if node == start:
+        yield []
+        return
+    for u, hop in into.get(node, []):
+        for path in _shortest(u, start, into):
+            yield path + [hop]
 
 
 def main(argv=None):
@@ -63,9 +76,11 @@ def main(argv=None):
     ap.add_argument("--crawl", required=True, help="the app map (<App>.crawl.json)")
     ap.add_argument("--app", required=True)
     ap.add_argument("--out", help="write here instead of stdout")
+    ap.add_argument("--max-routes", type=int, default=50, help="most shortest routes kept per page")
+    ap.add_argument("--seed", type=int, help="pick the same route on every run")
     a = ap.parse_args(argv)
     with open(a.crawl, encoding="utf-8") as f:
-        result = routes(json.load(f), a.app)
+        result = routes(json.load(f), a.app, a.max_routes, random.Random(a.seed))
     text = json.dumps(result, ensure_ascii=False, indent=2)
     if a.out:
         os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)

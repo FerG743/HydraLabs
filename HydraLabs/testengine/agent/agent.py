@@ -24,7 +24,8 @@ from sandbox import Sandbox  # noqa: E402
 BROWSER_TOOLS = {"browser_navigate", "browser_snapshot", "browser_click", "browser_type", "browser_fill_form", "browser_select_option",
                  "browser_press_key", "browser_wait_for", "browser_find", "browser_navigate_back",  # no browser_evaluate: arbitrary JS was a token sink
                  "browser_hover", "browser_file_upload", "browser_network_requests", "browser_console_messages", "browser_tabs"}
-RESULT_CHARS = 5000        # a page snapshot can be huge: the model only needs the head of it
+RESULT_CHARS = 5000
+REPEAT_LIMIT = 4        # refused repeats in one run before it is stopped        # a page snapshot can be huge: the model only needs the head of it
 FINISH_REFUSALS = 2        # how many times finish() is bounced while problems remain
 
 
@@ -149,7 +150,7 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
     messages = [{"role": "system", "content": system},
                 {"role": "user", "content": "Automatiza este caso.\n" + json.dumps(task, ensure_ascii=False, indent=1)}]
     log = open(log_path, "w", encoding="utf-8") if log_path else None
-    refusals, result = 0, {"finished": False, "summary": "", "turns": 0, "problems": []}
+    refusals, repeats, result = 0, 0, {"finished": False, "summary": "", "turns": 0, "problems": []}
     start_tokens, tried = USAGE["tokens"], {}
 
     def note(kind, data):
@@ -184,11 +185,12 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
                 else:
                     sig = name + json.dumps(args, sort_keys=True)
                     tried[sig] = tried.get(sig, 0) + 1
-                    if tried[sig] > 1 and (name in BROWSER_TOOLS or name == "submit_spec"):  # same call twice: no new information
+                    if tried[sig] > 1 and (name in BROWSER_TOOLS or name in ("submit_spec", "run_test")):  # same call twice: no new information
                         out = ("Enviaste exactamente la misma spec: cámbiala según el error anterior." if name == "submit_spec"
                                else "Ya ejecutaste exactamente esto y no aporta nada nuevo. Usa lo que ya tienes y llama a submit_spec.")
                         note("tool", {"name": name, "args": args, "result": out})
                         messages.append({"role": "tool", "tool_call_id": c.get("id", name), "content": out})
+                        repeats += 1
                         continue
                     out = dispatch(name, args, sb, mcp, repo, app, base_url, result, state)
                     if name == "finish":
@@ -203,6 +205,9 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
                 note("tool", {"name": name, "args": args, "result": out[:1500]})
                 messages.append({"role": "tool", "tool_call_id": c.get("id", name), "content": out})
                 shown += PAGE_URL.findall(out)
+            if repeats >= REPEAT_LIMIT:  # the model keeps sending a call it was already refused: the run cannot improve
+                result["summary"] = f"stopped: {repeats} repeated calls refused, no progress"
+                break
             for url in shown if crawl else []:  # a page the model has not seen yet: its locators go in before its next move
                 path = urlparse(url).path.rstrip("/") or "/"
                 if path not in sent:

@@ -112,6 +112,29 @@ class AgentLoop(unittest.TestCase):
         msgs = [m["content"] for m in seen[-1]["messages"] if m["role"] == "tool"]
         self.assertTrue(any("no aporta nada nuevo" in t for t in msgs), msgs)
 
+    def test_identical_run_test_is_not_run_twice(self):
+        mcp = FakeMCP()
+        srv, url, seen = fake_lm([call("run_test", file="tests/Portal/test_x.py"), call("run_test", file="tests/Portal/test_x.py"), call("finish", summary="x")])
+        try:
+            agent.run(CASE, self.repo, "Portal", "http://x", "fake", url, mcp=mcp, max_turns=3)
+        finally:
+            srv.shutdown()
+            srv.server_close()
+        msgs = [m["content"] for m in seen[-1]["messages"] if m["role"] == "tool"]
+        self.assertTrue(any("no aporta nada nuevo" in t for t in msgs), msgs)
+
+    def test_a_model_that_keeps_repeating_a_refused_call_is_stopped(self):
+        mcp = FakeMCP()
+        srv, url, seen = fake_lm([call("browser_snapshot")] * 12)
+        try:
+            res = agent.run(CASE, self.repo, "Portal", "http://x", "fake", url, mcp=mcp, max_turns=12)
+        finally:
+            srv.shutdown()
+            srv.server_close()
+        self.assertFalse(res["finished"])
+        self.assertIn("repeated calls refused", res["summary"])
+        self.assertLessEqual(len(seen), agent.REPEAT_LIMIT + 2)
+
     def test_app_map_reaches_the_model_and_evaluate_is_not_offered(self):
         crawl = os.path.join(self.repo, "c.json")
         json.dump({"pages": [{"url": "http://h/p", "elements": [

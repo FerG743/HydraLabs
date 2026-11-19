@@ -2,8 +2,9 @@
 fails loudly. Page-level routes (a test's own RequestMock) take precedence over this context-level guard, so deliberately
 mocked POSTs still work.
 
-HYDRA_ALLOW_WRITES=1 lets writes through, but ONLY to loopback hosts (or those named in HYDRA_WRITE_HOSTS): a local
-frontend started in PROD mode would otherwise send real writes to production. Same rule as tools/jira/support/harness.py."""
+Writes go through only when the owning team allowed them (the writes config, passed in as env by runner.run_test): HYDRA_ALLOW_WRITES=1,
+and only to the hosts in HYDRA_WRITE_HOSTS and, when HYDRA_WRITE_ENDPOINTS is set, only to those "METHOD /path" endpoints.
+Nothing is writable by default, loopback included: a local frontend started in PROD mode would otherwise send real writes to production."""
 import os
 from urllib.parse import urlparse
 
@@ -14,11 +15,12 @@ try:  # the framework's sign-in (utils/login.py); repos created before it have n
 except ImportError:
     _login = None
 
-LOOPBACK = {"127.0.0.1", "localhost", "::1"}
-
-
-def write_allowed(method, host, allow_writes, extra_hosts=()):
-    return method in ("GET", "HEAD", "OPTIONS") or (allow_writes and (host in LOOPBACK or host in extra_hosts))
+def write_allowed(method, host, allow_writes, extra_hosts=(), path="/", endpoints=()):
+    if method in ("GET", "HEAD", "OPTIONS"):
+        return True
+    if not (allow_writes and host in extra_hosts):
+        return False
+    return not endpoints or f"{method} {path}" in endpoints
 
 
 @pytest.fixture(autouse=True)
@@ -29,10 +31,12 @@ def _hydra_guard(request):
     driver = request.getfixturevalue("driver")
     allow = os.environ.get("HYDRA_ALLOW_WRITES") == "1"
     extra = [h for h in os.environ.get("HYDRA_WRITE_HOSTS", "").split(",") if h]
+    endpoints = [e for e in os.environ.get("HYDRA_WRITE_ENDPOINTS", "").split(",") if e]
     blocked = []
 
     def guard(route, req):
-        if write_allowed(req.method, urlparse(req.url).hostname, allow, extra) or (_login and _login.ACTIVE):
+        u = urlparse(req.url)
+        if write_allowed(req.method, u.hostname, allow, extra, u.path or "/", endpoints) or (_login and _login.ACTIVE):
             route.continue_()
         else:
             blocked.append(f"{req.method} {req.url}")

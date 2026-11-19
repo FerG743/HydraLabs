@@ -202,7 +202,8 @@ def module_header(app, page, body):
     return f"# apps/{app}/modules/{page}_module.py\n#\n# Generado por HydraLabs: un flujo reutilizable por acción distinta.\n\n" + "\n".join(imports) + "\n"
 
 
-def render(repo, app, case, spec):
+def render(repo, app, case, spec, replace=frozenset()):
+    """replace: names whose new selector was verified on the live page; they may overwrite the value the repo has."""
     """Writes the files. Returns {"files": [...], "warnings": [...], "errors": [...]} (errors: nothing is written)."""
     page, token = spec["page"], slug(case["id"])
     apps, tests = os.path.join(repo, "apps", app), os.path.join(repo, "tests", app)
@@ -236,6 +237,10 @@ def render(repo, app, case, spec):
     locs = read_locators(loc_path)
     for name, (sel, dyn) in b.locs.items():
         if name in locs and locs[name][0] != sel:
+            if name in replace:  # verified on the live page: the old value was wrong, and the change is reported
+                warnings.append(f"{name}: {locs[name][0]!r} → {sel!r} (verificado en la página)")
+                locs[name] = (sel, dyn)
+                continue
             errors.append(f"el localizador {name} ya existe con otro valor ({locs[name][0]!r}); reutilízalo o usa otro nombre")
         locs.setdefault(name, (sel, dyn))
     funcs = read_functions(mod_path)

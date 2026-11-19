@@ -42,6 +42,118 @@ class Validator(unittest.TestCase):
         self.assertIn('"action": "goto", "path"', out)
         self.assertIn("recibí las claves ['visible']", out)
 
+    def test_malformed_shapes_come_back_as_errors_not_crashes(self):
+        # the shapes that crashed the validator in real runs: a list where a name goes, a null step, a string 'do'
+        c = case("DWQ-130")
+        cases = {
+            "steps with a null item": lambda s: s.__setitem__("steps", [None] + s["steps"][1:]),
+            "a step n that is a list": lambda s: s["steps"][0].update(n=[1]),
+            "do as a string": lambda s: s["steps"][0].update(do="goto /x"),
+            "locator as a list": lambda s: s["steps"][4]["do"].update(locator=["BOTON"]),
+            "checks as a dict": lambda s: s.__setitem__("checks", {"n": 1}),
+            "a check that is a string": lambda s: next(c for c in s["checks"] if "skip" not in c).update(check="visible"),
+            "after_step as a list": lambda s: next(c for c in s["checks"] if "skip" not in c).update(after_step=[3]),
+            "locators as a list": lambda s: s.__setitem__("locators", [["BOTON"]]),
+            "a selector that is a list": lambda s: s["locators"].update(BOTON_X={"selector": ["x"]}),
+            "data as a list": lambda s: s.__setitem__("data", ["order_number"]),
+            "mock as a list": lambda s: s.__setitem__("mock", [{"pattern": "x"}]),
+        }
+        for name, mutate in cases.items():
+            s = copy.deepcopy(golden("DWQ-130"))
+            mutate(s)
+            try:
+                out = specmod.validate(s, c)
+            except Exception as e:  # noqa: BLE001 - the point of the test
+                self.fail(f"{name}: validate raised {type(e).__name__}: {e}")
+            self.assertTrue(out, f"{name}: a malformed spec must come back with errors")
+
+    def test_wrong_value_types_say_what_the_field_needs(self):
+        c = case("DWQ-130")
+        def broken(mutate):
+            s = copy.deepcopy(golden("DWQ-130"))
+            mutate(s)
+            return "\n".join(specmod.validate(s, c))
+        # the real mistakes: from_download sent as true, data sent as a list
+        self.assertIn("\"from_download\" debe ser el nombre", broken(lambda s: s["steps"][4]["do"].update(action="upload_file", from_download=True, locator="BOTON_PROCESAR")))
+        self.assertIn("\"data\" debe ser el NOMBRE", broken(lambda s: next(x["do"] for x in s["steps"] if x.get("do", {}).get("action") == "fill").update(data=["LIVR"])))
+
+    def test_a_save_as_that_is_not_a_python_name_is_refused_before_rendering(self):
+        # the real crash: save_as "ejemplo-ordenes.csv" became a variable and the generated module did not compile
+        c = case("DWQ-131")
+        s = copy.deepcopy(golden("DWQ-131"))
+        dl = next(x["do"] for x in s["steps"] if x.get("do", {}).get("action") == "download")
+        dl["save_as"] = "ejemplo-ordenes.csv"
+        out = "\n".join(specmod.validate(s, c))
+        self.assertIn("save_as debe ser un nombre de variable", out)
+
+    def test_unknown_root_keys_are_dropped_and_reported(self):
+        s = copy.deepcopy(golden("DWQ-130"))
+        s["currentPage"] = "cobro_ordenes"
+        notes = specmod.normalize(s)
+        self.assertNotIn("currentPage", s)
+        self.assertTrue(any("currentPage" in n for n in notes), notes)
+
+    def test_a_select_with_values_becomes_its_data_key(self):
+        s = copy.deepcopy(golden("DWQ-131"))
+        s.setdefault("data", {})["store"] = "LIVR"
+        s["steps"].append({"n": 99, "do": {"action": "select", "locator": "SELECT_TIENDA", "values": ["LIVR"]}})
+        s["locators"]["SELECT_TIENDA"] = "#store"
+        notes = specmod.normalize(s)
+        step = next(x for x in s["steps"] if x["n"] == 99)
+        self.assertEqual(step["do"].get("data"), "store")
+        self.assertNotIn("values", step["do"])
+        self.assertTrue(notes)
+
+    def test_a_wrong_repo_locator_is_refused_unless_its_replacement_was_verified(self):
+        s = copy.deepcopy(golden("DWQ-130"))
+        name = specmod.used_locators(s)[0]
+        s["locators"][name] = "role=textbox[name=\"Nuevo\"]"
+        c = case("DWQ-130")
+        repo = tempfile.mkdtemp()
+        framework(repo)
+        loc = os.path.join(repo, "apps", "PortalQA", "locators", f"{s['page']}_locators.py")
+        os.makedirs(os.path.dirname(loc), exist_ok=True)
+        with open(loc, "w", encoding="utf-8") as f:
+            f.write(f"class X:\n    {name} = 'input[name=\"viejo\"]'\n")
+        import render
+        refused = render.render(repo, "PortalQA", c, s)
+        self.assertTrue(any("ya existe con otro valor" in e for e in refused["errors"]), refused)
+        fixed = render.render(repo, "PortalQA", c, s, replace=frozenset({name}))
+        self.assertEqual(fixed["errors"], [])
+        self.assertTrue(any("verificado en la página" in w for w in fixed["warnings"]), fixed["warnings"])
+        self.assertIn("Nuevo", read(loc))
+
+    def test_snapshot_refs_are_not_selectors(self):
+        s = copy.deepcopy(golden("DWQ-130"))
+        s["locators"]["BOTON_X"] = 'option[ref="e195"]'
+        out = "\n".join(specmod.validate(s, case("DWQ-130")))
+        self.assertIn("referencia del snapshot", out)
+
+    def test_names_the_repo_already_has_are_declared_from_it(self):
+        s = copy.deepcopy(golden("DWQ-130"))
+        name = specmod.used_locators(s)[0]
+        s["locators"].pop(name, None)
+        existing = {name.split("__", 1)[-1]: ("role=button[name=\"Procesar\"]", False)}
+        self.assertEqual(specmod.resolve(s, existing), [name])
+        self.assertEqual(s["locators"][name], "role=button[name=\"Procesar\"]")
+        self.assertNotIn(name, "\n".join(specmod.validate(s, case("DWQ-130"))))
+
+    def test_a_near_miss_name_gets_a_did_you_mean(self):
+        s = copy.deepcopy(golden("DWQ-130"))
+        name = specmod.used_locators(s)[0]
+        s["locators"].pop(name, None)
+        s["locators"][name + "S"] = "#x"  # declared, but the step says the name without the S
+        out = "\n".join(specmod.validate(s, case("DWQ-130")))
+        self.assertIn(f"¿quisiste decir {name}S?", out)
+
+    def test_a_spec_wrapped_in_pages_says_where_the_fields_go(self):
+        # the real mistake of a small model: page and locators nested under "pages"
+        s = copy.deepcopy(golden("DWQ-130"))
+        s["pages"] = {"page": s.pop("page"), "locators": s.pop("locators")}
+        out = "\n".join(specmod.validate(s, case("DWQ-130")))
+        self.assertIn("no lleva 'pages'", out)
+        self.assertIn("en la raíz del objeto", out)
+
     def test_bad_specs_are_rejected_with_actionable_errors(self):
         c = case("DWQ-130")
         def broken(mutate):

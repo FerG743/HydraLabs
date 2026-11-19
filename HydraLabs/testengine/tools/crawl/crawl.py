@@ -16,7 +16,7 @@ login are never written to events or output (they come from ENV: tokens, same co
 
 login.json: [{"fill": "#user", "value": "ENV:CORREO_ADMIN"}, {"fill": "#pw", "value": "ENV:MI_PASSWORD"}, {"click": "button[type=submit]"}]
 """
-import argparse, hashlib, json, os, re, sys, time
+import argparse, hashlib, json, os, re, sys, tempfile, time
 from urllib.parse import urljoin, urlparse, urldefrag
 
 from playwright.sync_api import sync_playwright
@@ -254,6 +254,8 @@ def record_options(page, el, ev):
 
 STEP_NAV = re.compile(r'^Navigate to (/\S*?)\.?$')  # the renderer's own wording (tools/jira/render_pytest.py ACTIONS)
 STEP_CLICK = re.compile(r'^(?:Click|Press) "(.+?)"\.?$')
+STEP_DOWNLOAD = re.compile(r'^(?:Click|Press) "(.+?)" and capture the downloaded file\.?$', re.I)
+STEP_UPLOAD = re.compile(r'^Upload (?:that|the) file\b', re.I)
 
 
 def clickable(page, name):
@@ -265,29 +267,127 @@ def clickable(page, name):
     return None
 
 
-def walk_case(page, base, steps, settle, map_here, ev):
+LOOPBACK = {"127.0.0.1", "localhost", "::1"}
+
+
+def load_writes(path):
+    """The owning team's write permission for this app. No file, or allow_writes false: the crawl stays read-only.
+    {"allow_writes": true, "hosts": ["127.0.0.1", "qa-minframe.example"]}: writes may reach only these hosts."""
+    if not path:
+        return {"allow_writes": False, "hosts": [], "endpoints": []}
+    cfg = json.load(open(path, encoding="utf-8"))
+    hosts = [h for h in cfg.get("hosts", []) if isinstance(h, str)]
+    endpoints = [e for e in cfg.get("endpoints", []) if isinstance(e, str)]  # "POST /uploadFile": one write, not its whole host
+    return {"allow_writes": bool(cfg.get("allow_writes")), "hosts": hosts, "endpoints": endpoints}
+
+
+def decisions_from(writes, old=()):
+    """Every write endpoint the crawl saw (sent or blocked), one entry per method+host+path, for the team to decide:
+    allow (add its host to the writes config), stub (a canned response in tests), or keep blocked (the default).
+    A choice already recorded in `old` is kept."""
+    out = {(d["method"], d["host"], d["path"]): dict(d) for d in old}  # earlier runs' endpoints stay, with their choices
+    for line in writes:
+        status, method, url = line.split(" ", 2)
+        u = urlparse(url)
+        key = (method, u.hostname or "", u.path or "/")
+        if key in out:
+            out[key]["status"] = status
+            continue
+        out[key] = {"method": method, "host": key[1], "path": key[2], "example": url, "status": status,
+                    "choice": "keep_blocked", "options": ["allow", "stub", "keep_blocked"]}
+    return list(out.values())
+
+
+def may_write(url, login_on, write_on, hosts=(), endpoints=(), method="POST"):
+    """Login steps may send forms (the crawl was pointed at this app). A walked write only to a listed host, and when the
+    config names endpoints, only to those ("METHOD /path")."""
+    if login_on:
+        return True
+    if not write_on or urlparse(url).hostname not in set(hosts):
+        return False
+    return not endpoints or f"{method} {urlparse(url).path or '/'}" in set(endpoints)
+
+
+def read_only_route(requests, allow=lambda url, method: False):
+    """Route handler: GET/HEAD/OPTIONS pass. Any other request is recorded in `requests` as sent (when allow() says so)
+    or blocked (aborted): what each control really sends."""
+    def handler(route, req):
+        if req.method in ("GET", "HEAD", "OPTIONS"):
+            return route.continue_()
+        if allow(req.url, req.method):
+            requests.append(f"sent {req.method} {req.url}")
+            return route.continue_()
+        requests.append(f"blocked {req.method} {req.url}")
+        route.abort()
+    return handler
+
+
+def observe(page, wait_s=90):
+    """The app's result tables once they stop changing and no row is still 'En proceso' (processing is asynchronous)."""
+    last, waited = None, 0
+    while waited <= wait_s:
+        now = [t.strip()[:600] for t in page.locator("table").all_inner_texts()]
+        if now and now == last and not any("En proceso" in t for t in now):
+            return now
+        last = now
+        page.wait_for_timeout(2000)
+        waited += 2
+    return last or []
+
+
+def walk_case(page, base, steps, settle, map_here, ev, ctx):
     """Follow a case's navigation and clicks (read-only: a click that would send a form is aborted by the route) and map
-    the screen after each one. Other steps (typing, choosing) are skipped: nothing is ever typed into the app."""
+    the screen after each one. Typing and choosing are skipped: nothing is typed into the app. ctx carries what the walk
+    records: the requests each click sent or blocked, the downloads it captured, and (with --allow-writes, only to the hosts the team listed)
+    the upload of a captured file and the result a write click left on screen."""
     for text in steps:
         t = text.replace("`", "").strip()
         nav, click = STEP_NAV.match(t), STEP_CLICK.match(t)
+        download, upload = STEP_DOWNLOAD.match(t), STEP_UPLOAD.match(t)
+        new_writes, observed = None, None
         try:
             if nav:
                 settled = settle(base + nav.group(1))
+            elif download and not AVOID.search(download.group(1)):
+                target = clickable(page, download.group(1))
+                if target is None:
+                    ev.emit("skip", text=f"{t} nothing clickable has that exact name on this screen")
+                    continue
+                with page.expect_download(timeout=20000) as d:
+                    target.click(timeout=5000)
+                dl = d.value
+                path = os.path.join(ctx["dir"], dl.suggested_filename)
+                dl.save_as(path)
+                ctx["files"].append(path)
+                settled = settle()
+            elif upload:
+                if not (ctx["allow"] and ctx["files"]):
+                    ev.emit("skip", text=f"{t} not uploaded (needs --allow-writes and a captured file)")
+                    continue
+                page.locator("input[type='file']").first.set_input_files(ctx["files"][-1])
+                settled = settle()
             elif click and not AVOID.search(click.group(1)):
                 target = clickable(page, click.group(1))
                 if target is None:
                     ev.emit("skip", text=f"{t} nothing clickable has that exact name on this screen")
                     continue
-                target.click(timeout=5000)
+                before = len(ctx["writes"])
+                ctx["ok"]["on"] = ctx["allow"]  # a write goes through only when allowed: the local app, by explicit flag
+                try:
+                    target.click(timeout=5000)
+                finally:
+                    ctx["ok"]["on"] = False
                 settled = settle()
+                new_writes = ctx["writes"][before:]
+                if ctx["allow"] and new_writes:
+                    observed = observe(page)
             else:
-                ev.emit("skip", text=f"{t} not walked (only navigation and safe clicks)")
+                ev.emit("skip", text=f"{t} not walked (only navigation, safe clicks and captured uploads)")
                 continue
         except Exception as e:
             ev.emit("error", text=f"{t} {type(e).__name__}")
             continue
-        map_here(settled, after=t)
+        map_here(settled, after=t, writes=new_writes, observed=observed)
 
 
 def crawl(a):
@@ -306,7 +406,14 @@ def crawl(a):
                                       **({"record_video_dir": a.video, "record_video_size": {"width": 1280, "height": 800}} if a.video else {}))
         page = context.new_page()
         login_now = {"on": False}  # the crawl is read-only; only the login steps may send forms (connection, sign-in)
-        page.route("**/*", lambda route, req: route.continue_() if req.method == "GET" or login_now["on"] else route.abort())
+        writes_cfg = load_writes(a.writes_config)
+        if a.allow_writes and not writes_cfg["allow_writes"]:
+            raise SystemExit("--allow-writes requiere --writes-config con \"allow_writes\": true (el equipo dueño de la app lo decide)")
+        allow_writes = a.allow_writes and writes_cfg["allow_writes"]
+        writes = []  # every non-GET the page sent or tried to send, listed on the step that caused it
+        write_ok = {"on": False}  # set only around a walked click when --allow-writes
+        page.route("**/*", read_only_route(writes, lambda url, method: may_write(
+            url, login_now["on"], write_ok["on"], writes_cfg["hosts"], writes_cfg["endpoints"], method)))
 
         def settle(url=None):
             # DOM ready is required; network quiet is best effort: a third-party tracker that never answers
@@ -340,7 +447,7 @@ def crawl(a):
                     ev.emit("login", action="click", selector=step["click"])
             login_now["on"] = False
             settle()
-        def map_here(settled, after=None):
+        def map_here(settled, after=None, writes=None, observed=None):
             """Every element on screen now -> a page entry of the app map (after: the case step that revealed it)."""
             els = page.evaluate(EXTRACT)
             for el in els:
@@ -377,7 +484,7 @@ def crawl(a):
                 el.pop("rect", None)  # positions are for the picture only; the map stays compact
             pages.append({"url": page.url, "title": page.title(), "hash": sig, "shot": shot, "settled": settled, "elements": els,
                           "headings": [h.strip() for h in page.locator("h1,h2,h3").all_inner_texts() if h.strip()][:10],
-                          **({"after": after} if after else {})})
+                          **({"after": after} if after else {}), **({"writes": writes} if writes else {}), **({"observed": observed} if observed else {})})
             by = {}
             for el in els:
                 by[el["strategy"]] = by.get(el["strategy"], 0) + 1
@@ -385,7 +492,8 @@ def crawl(a):
             return els
 
         if a.guide:  # walk one case's steps instead of following links: what a tab or button reveals gets mapped too
-            walk_case(page, base, json.load(open(a.guide, encoding="utf-8")), settle, map_here, ev)
+            ctx = {"writes": writes, "ok": write_ok, "allow": allow_writes, "dir": tempfile.mkdtemp(prefix="crawl-dl-"), "files": []}
+            walk_case(page, base, json.load(open(a.guide, encoding="utf-8")), settle, map_here, ev, ctx)
             queue = []
         reuse = bool(a.login)  # after sign-in, the page already on screen is not reloaded: on some apps (the POS) that drops the session
         while queue and len(pages) < a.max_pages:
@@ -419,11 +527,12 @@ def crawl(a):
         final = os.path.join(a.video, time.strftime("crawl-%Y%m%d-%H%M%S.webm"))
         os.replace(video, final)
         ev.emit("video", path=final, mb=round(os.path.getsize(final) / 1e6, 1))
-    out = {"baseUrl": base, "crawledAt": time.strftime("%Y-%m-%dT%H:%M:%S"), "readOnly": True, "pages": pages}
-    if a.guide and os.path.exists(a.out):  # a walk adds to the app map; a page it mapped again replaces the old entry
-        old = json.load(open(a.out, encoding="utf-8"))
+    old = json.load(open(a.out, encoding="utf-8")) if os.path.exists(a.out) else {}
+    out = {"baseUrl": base, "crawledAt": time.strftime("%Y-%m-%dT%H:%M:%S"), "readOnly": True, "pages": pages,
+           "decisions": decisions_from(writes, old.get("decisions", []))}
+    if a.guide and old:  # a walk adds to the app map; a page it mapped again replaces the old entry
         merged = {(pg["url"], pg.get("after")): pg for pg in old["pages"] + pages}  # same screen again: the newest wins
-        out = {**old, "pages": list(merged.values())}
+        out = {**old, "pages": list(merged.values()), "decisions": decisions_from(writes, old.get("decisions", []))}
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     json.dump(out, open(a.out, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
     total = sum(len(pg["elements"]) for pg in pages)
@@ -446,6 +555,9 @@ if __name__ == "__main__":
     ap.add_argument("--login", default="")
     ap.add_argument("--login-path", default="")
     ap.add_argument("--env-file", default="")
+    ap.add_argument("--allow-writes", action="store_true", help="a walked write (upload, submit) really runs: needs --writes-config")
+    ap.add_argument("--writes-config", default="", metavar="JSON",
+                    help='the owning team\'s write permission: {"allow_writes": true, "hosts": ["127.0.0.1"]}. Without it, read-only.')
     ap.add_argument("--guide", default="", help="JSON list of one case's steps: walk them instead of following links, add to --out")
     ap.add_argument("--detect-login", action="store_true", help="only find the sign-in form and print its locators as JSON")
     args = ap.parse_args()

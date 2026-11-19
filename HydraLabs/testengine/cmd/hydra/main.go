@@ -420,6 +420,21 @@ func main() {
 				os.Exit(3)
 			}
 		}
+	case "remove": // unregister a project; its profile, and with --purge-repo its Hydra-<App> repo. Dry run unless --yes
+		purge, yes := fs.Bool("purge-repo", false, "also delete the app's Hydra-<App> repo (only if clean)"), fs.Bool("yes", false, "actually remove (default: print what would go)")
+		fs.Parse(os.Args[2:])
+		if cfg.Registry == nil || cfg.Project == "" {
+			err = fmt.Errorf("remove needs --project KEY (registered in projects.json)")
+			break
+		}
+		var rm Removal
+		if rm, err = cfg.Registry.Remove(cfg.Project, *purge, *yes); err == nil {
+			b, _ := json.MarshalIndent(rm, "", "  ")
+			fmt.Println(string(b))
+			if !*yes {
+				fmt.Println("dry run: nothing removed. Run again with --yes to remove.")
+			}
+		}
 	case "announce": // backfill: comment on cases that were delivered before write-back existed
 		post, keys := fs.Bool("post", false, "actually post (default: only print what would be posted)"), fs.String("keys", "", "comma-separated keys (default: every passing case)")
 		fs.Parse(os.Args[2:])

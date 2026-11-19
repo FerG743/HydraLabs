@@ -41,6 +41,20 @@ class Decide(unittest.TestCase):
         self.assertFalse(os.path.exists(w))
         self.assertEqual(json.load(open(m))["decisions"][0]["choice"], "stub")
 
+    def test_writes_off_switches_writes_off_and_keeps_the_listed_hosts_and_endpoints(self):
+        m, w = files()
+        run(m, "--writes", w, "--set", "POST /uploadFile", "allow")
+        self.assertEqual(run("--writes", w, "--writes-off").returncode, 0)
+        cfg = crawl.load_writes(w)
+        self.assertFalse(cfg["allow_writes"])
+        self.assertEqual((cfg["hosts"], cfg["endpoints"]), (["127.0.0.1"], ["POST /uploadFile"]))
+
+    def test_show_writes_prints_the_config_or_says_there_is_none(self):
+        m, w = files()
+        self.assertIn("nothing is writable", run("--writes", w, "--show-writes").stdout)
+        run(m, "--writes", w, "--set", "POST /uploadFile", "allow")
+        self.assertIn('"allow_writes": true', run("--writes", w, "--show-writes").stdout)
+
     def test_an_unknown_endpoint_or_choice_is_refused(self):
         m, w = files()
         self.assertNotEqual(run(m, "--writes", w, "--set", "POST /nope", "allow").returncode, 0)

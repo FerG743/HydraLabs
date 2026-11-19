@@ -28,6 +28,7 @@ type Registry struct {
 	Model     int                     `json:"modelCasesPerPoll"` // cases that need the model per poll (default 1); the rest wait
 	Projects  map[string]ProjectEntry `json:"projects"`
 	dir       string
+	path      string
 }
 
 func LoadRegistry(path string) (*Registry, error) {
@@ -35,7 +36,7 @@ func LoadRegistry(path string) (*Registry, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &Registry{dir: filepath.Dir(path)}
+	r := &Registry{dir: filepath.Dir(path), path: path}
 	if err := json.Unmarshal(b, r); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}

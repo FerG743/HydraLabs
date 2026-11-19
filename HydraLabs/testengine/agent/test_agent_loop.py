@@ -161,6 +161,13 @@ class AgentLoop(unittest.TestCase):
         self.assertTrue(any("La spec tiene errores" in t and "no_existe" in t for t in msgs), msgs)
         self.assertFalse(os.path.exists(os.path.join(self.repo, "tests/Portal/test_dwq_130.py")))
 
+    def test_rereading_the_page_after_a_failed_spec_is_not_a_repeat(self):
+        bad = fixtures.golden("DWQ-130")
+        bad["steps"][2]["do"]["data"] = "no_existe"
+        res, seen = self.drive([call("browser_snapshot"), call("submit_spec", spec=bad), call("browser_snapshot"), call("finish", summary="x")], max_turns=4)
+        msgs = [m["content"] for m in seen[-1]["messages"] if m["role"] == "tool"]
+        self.assertFalse(any("Ya ejecutaste" in t for t in msgs), msgs)  # the second snapshot ran
+
     def test_the_model_has_no_way_to_write_files(self):
         res, seen = self.drive([call("write_file", path="utils/driver_wrapper.py", content="evil = 1\n"), call("finish", summary="x")], max_turns=1)
         with open(os.path.join(self.repo, "utils/driver_wrapper.py")) as f:
@@ -172,9 +179,10 @@ class AgentLoop(unittest.TestCase):
     def test_finish_is_bounced_until_a_spec_has_been_rendered(self):
         res, seen = self.drive([call("finish", summary="listo")] * 5)
         bounced = [m["content"] for m in seen[-1]["messages"] if m["role"] == "tool" and m["content"].startswith("No puedes terminar")]
-        self.assertEqual(len(bounced), agent.FINISH_REFUSALS)  # refused twice, then let through with the problems reported
+        self.assertEqual(len(bounced), agent.FINISH_REFUSALS)  # refused twice; then the run stops, not finished
         self.assertIn("submit_spec", bounced[0])
-        self.assertTrue(res["problems"])
+        self.assertFalse(res["finished"])  # a run with problems still open is never reported as finished
+        self.assertIn("problems still open", res["summary"])
 
     def test_dangerous_and_useless_tools_are_not_offered(self):
         _, seen = self.drive([call("finish", summary="x")], max_turns=1)

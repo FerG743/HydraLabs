@@ -8,7 +8,7 @@ The model never writes code or files. It fills a declarative spec (spec.py); ren
 layout. Guardrails live in code, not in the prompt: the browser blocks every non-GET request (guard.cjs), the file tools are
 read-only, run_code_unsafe is never offered, and `finish` is refused until a spec was rendered and the checks are clean.
 """
-import argparse, json, os, re, sys, time, urllib.request
+import argparse, json, os, re, sys, time, traceback, urllib.request
 from urllib.parse import urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -37,6 +37,7 @@ def local_tools():
         ("read_file", "Lee un archivo del repositorio.", obj({"path": s}, ["path"])),
         ("submit_spec", "Envía la spec del caso; la valida y genera los archivos. Devuelve errores o la lista de archivos.", obj({"spec": {"type": "object"}}, ["spec"])),
         ("verify_locators", "Comprueba en la página REAL (solo lectura) que los localizadores estáticos de la última spec resuelven.", obj({}, [])),
+        ("lookup_element", "Busca un elemento en el mapa de la app por su selector o su nombre visible. Devuelve su rol y las acciones que acepta. No abre el navegador.", obj({"name": s}, ["name"])),
         ("run_test", "Ejecuta un test generado en modo SOLO LECTURA (las escrituras reales se bloquean).", obj({"file": s}, ["file"])),
         ("finish", "Termina. Incluye resumen y pasos NO automatizados/verificados.", obj({"summary": s}, ["summary"])),
     ]
@@ -82,6 +83,17 @@ NAVIGATE = re.compile(r"[Nn]avigate to `?(/[^`\s]*)")  # the case's first step n
 PAGE_URL = re.compile(r"- Page URL: (\S+)")  # every browser tool answer names the page it left the browser on
 
 
+def _write_lines(pg):
+    """A control that wrote during the crawl (sent, or blocked by the read-only guard), with what its result looked like."""
+    if not pg.get("writes"):
+        return []
+    sent = "; ".join(pg["writes"])
+    if pg.get("observed"):
+        return [f"ESCRIBE {pg.get('after', '')!r} -> {sent}; resultado observado en la app: {' | '.join(pg['observed'])[:400]}"]
+    return [f"ESCRIBE {pg.get('after', '')!r} -> {sent} (resultado no observado: verifícalo una vez con run_test; "
+            "no supongas un mensaje ni una tabla)"]
+
+
 def _locator_lines(pg):
     """One line per stable, unique, non-link element of a crawled page."""
     return [f"{e['role']} {e['name'][:40]!r} -> {e['locator']}" + (f" opciones={e['options']}" if e.get("options") else "")
@@ -97,6 +109,7 @@ def map_summary(path, limit=3500):
     lines, seen = [], set()
     for pg in crawl.get("pages", []):
         lines.append(f"# {pg['url'].split('//', 1)[-1].split('/', 1)[-1] or '/'}")
+        lines += _write_lines(pg)
         for line in _locator_lines(pg):
             locator = line.rsplit(" -> ", 1)[-1]
             if locator not in seen:
@@ -112,14 +125,32 @@ def page_summary(path, url, limit=3500):
     except (OSError, ValueError):
         return ""
     want = urlparse(url).path.rstrip("/") or "/"
+    writes, lines = [], []  # the page's own entry and each walked state of it (after a click): all of them
     for pg in crawl.get("pages", []):
         if (urlparse(pg["url"]).path.rstrip("/") or "/") == want:
-            return "\n".join(_locator_lines(pg))[:limit]
-    return ""
+            writes += _write_lines(pg)
+            lines += _locator_lines(pg)
+    return "\n".join(dict.fromkeys(writes + lines))[:limit]  # the writes first: they are what a guess would get wrong
 
 
-def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", mcp=None, ctx_tokens=32000, log_path=None, notes="",
-        app_map="", max_tokens=0, crawl="", hints=True):
+HARMONY_CALL = re.compile(r"to=functions\.(\w+)[^{]*?<\|message\|>(\{.*?\})(?=<\||\s*$)", re.DOTALL)
+
+
+def harmony_calls(text):
+    """gpt-oss sometimes writes its tool call as text ('to=functions.finish ... <|message|>{...}') instead of a tool_call.
+    Read it the same way, so the call runs. -> calls shaped like the server's tool_calls."""
+    out = []
+    for m in HARMONY_CALL.finditer(text or ""):
+        try:
+            json.loads(m.group(2))
+        except ValueError:
+            continue
+        out.append({"id": f"text-{len(out)}", "function": {"name": m.group(1), "arguments": m.group(2)}})
+    return out
+
+
+def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", mcp=None, ctx_tokens=32000, log_path=None, notes="", live_gate=False,
+        app_map="", max_tokens=0, crawl="", hints=True, writes=None):
     sb = Sandbox(repo, app)
     state = {"case": case, "spec": None, "rendered": False}
     scaffold_warnings = render.scaffold(repo, app)
@@ -134,6 +165,7 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
     sent = set()  # pages whose locators the model already has
     if not hints:  # the bench's control run: the model gets the case and nothing the repo or the crawl already knows
         crawl = ""
+    state["crawl"], state["base_url"], state["writes"] = crawl, base_url, writes or runner.load_writes("")  # the lookup tool answers from the crawl; the locator check needs the page
     if crawl:  # the crawler's locators for the page the case opens, then for each page it moves to
         start = next((m.group(1) for s in case.get("steps", []) for m in [NAVIGATE.search(str(s))] if m), "")
         if start:
@@ -169,9 +201,10 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
             compact(messages, int(ctx_tokens * 3.2 * 0.7))
             msg = chat(lm_url, model, messages, tools, effort)
             messages.append({k: v for k, v in msg.items() if k in ("role", "content", "tool_calls") and v is not None} | {"content": msg.get("content") or ""})
-            calls = msg.get("tool_calls") or []
+            calls = msg.get("tool_calls") or harmony_calls(msg.get("content") or "")
             shown = []  # the pages the browser showed in this turn
-            note("assistant", {"content": msg.get("content"), "calls": [(c["function"]["name"], c["function"]["arguments"]) for c in calls]})
+            note("assistant", {"reasoning": msg.get("reasoning_content") or msg.get("reasoning") or "", "content": msg.get("content"),
+                               "calls": [(c["function"]["name"], c["function"]["arguments"]) for c in calls]})  # the reasoning is what LM Studio shows: keep it in the run log
             if not calls:
                 messages.append({"role": "user", "content": "Usa las herramientas. Cuando termines, llama a finish."})
                 continue
@@ -193,12 +226,25 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
                         repeats += 1
                         continue
                     out = dispatch(name, args, sb, mcp, repo, app, base_url, result, state)
+                    if name == "submit_spec" and out.startswith(("La spec tiene errores", "La spec no tiene")):
+                        for k in [k for k in tried if k.split("{", 1)[0] in BROWSER_TOOLS]:  # re-reading the page after a failed spec is recovery, not a repeat
+                            del tried[k]
                     if name == "finish":
                         problems = runner.run_checks(repo, app, base_url) if state["rendered"] else ["aún no se ha generado ningún archivo: llama a submit_spec con una spec válida"]
+                        if live_gate and state["rendered"] and not problems:  # opt-in: the tests must also pass against the app
+                            for t in state.get("tests", []):
+                                verdict = runner.run_test(repo, app, t, base_url, state["writes"])
+                                note("tool", {"name": "live_gate", "args": {"test": t}, "result": verdict[:1500]})
+                                if verdict.startswith("FALLÓ"):
+                                    problems.append(f"el test {t} no pasa contra la app:\n" + verdict[:1500])
                         if problems and refusals < FINISH_REFUSALS:
                             refusals += 1
                             out = "No puedes terminar todavía; corrige:\n" + "\n".join(problems[:15])
                             result["finished"] = False
+                        elif problems:  # the refusals ran out with problems still there: that is not a finished run
+                            result["finished"], result["problems"] = False, problems
+                            result["summary"] = f"stopped: finish with {len(problems)} problems still open"
+                            return result
                         else:
                             result["finished"], result["problems"] = True, problems
                 out = out if len(out) <= RESULT_CHARS else out[:RESULT_CHARS] + "\n...[truncado]"
@@ -219,6 +265,8 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
         if not result["finished"] and not result["summary"]:
             result["summary"] = f"stopped without finishing: {result['turns']} turns, {USAGE['tokens'] - start_tokens} tokens, no valid spec"
     finally:
+        if mcp is not None:  # the browser guard reports every write it blocked on stderr: keep them for the report
+            result["blocked_writes"] = [l for l in getattr(mcp, "stderr_lines", []) if "hydra-guard] blocked" in l]
         if log:
             log.close()
         if own_mcp:
@@ -226,11 +274,50 @@ def run(case, repo, app, base_url, model, lm_url, max_turns=40, effort="none", m
     return result
 
 
+ACTIONS_BY_ROLE = {  # what each kind of control accepts: a select on a button is the mistake this table prevents
+    "combobox": ["click", "select (widget: combobox)"],
+    "listbox": ["click", "select (widget: combobox)"],
+    "button": ["click", "dblclick"],
+    "link": ["click"],
+    "textbox": ["fill", "upload_csv"],
+    "checkbox": ["click"],
+    "radio": ["click"],
+}
+
+
+def crawled_elements(crawl_path):
+    """Every element of the crawl, one dict each, with its page's url."""
+    if not crawl_path or not os.path.exists(crawl_path):
+        return []
+    out = []
+    for pg in json.load(open(crawl_path, encoding="utf-8")).get("pages", []):
+        for e in pg.get("elements", []):
+            out.append(dict(e, page=pg.get("url", "")))
+    return out
+
+
+def lookup_element(crawl_path, name):
+    """What the crawl says about an element: matched by its selector or its visible name. Nothing is invented."""
+    needle = name.strip().lower()
+    hits = [e for e in crawled_elements(crawl_path)
+            if needle and (needle == str(e.get("locator", "")).lower() or needle in str(e.get("name", "")).lower())]
+    if not hits:
+        return f"'{name}' no está en el mapa de la app. Usa browser_snapshot para ver el elemento."
+    lines = []
+    for e in hits[:5]:
+        role = e.get("role") or e.get("tag") or "?"
+        acts = ", ".join(ACTIONS_BY_ROLE.get(role, ["click"]))
+        lines.append(f"- {e.get('locator')} | rol: {role} | nombre: {e.get('name')!r} | página: {e.get('page')} | acciones: {acts}")
+    return "\n".join(lines)
+
+
 def dispatch(name, args, sb, mcp, repo, app, base_url, result, state):
     try:
         if name in BROWSER_TOOLS:
             text, is_error = mcp.call(name, args)
             return ("ERROR: " if is_error else "") + text
+        if name == "lookup_element":
+            return lookup_element(state.get("crawl", ""), str(args.get("name", "")))
         if name == "list_files":
             return sb.list_files(args.get("path", "."))
         if name == "read_file":
@@ -243,7 +330,7 @@ def dispatch(name, args, sb, mcp, repo, app, base_url, result, state):
             goto = next((s["do"]["path"] for s in state["spec"]["steps"] if s.get("do", {}).get("action") == "goto"), "/")
             return runner.verify_locators(repo, app, state["spec"]["page"], base_url.rstrip("/") + goto)
         if name == "run_test":
-            return runner.run_test(repo, app, args["file"], base_url)
+            return runner.run_test(repo, app, args["file"], base_url, state["writes"])
         if name == "finish":
             result["summary"] = args.get("summary", "")
             return "ok"
@@ -262,17 +349,52 @@ def submit_spec(spec, repo, app, state):
             near = spec[max(0, e.pos - 50):e.pos + 30].replace("\n", " ")
             return (f"la spec no es JSON válido: {e.msg} en línea {e.lineno}, columna {e.colno}. Cerca de: ...{near}...\n"
                     "Corrige ese punto y envíala de nuevo (envía el objeto JSON, sin texto adicional).")
+    if spec is None:  # the call arrived without its "spec" argument
+        return 'Falta el objeto spec en la llamada: envía submit_spec con {"spec": {...}} (page, locators, steps, checks).'
+    if not isinstance(spec, dict):
+        return "La spec debe ser un objeto JSON ({...}), no una lista ni otro valor. Envíala de nuevo."
     page = (spec or {}).get("page", "") if isinstance(spec, dict) else ""
     existing = render.read_locators(os.path.join(repo, "apps", app, "locators", f"{page}_locators.py")) if page else {}
-    errors = specmod.validate(spec, state["case"], existing_locators=existing)
-    if errors:
-        return "La spec tiene errores; corrígela y vuelve a enviarla:\n- " + "\n- ".join(errors)
-    res = render.render(repo, app, state["case"], spec)
+    try:
+        notes = specmod.normalize(spec) if isinstance(spec, dict) else []  # clear-intent fixes, reported below
+        added = specmod.resolve(spec, existing) if isinstance(spec, dict) else []  # names the repo already has: no need to retype them
+        start = next((s["do"]["path"] for s in spec.get("steps") or [] if isinstance(s, dict) and isinstance(s.get("do"), dict)
+                      and s["do"].get("action") == "goto"), "/")
+        url = state.get("base_url", "").rstrip("/") + start
+        locs = spec.get("locators") or {}
+        kinds = {e["locator"]: e.get("role") for e in crawled_elements(state.get("crawl", "")) if e.get("role")}
+        # a repo locator with a different value is replaced only if the new selector matches exactly one element live
+        conflicts = {n: specmod.locator_selector(v) for n, v in locs.items()
+                     if n in existing and specmod.locator_selector(v) and existing[n][0] != specmod.locator_selector(v)}
+        # the live page says what each control is, when the crawl does not (hints off, or a control it missed)
+        select_sels = {specmod.locator_selector(locs.get(s["do"]["locator"])) for s in spec.get("steps") or []
+                       if isinstance(s, dict) and isinstance(s.get("do"), dict) and s["do"].get("action") == "select"
+                       and isinstance(s["do"].get("locator"), str)}
+        wanted = set(conflicts.values()) | (select_sels - set(kinds))
+        probes = runner.probe(url, sorted(s for s in wanted if s)) if wanted else {}
+        for sel, (count, role) in probes.items():
+            if role:
+                kinds.setdefault(sel, role)
+        errors = specmod.validate(spec, state["case"], existing_locators=existing, kinds=kinds)
+        if errors:
+            return ("Ajusté: " + "; ".join(notes) + "\n" if notes else "") + "La spec tiene errores; corrígela y vuelve a enviarla:\n- " + "\n- ".join(errors)
+        replace = {n for n, sel in conflicts.items() if probes.get(sel, (0, None))[0] == 1}
+        res = render.render(repo, app, state["case"], spec, replace=frozenset(replace))
+    except Exception as e:  # a shape the validator did not expect: say so in words the model can act on, not a Python traceback
+        where = traceback.extract_tb(e.__traceback__)[-1]
+        return (f"La spec no tiene la forma esperada ({type(e).__name__}: {e} en {os.path.basename(where.filename)}:{where.lineno}). "
+                "Revisa que \"steps\" y \"checks\" sean listas de objetos "
+                "con \"n\" entero, que \"locators\" sea un objeto NOMBRE -> selector, y que todo esté en la raíz (sin \"pages\").")
     if res["errors"]:
         return "No se generó nada:\n- " + "\n- ".join(res["errors"])
     state["spec"], state["rendered"] = spec, True
+    state["tests"] = [f for f in res["files"] if f.startswith("tests/")]
     problems = structure_check.check(repo, app)  # should be empty by construction; a safety net
     out = "Generado:\n" + "\n".join("  " + f for f in res["files"])
+    if added:
+        out += "\nLocalizadores tomados del repo: " + ", ".join(added)
+    if notes:
+        out += "\nAjusté: " + "; ".join(notes)
     if res["warnings"]:
         out += "\nAvisos:\n- " + "\n- ".join(res["warnings"])
     if problems:
@@ -304,6 +426,7 @@ if __name__ == "__main__":
     ap.add_argument("--log-dir", default="", help="where the transcript of this run goes (default: agent/runs); hydra points it into the app's repo")
     ap.add_argument("--max-tokens", type=int, default=0, help="hard cap on tokens for this case (0 = none)")
     ap.add_argument("--no-hints", action="store_true", help="control run: no crawl or repo selectors in the task (for measuring)")
+    ap.add_argument("--writes-config", default="", help="the owning team's writes config: without it, test runs cannot write")
     ap.add_argument("--notes", default="", help="knowledge/<App>.md: peculiarities of the app, given to the model")
     a = ap.parse_args()
     ctx = loaded_context(a.lm_url, a.model)
@@ -316,6 +439,6 @@ if __name__ == "__main__":
     log = os.path.join(log_dir, f"{case['id']}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl")
     res = run(case, os.path.expanduser(a.repo), a.app, a.base_url, a.model, a.lm_url, a.max_turns, a.effort, ctx_tokens=ctx or 32000, log_path=log,
               notes=open(a.notes, encoding="utf-8").read() if a.notes else "",
-              crawl=a.map, max_tokens=a.max_tokens, hints=not a.no_hints)
+              crawl=a.map, max_tokens=a.max_tokens, hints=not a.no_hints, writes=runner.load_writes(a.writes_config))
     print(json.dumps({**res, "tokens": USAGE["tokens"], "log": log}, indent=2, ensure_ascii=False))
     sys.exit(0 if res["finished"] and not res["problems"] else 1)

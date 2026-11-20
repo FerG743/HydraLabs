@@ -23,8 +23,13 @@ import (
 func engineDir() string {
 	isEngine := func(d string) bool { return fileExists(filepath.Join(d, "tools", "crawl", "crawl.py")) }
 	here, _ := os.Getwd()
-	if isEngine(here) {
-		return here
+	for d := here; ; d = filepath.Dir(d) { // run from a subfolder (testengine/cmd/hydra): the engine is an ancestor
+		if isEngine(d) {
+			return d
+		}
+		if filepath.Dir(d) == d {
+			break
+		}
 	}
 	if exe, err := os.Executable(); err == nil {
 		if exe, err = filepath.EvalSymlinks(exe); err == nil {
@@ -312,11 +317,33 @@ func main() {
 		create := fs.String("create", "", "create in Jira the drafts that passed in a saved run: its folder, or \"last\"")
 		parent, issueType := fs.String("parent", "", "Jira issue the drafts go under (e.g. DWQ-129)"), fs.String("type", "Task", "Jira issue type of the drafts")
 		yes := fs.Bool("yes", false, "with --create: no confirmation prompt")
+		save := fs.String("save", "", "write the drafts that passed in a saved run into cases/: its folder, or \"last\"")
+		plain := fs.Bool("plain", false, "comparison: draft with no drafting rules and no planning call (the checks still run)")
 		fs.Parse(os.Args[2:])
 		if err = cfg.requireHome(); err != nil {
 			break
 		}
+		cfg.PlainDrafts = *plain
 		var d Design
+		if *save != "" {
+			if d, err = cfg.LoadDesign(*save); err != nil {
+				break
+			}
+			keys, e := cfg.saveDrafts(&d)
+			if e != nil {
+				err = e
+				break
+			}
+			if err = writeJSON(filepath.Join(d.Dir, "design.json"), d); err != nil {
+				break
+			}
+			if len(keys) == 0 {
+				fmt.Println("nothing to save: no draft in that run passed, or all are saved already")
+			} else {
+				fmt.Printf("saved %d case(s) in %s: %s\n", len(keys), cfg.localCaseDir(), strings.Join(keys, ", "))
+			}
+			break
+		}
 		if *create == "" {
 			req, src, e := requirementText(*from, *story)
 			if e != nil {
@@ -434,6 +461,36 @@ func main() {
 			if !*yes {
 				fmt.Println("dry run: nothing removed. Run again with --yes to remove.")
 			}
+		}
+	case "show": // one case from cases/ and its latest recorded run: hydra show PQA-1 --project PQA
+		key, rest := splitCaseKey(os.Args[2:])
+		if key == "" {
+			err = fmt.Errorf("usage: hydra show <CASE-KEY> [--project KEY]")
+			break
+		}
+		sc, e := cfgFlags(flag.NewFlagSet("show", flag.ContinueOnError), rest)
+		if e != nil {
+			err = e
+			break
+		}
+		var text string
+		if text, err = sc.caseText(key); err == nil {
+			fmt.Print(text)
+		}
+	case "index": // the crawl's pages and names plus the local cases, as one small JSON file (what design reads to avoid repeats)
+		fs.Parse(os.Args[2:])
+		var ix Index
+		if ix, err = cfg.BuildIndex(); err == nil {
+			path := filepath.Join(cfg.Out, "index", cfg.App+".index.json")
+			if err = writeJSON(path, ix); err == nil {
+				fmt.Printf("%d page(s), %d case(s) indexed in %s\n", len(ix.Pages), len(ix.Cases), path)
+			}
+		}
+	case "crawl-cases": // one smoke case per crawled page, written to out/crawl-cases for review (not run, not in cases/)
+		fs.Parse(os.Args[2:])
+		var n int
+		if n, err = cfg.CrawlCases(filepath.Join(cfg.Out, "crawl-cases")); err == nil {
+			fmt.Printf("%d smoke case(s) written to %s: review them, then move the good ones to cases/\n", n, filepath.Join(cfg.Out, "crawl-cases"))
 		}
 	case "announce": // backfill: comment on cases that were delivered before write-back existed
 		post, keys := fs.Bool("post", false, "actually post (default: only print what would be posted)"), fs.String("keys", "", "comma-separated keys (default: every passing case)")

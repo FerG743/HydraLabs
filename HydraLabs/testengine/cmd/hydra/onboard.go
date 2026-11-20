@@ -83,7 +83,7 @@ type Onboarding struct {
 // defaultProfile is what a new app starts with: read-only, no base URL (the gate), the model tier available.
 func defaultProfile(project, app string) map[string]any {
 	return map[string]any{"app": app, "baseUrl": "", "allowWrites": false, "paths": []string{"/"}, "maxPages": 25, "safeClicks": true,
-		"agent": "agent/agent.py", "model": "prism-ml/bonsai-27b", "maxTurns": 20, "maxTokens": 100000,
+		"agent": "agent/agent.py", "model": "openai/gpt-oss-20b", "maxTurns": 20, "maxTokens": 100000,
 		"jql":  fmt.Sprintf(`project = %s AND labels in ("automate", "execute") ORDER BY key ASC`, project),
 		"_doc": "Created by onboarding. Set baseUrl (and allowWrites only for a QA environment you may change), then run again."}
 }

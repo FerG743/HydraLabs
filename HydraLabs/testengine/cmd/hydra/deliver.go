@@ -357,7 +357,7 @@ func (c Config) runPytest(repo, work string, n int) (map[string]CaseOutcome, str
 	}
 	// AUTO_ACC empty: with an HTML report the framework would post to the team's chat and upload the report and
 	// video to an external host. A pre-review gate run must never publish anything.
-	cmd.Env = append(os.Environ(), "PYTHONPATH="+repo+string(os.PathListSeparator)+agentDir,
+	cmd.Env = append(append(os.Environ(), dotenvOnly(filepath.Join(repo, ".env"), os.Environ())...), "PYTHONPATH="+repo+string(os.PathListSeparator)+agentDir,
 		"BASE_URL="+c.PortalURL, "HEADLESS="+headless, "SLOW_MO="+slow, "AUTO_ACC=", "HYDRA_ALLOW_WRITES="+allow,
 		"PYTHONDONTWRITEBYTECODE=1")
 	var logb bytes.Buffer
@@ -416,6 +416,31 @@ func judgeRuns(keys []string, results []map[string]CaseOutcome, want int) []Case
 			o.Status, o.Detail = first.Status, first.Detail
 		}
 		out = append(out, o)
+	}
+	return out
+}
+
+// dotenvOnly: the project's .env as NAME=value pairs the process does not already set (the framework reads the same file
+// with load_dotenv, which never overrides a variable). Values in .env reach the test this way.
+func dotenvOnly(path string, env []string) []string {
+	have := map[string]bool{}
+	for _, kv := range env {
+		k, _, _ := strings.Cut(kv, "=")
+		have[k] = true
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, line := range strings.Split(string(b), "\n") {
+		line = strings.TrimSpace(line)
+		k, v, ok := strings.Cut(line, "=")
+		k = strings.TrimSpace(k)
+		if !ok || strings.HasPrefix(line, "#") || k == "" || have[k] {
+			continue
+		}
+		out = append(out, k+"="+strings.Trim(strings.TrimSpace(v), `"'`))
 	}
 	return out
 }

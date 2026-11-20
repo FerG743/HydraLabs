@@ -43,6 +43,7 @@ PRECONDITIONS = [  # searched anywhere in the precondition text
     (r'mocked to return HTTP (\d{3}) after (?:a )?([\d.]+) ?s', "mock_post"),
 ]
 EXPECTED = [
+    (r'^The "(.+?)" (?:field|dropdown) shows the (?:value entered|option chosen)\.?$', "field_value"),
     (r'^The download succeeds\.?$', "download_ok"),
     (r'^.*non-CSV file is rejected client-side and "(.+?)" stays (enabled|disabled)\.?$', "rejected_client"),
     (r'^.*\bat most (one|\d+) POST request.*$', "max_posts"),
@@ -101,7 +102,9 @@ def analyse(case):
             col, k = slug(g[0]), 2
             while col in data:
                 col, k = f"{slug(g[0])}_{k}", k + 1
-            data[col] = g[1]
+            # [NAME] is a variable in the app's .env: the CSV holds ENV:NAME, so the value never lives in the case or the CSV
+            bracket = re.fullmatch(r"\[([A-Za-z][A-Za-z0-9_]*)\]", g[1].strip())
+            data[col] = "ENV:" + bracket.group(1) if bracket else g[1]
         steps.append({"n": s["n"], "text": text, "op": op, "g": g, "col": col})
     expected = []
     for e in case.get("expected", []):
@@ -345,9 +348,26 @@ def build_expected(app, a, ctx):
                 # never clicked in this case: "after" is the end of the test
                 out.append((e, f"co.{state_flujo(app, g[0], g[2], ctx['page'])}(driver)", None if after is None else after - 1))
                 continue
-        elif op == "order_in_section" and a["data"].get("order_number"):
+        elif op == "field_value":  # the input holds what the case typed into it (matched by the field's name in the steps)
+            fills = [st for st in a["steps"] if st["op"] in ("fill", "select") and st.get("loc")]
+            hit = next((st for st in fills if st["g"][0].lower() in g[0].lower() or g[0].lower() in st["g"][0].lower()),
+                       fills[-1] if fills else None)
+            if hit:
+                loc = hit["loc"]
+                if hit["op"] == "fill":  # a text input: its value is the typed text
+                    body = f"""    expect(driver.page.locator(L.{loc})).to_have_value(valor)
+    add_step("El campo tiene el valor escrito.", "Exitoso")"""
+                else:  # a dropdown: the option it shows (a native <select> or a custom combobox)
+                    body = f"""    mostrado = driver.page.locator(L.{loc}).evaluate("e => e.tagName === 'SELECT' ? e.options[e.selectedIndex].text : e.innerText")
+    assert valor in mostrado, f"El campo muestra '{{mostrado}}', no '{{valor}}'"
+    add_step("El campo muestra la opción elegida.", "Exitoso")"""
+                n = app.flujo(f"verificar_valor_{loc.lower()}_flujo", f'''def verificar_valor_{loc.lower()}_flujo(driver, valor):
+    """Verifica que el campo muestre el valor que se escribió o eligió."""
+{body}''')
+                line = f"co.{n}(driver, {hit['col']})"
+        elif op == "order_in_section" and a["data"]:  # the value looked for: the first thing the case typed or picked
             n = app.flujo("verificar_valor_en_seccion_flujo", TEXT_CHECKS["in_section"])
-            line = f"co.{n}(driver, {g[0]!r}, order_number)"
+            line = f"co.{n}(driver, {g[0]!r}, {next(iter(a['data']))})"
         elif op == "numbers_visible":
             nums = re.findall(r"\b\d{6,}\b", e["text"])
             results = app.sections.get("results") if re.search(r"results table|tabla de resultados", e["text"], re.I) else None

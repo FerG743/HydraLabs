@@ -36,6 +36,7 @@ type DraftResult struct {
 	OK       bool     `json:"ok"`
 	Problems []string `json:"problems,omitempty"`
 	Issue    string   `json:"issue,omitempty"` // the Jira key once created
+	Case     string   `json:"case,omitempty"`  // the cases/ key once saved
 }
 
 type Design struct {
@@ -52,15 +53,19 @@ write no case for that situation. Never contradict it.
 Step 1 is always navigate, to the page the requirement is about: the precondition describes the state, the steps
 create it. Each step is one action, picked from a fixed list, with its target and value:
 - navigate: value = a path of the app (from the page list)
-- enter: target = the text field in plain English words (e.g. "order number"), value = the text to type
+- enter: target = only the field's name (e.g. "cuenta" for the field "Ingresa la cuenta", never the instruction), value = the text to type; if the requirement names a value as ENV:NAME, the value is that ENV:NAME token
 - select: target = the dropdown in plain English words (e.g. "store"), value = one of its options
 - click / verify_enabled / verify_disabled: target = the button's exact visible name
 Each expected result is one kind, picked from a fixed list:
 - disabled_then_enabled: target = a button, between = what happens in between (e.g. "the order is added")
 - appears_in: target = the section heading where the processed order shows
+- control_visible: target = a button, tab or text box as its exact visible name (the page shows it)
 - empty_state_disappears / no_message: target = the exact visible text
 - error_shown: an error toast or alert is shown (no target)
 Every value must come from the requirement or from a dropdown's options; never invent data.
+A value the test types or picks is written as [name] (e.g. [QA_CARD]), never the value itself: the name is a variable in the app's .env.
+Never write a file path or a placeholder value. If a case would need a file the requirement does not name, write no case for it.
+A precondition is optional: leave it empty unless the requirement asks for a starting state other than the app's default (the app's access note below). Never write the default yourself.
 Each case has a short name, a precondition (the starting state), 2 to 8 steps and 1 to 3 expected results.`
 
 // vocabulary: what the model may refer to, from the crawl (paths, fields, buttons, dropdown options).
@@ -92,26 +97,47 @@ func vocabulary(cr *Crawl) (string, map[string]bool) {
 	return b.String(), known
 }
 
+const designExample = `{"cases":[{"name":"Tarjetas shows Agregar","precondition":"","steps":[{"action":"navigate","target":"","value":"/Tarjetas"},{"action":"verify_enabled","target":"Agregar","value":""}],"expected":[{"kind":"control_visible","target":"Agregar","between":""}]}]}`
+
+// closeJSON: from the first "{" to the end, with the braces the model left open closed.
+// shortcut: counts braces inside strings too, so a case text with a brace would be closed wrongly; the case checks still judge every draft.
+func closeJSON(content string) string {
+	if i := strings.Index(content, "{"); i >= 0 {
+		content = content[i:]
+	}
+	content = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(content), "```"))
+	if open := strings.Count(content, "{") - strings.Count(content, "}"); open > 0 {
+		content += strings.Repeat("}", open)
+	}
+	return content
+}
+
+// accessNote: from the profile's login (set by init). The model decides per case whether it needs a signed-in user.
+func (c Config) accessNote() string {
+	if c.LoginFile == "" {
+		return "no sign-in: the pages open without a user."
+	}
+	return "the app has a sign-in page at " + c.LoginPath + ". A page behind it needs a signed-in user, so a case about it starts signed in; a case about the sign-in page itself starts signed out."
+}
+
+// defaultPrecondition: the app's starting state, read from its profile (the same login that the board shows).
+func (c Config) defaultPrecondition() string {
+	if c.LoginFile == "" {
+		return "No sign-in is needed."
+	}
+	return "The user is signed in."
+}
+
 // askDrafts is the model's one bounded job. Structured output keeps the answer to the shape; code checks the content.
-func (c Config) askDrafts(requirement, vocab string, max int) ([]Draft, int, error) {
-	str := map[string]any{"type": "string"}
-	step := map[string]any{"type": "object", "required": []string{"action", "target", "value"}, "properties": map[string]any{
-		"action": map[string]any{"type": "string", "enum": []string{"navigate", "enter", "select", "click", "verify_enabled", "verify_disabled"}},
-		"target": str, "value": str}}
-	exp := map[string]any{"type": "object", "required": []string{"kind", "target", "between"}, "properties": map[string]any{
-		"kind":   map[string]any{"type": "string", "enum": []string{"disabled_then_enabled", "appears_in", "empty_state_disappears", "no_message", "error_shown"}},
-		"target": str, "between": str}}
-	schema := map[string]any{"type": "object", "required": []string{"cases"}, "properties": map[string]any{
-		"cases": map[string]any{"type": "array", "maxItems": max, "items": map[string]any{"type": "object",
-			"required": []string{"name", "precondition", "steps", "expected"}, "properties": map[string]any{
-				"name": str, "precondition": str,
-				"steps":    map[string]any{"type": "array", "items": step},
-				"expected": map[string]any{"type": "array", "items": exp}}}}}}
+func (c Config) askDrafts(requirement, access, vocab, existing, plan string, max int) ([]Draft, int, error) {
+	rules := designRules
+	if c.PlainDrafts {
+		rules = plainRules
+	}
 	body, _ := json.Marshal(map[string]any{"model": c.Model, "temperature": 0, "max_tokens": 3000, "reasoning_effort": "none",
-		"response_format": map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": "cases", "schema": schema}},
 		"messages": []map[string]string{
-			{"role": "system", "content": designRules},
-			{"role": "user", "content": fmt.Sprintf("Requirement:\n%s\n\nThe app (from its crawl):\n%s\nWrite up to %d cases.", requirement, vocab, max)}}})
+			{"role": "system", "content": rules},
+			{"role": "user", "content": fmt.Sprintf("Requirement:\n%s\n\nThe app's access: %s\n\nThe app (from its crawl):\n%s\n%s\n%sWrite up to %d cases. Answer ONLY with a JSON object shaped like this example, no prose: %s", requirement, access, vocab, existing, planText(plan), max, designExample)}}})
 	resp, err := (&http.Client{Timeout: 5 * time.Minute}).Post(c.LMURL+"/chat/completions", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, 0, fmt.Errorf("the model is not reachable at %s: %w", c.LMURL, err)
@@ -127,12 +153,12 @@ func (c Config) askDrafts(requirement, vocab string, max int) ([]Draft, int, err
 		return nil, 0, fmt.Errorf("the model gave no answer (status %d)", resp.StatusCode)
 	}
 	var out struct{ Cases []modelCase }
-	content := r.Choices[0].Message.Content
-	if i, j := strings.Index(content, "{"), strings.LastIndex(content, "}"); i >= 0 && j > i {
-		content = content[i : j+1]
-	}
+	content := closeJSON(r.Choices[0].Message.Content)
 	if err := json.Unmarshal([]byte(content), &out); err != nil {
-		return nil, r.Usage.Total, fmt.Errorf("the model's answer is not the agreed JSON: %v", err)
+		return nil, r.Usage.Total, fmt.Errorf("the model's answer is not the agreed JSON (%v); its answer: %s", err, r.Choices[0].Message.Content)
+	}
+	if len(out.Cases) == 0 { // say what the model said, so an empty answer is not silent
+		return nil, r.Usage.Total, fmt.Errorf("the model returned no cases; its answer: %.300s", r.Choices[0].Message.Content)
 	}
 	if len(out.Cases) > max {
 		out.Cases = out.Cases[:max]
@@ -162,7 +188,7 @@ func (m modelCase) draft() Draft {
 		}
 		line := map[string]string{
 			"navigate":        "Navigate to `" + v + "`.",
-			"enter":           "Enter " + t + " `" + v + "`.",
+			"enter":           "Enter " + fieldName(t) + " `" + v + "`.",
 			"select":          "Select " + t + " `" + v + "`.",
 			"click":           `Click "` + t + `".`,
 			"verify_enabled":  `Verify "` + t + `" is enabled.`,
@@ -178,6 +204,7 @@ func (m modelCase) draft() Draft {
 		line := map[string]string{
 			"disabled_then_enabled":  `"` + t + `" is disabled before ` + strings.TrimSpace(e.Between) + ` and enabled after.`,
 			"appears_in":             `After processing, the order appears in "` + t + `".`,
+			"control_visible":        `The page shows "` + t + `": it appears in "` + t + `".`,
 			"empty_state_disappears": `The "` + t + `" empty state disappears.`,
 			"no_message":             `No "` + t + `" message appears.`,
 			"error_shown":            "An error toast or alert is shown to the user.",
@@ -232,11 +259,37 @@ func (c Config) Design(requirement, source string, max int) (Design, error) {
 		return d, fmt.Errorf("%s: %w", c.crawlPath(), err)
 	}
 	vocab, known := vocabulary(cr)
+	envKeys := readEnvKeys(filepath.Join(c.Home, ".env"))
+	names, roles := elementNames(cr), elementRoles(cr)
 	start := pageNamed(requirement, known)
-	drafts, tokens, err := c.askDrafts(requirement, vocab, max)
-	d.Tokens = tokens
+	existing := ""
+	if ix, err := c.BuildIndex(); err == nil { // cases already written for this page or these names: do not repeat them
+		if rel := ix.Related(requirement, 5); len(rel) > 0 {
+			var b strings.Builder
+			b.WriteString("Existing cases about this (do not repeat them):\n")
+			for _, r := range rel {
+				fmt.Fprintf(&b, "- %s: %s\n", r.Key, r.Title)
+			}
+			existing = b.String()
+		}
+	}
+	plan, ptokens := "", 0
+	if !c.PlainDrafts {
+		if plan, ptokens, err = c.askPlan(requirement, c.accessNote(), vocab, existing, max); err != nil {
+			d.Tokens = ptokens
+			return d, err
+		}
+	}
+	d.Tokens = ptokens
+	drafts, tokens, err := c.askDrafts(requirement, c.accessNote(), vocab, existing, plan, max)
+	d.Tokens += tokens
 	if err != nil {
 		return d, err
+	}
+	for i := range drafts { // the app's default starting state, unless the case asked for another
+		if drafts[i].Precondition == "" {
+			drafts[i].Precondition = c.defaultPrecondition()
+		}
 	}
 	stored, _ := c.loadCases() // siblings give the renderer its default values, as in the router
 	tmp, err := os.MkdirTemp("", "hydra-design-")
@@ -268,12 +321,17 @@ func (c Config) Design(requirement, source string, max int) (Design, error) {
 			seen[key] = res.ID
 		}
 		res.Problems = append(res.Problems, bad...)
+		for _, st := range dr.Steps {
+			res.Problems = append(res.Problems, unsourced(st, envKeys)...)
+			res.Problems = append(res.Problems, unmatched(st, names)...)
+			res.Problems = append(res.Problems, fieldClicks(st, roles)...)
+		}
 		for _, s := range cs.Steps {
 			for _, m := range backticked.FindAllStringSubmatch(s.Action, -1) {
 				v := strings.ToLower(m[1])
 				// the requirement is untrusted text too: these two never pass because it mentions them
-				if strings.HasPrefix(v, "env:") {
-					res.Problems = append(res.Problems, fmt.Sprintf("step %s uses %q: secrets are never test data in a draft", s.N, m[1]))
+				if strings.HasPrefix(v, "env:") && !isEnvPointer(m[1]) {
+					res.Problems = append(res.Problems, fmt.Sprintf("step %s uses %q: a draft may only point at a variable (ENV:NAME), never write the secret", s.N, m[1]))
 					continue
 				}
 				if strings.HasPrefix(s.Action, "Navigate to ") && !known[v] {
@@ -460,3 +518,167 @@ func (c Config) createDrafts(d *Design, parent, issueType string) error {
 	}
 	return writeJSON(filepath.Join(d.Dir, "design.json"), d)
 }
+
+// fieldName: the field's name without an instruction the model copied in ("Ingresa la cuenta" -> "cuenta").
+var instruction = regexp.MustCompile(`(?i)^(ingresa|escribe|escriba|ingrese|enter|type|fill|write)\s+(en\s+|la\s+|el\s+|the\s+|a\s+|the\s+)?`)
+
+func fieldName(t string) string {
+	if n := strings.TrimSpace(instruction.ReplaceAllString(t, "")); n != "" {
+		return n
+	}
+	return t
+}
+
+// isEnvPointer: ENV:NAME, the name of a variable in the project's .env. The value itself never goes into a draft.
+var envPointer = regexp.MustCompile(`^ENV:[A-Z][A-Z0-9_]*$`)
+
+func isEnvPointer(v string) bool { return envPointer.MatchString(v) }
+
+// [name] in a step is a value the test reads: it must be a variable in the app's .env (the value never goes into a draft).
+var bracketName = regexp.MustCompile(`\[([A-Za-z][A-Za-z0-9_]*)\]`)
+
+// unsourced: one problem for each [name] in the step that .env does not define.
+func unsourced(step string, envKeys map[string]bool) []string {
+	var out []string
+	for _, m := range bracketName.FindAllStringSubmatch(step, -1) {
+		if !envKeys[m[1]] {
+			out = append(out, fmt.Sprintf("%q: [%s] has no source: add %s to the project's .env", step, m[1], m[1]))
+		}
+	}
+	return out
+}
+
+// readEnvKeys: the variable names in a .env file (values are never read here).
+func readEnvKeys(path string) map[string]bool {
+	keys := map[string]bool{}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return keys
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if k, _, ok := strings.Cut(strings.TrimSpace(line), "="); ok && !strings.HasPrefix(k, "#") {
+			keys[strings.TrimSpace(k)] = true
+		}
+	}
+	return keys
+}
+
+// elementNames: the names of the app's fields, buttons and dropdowns in the crawl (links are navigation, not targets).
+func elementNames(cr *Crawl) []string {
+	var out []string
+	for _, p := range cr.Pages {
+		for _, e := range p.Elements {
+			if e.Name != "" && e.Role != "link" && e.Role != "menuitem" {
+				out = append(out, e.Name)
+			}
+		}
+	}
+	return out
+}
+
+var quotedName = regexp.MustCompile(`"([^"]+)"`)
+var fieldTarget = regexp.MustCompile("^(?:Enter|Select) (.+?) `")
+var accents = strings.NewReplacer("á", "a", "é", "e", "í", "i", "ó", "o", "ú", "u", "ñ", "n", "Á", "a", "É", "e", "Í", "i", "Ó", "o", "Ú", "u", "Ñ", "n")
+
+func plainKey(s string) string { return strings.ToLower(accents.Replace(strings.TrimSpace(s))) }
+
+// unmatched: each field or button a step names must be on the app's page (a name in the crawl, ignoring case and accents).
+func unmatched(step string, names []string) []string {
+	var targets []string
+	if m := fieldTarget.FindStringSubmatch(step); m != nil {
+		targets = append(targets, m[1])
+	}
+	for _, m := range quotedName.FindAllStringSubmatch(step, -1) {
+		targets = append(targets, m[1])
+	}
+	var out []string
+	for _, t := range targets {
+		found := false
+		for _, n := range names {
+			if strings.Contains(plainKey(n), plainKey(t)) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			out = append(out, fmt.Sprintf("%q: %q is not on the page (crawl)", step, t))
+		}
+	}
+	return out
+}
+
+// planRules: the first call reasons in plain words; the second call turns the plan into the agreed JSON, and code checks it.
+const planRules = `You plan manual test cases for a web app from a requirement. Reason it through in plain words, not JSON.
+For each case, in a numbered list: its name; its starting state (only what the requirement or the app's access note says);
+each action in order, named with the exact names from the app's page list; each typed value written as [NAME]
+(a variable in the app's .env), never the value itself; each dropdown option is written as the option's own name from the page list; and the expected result. Do not invent names, values or pages.
+Every case comes from one sentence of the requirement: quote that sentence first, then the case. Write no case for behavior the
+requirement does not state (no reset, no second item, no error, unless the requirement says it). When the requirement says a
+Never write an error, message or result the requirement does not state. Never click a text box or dropdown: enter or select it. When the requirement says a
+control is enabled or disabled, the expected result states that change (disabled before, enabled after), never only that the
+control exists. If the requirement needs something the page list does not show, write one line starting with "Missing:".`
+
+// askPlan: free text, no JSON. The model may reason here; its plan is a hint for askDrafts, which still must pass the checks.
+func (c Config) askPlan(requirement, access, vocab, existing string, max int) (string, int, error) {
+	body, _ := json.Marshal(map[string]any{"model": c.Model, "temperature": 0, "max_tokens": 6000, "reasoning_effort": "medium",
+		"messages": []map[string]string{
+			{"role": "system", "content": planRules},
+			{"role": "user", "content": fmt.Sprintf("Requirement:\n%s\n\nThe app's access: %s\n\nThe app (from its crawl):\n%s\n%s\nPlan up to %d cases.", requirement, access, vocab, existing, max)}}})
+	resp, err := (&http.Client{Timeout: 5 * time.Minute}).Post(c.LMURL+"/chat/completions", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return "", 0, fmt.Errorf("the model is not reachable at %s: %w", c.LMURL, err)
+	}
+	defer resp.Body.Close()
+	var r struct {
+		Choices []struct{ Message struct{ Content string } }
+		Usage   struct {
+			Total int `json:"total_tokens"`
+		}
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil || len(r.Choices) == 0 {
+		return "", 0, fmt.Errorf("the model gave no plan (status %d)", resp.StatusCode)
+	}
+	plan := strings.TrimSpace(r.Choices[0].Message.Content)
+	if plan == "" {
+		return "", r.Usage.Total, fmt.Errorf("the model gave an empty plan")
+	}
+	return plan, r.Usage.Total, nil
+}
+
+// planText: the plan as input to the drafting call ("" when there is none).
+func planText(plan string) string {
+	if plan == "" {
+		return ""
+	}
+	return "The plan written from the requirement (use it, and only what the requirement and the page list support):\n" + plan + "\n\n"
+}
+
+// elementRoles: each named element's role, by its plain name (a Click on a text box or dropdown is a mistake).
+func elementRoles(cr *Crawl) map[string]string {
+	out := map[string]string{}
+	for _, p := range cr.Pages {
+		for _, e := range p.Elements {
+			if e.Name != "" {
+				out[plainKey(e.Name)] = e.Role
+			}
+		}
+	}
+	return out
+}
+
+// fieldClicks: "Click <field>" where the field is a text box or dropdown on the page: it must be entered or selected.
+func fieldClicks(step string, roles map[string]string) []string {
+	if !strings.HasPrefix(step, "Click ") {
+		return nil
+	}
+	var out []string
+	for _, m := range quotedName.FindAllStringSubmatch(step, -1) {
+		if r := roles[plainKey(m[1])]; r == "textbox" || r == "combobox" {
+			out = append(out, fmt.Sprintf("%q: %q is a %s: enter or select it, do not click it", step, m[1], r))
+		}
+	}
+	return out
+}
+
+// plainRules: the comparison arm of design --plain. The model gets only the shape and the page list; the checks still run.
+const plainRules = `You write manual test cases for a web app from a requirement. Answer with JSON only.`

@@ -36,6 +36,7 @@ type Config struct {
 	Agent       string `json:"agent"` // path to agent.py; empty disables T3
 	Model       string `json:"model"` // LM Studio model for T3
 	LMURL       string `json:"lmUrl"`
+	PlainDrafts bool   `json:"-"`           // design --plain: no drafting rules, no planning call (for comparing runs)
 	MaxTurns    int    `json:"maxTurns"`    // hard budget for T3; past it the case goes to review
 	MaxTokens   int    `json:"maxTokens"`   // hard token cap for T3 per case (a stuck run once cost 314k)
 	AllowWrites bool   `json:"allowWrites"` // let tests send real writes (default: read-only safety net)
@@ -299,6 +300,7 @@ func (c Config) escalate(cs *Case, r Run) Run {
 	}
 	var out, errb bytes.Buffer
 	cmd := exec.Command(c.Python, args...)
+	cmd.Env = append(os.Environ(), dotenvOnly(filepath.Join(c.Home, ".env"), os.Environ())...) // the test reads .env values such as QA_CARD
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	cmd.Run() // a non-zero exit still prints a report; judge by the report
 	var res struct {
@@ -450,6 +452,7 @@ func (c Config) verifyRun(key string) Verdict {
 	}
 	var out, errb bytes.Buffer
 	cmd := exec.Command(c.Python, args...)
+	cmd.Env = append(os.Environ(), dotenvOnly(filepath.Join(c.Home, ".env"), os.Environ())...) // the test reads .env values such as QA_CARD
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	err := cmd.Run()
 	var res struct {

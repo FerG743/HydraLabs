@@ -57,7 +57,7 @@ create it. Each step is one action, picked from a fixed list, with its target an
 - select: target = the dropdown in plain English words (e.g. "store"), value = one of its options
 - click / verify_enabled / verify_disabled: target = the button's exact visible name
 Each expected result is one kind, picked from a fixed list:
-- disabled_then_enabled: target = a button, between = what happens in between (e.g. "the order is added")
+- disabled_then_enabled: target = a button, between = what the requirement says happens in between (e.g. "the order is added"); never empty
 - appears_in: target = the section heading where the processed order shows
 - control_visible: target = a button, tab or text box as its exact visible name (the page shows it)
 - empty_state_disappears / no_message: target = the exact visible text
@@ -179,7 +179,7 @@ type modelCase struct {
 }
 
 func (m modelCase) draft() Draft {
-	d := Draft{Name: m.Name, Precondition: m.Precondition}
+	d := Draft{Name: caseKeyPrefix.ReplaceAllString(m.Name, ""), Precondition: m.Precondition}
 	q := func(s string) string { return strings.Trim(strings.TrimSpace(s), "\"'`") }
 	for _, s := range m.Steps {
 		t, v := q(s.Target), q(s.Value)
@@ -325,6 +325,9 @@ func (c Config) Design(requirement, source string, max int) (Design, error) {
 			res.Problems = append(res.Problems, unsourced(st, envKeys)...)
 			res.Problems = append(res.Problems, unmatched(st, names)...)
 			res.Problems = append(res.Problems, fieldClicks(st, roles)...)
+		}
+		for _, ex := range dr.Expected {
+			res.Problems = append(res.Problems, unrequested(ex, low)...)
 		}
 		for _, s := range cs.Steps {
 			for _, m := range backticked.FindAllStringSubmatch(s.Action, -1) {
@@ -682,3 +685,18 @@ func fieldClicks(step string, roles map[string]string) []string {
 
 // plainRules: the comparison arm of design --plain. The model gets only the shape and the page list; the checks still run.
 const plainRules = `You write manual test cases for a web app from a requirement. Answer with JSON only.`
+
+// caseKeyPrefix: a case key the model copied into a name ("PQA-3 Enter account") is not part of the name; the save step gives keys.
+var caseKeyPrefix = regexp.MustCompile(`^[A-Z][A-Z0-9]*-\d+[:\s]+`)
+
+// errorExpected: an expected error the requirement never mentions is invented, so it is refused.
+var errorExpected = regexp.MustCompile(`(?i)\berror\b|alert|toast`)
+var errorWords = regexp.MustCompile(`(?i)error|alerta|mensaje|toast|falla|rechaz`)
+
+// unrequested: an expected error that the requirement does not describe.
+func unrequested(expected, lowRequirement string) []string {
+	if errorExpected.MatchString(expected) && !errorWords.MatchString(lowRequirement) {
+		return []string{fmt.Sprintf("%q: the requirement does not describe an error, so this expected result is invented", expected)}
+	}
+	return nil
+}

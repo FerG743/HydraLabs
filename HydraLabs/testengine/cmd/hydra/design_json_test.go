@@ -135,3 +135,29 @@ func TestClickingAFieldIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// A case key copied into a draft's name is dropped: keys come from the save step.
+func TestDraftNameDropsACopiedCaseKey(t *testing.T) {
+	for _, name := range []string{"PQA-3 Enter account value", "PQA-6: Tarjetas full flow"} {
+		if got := (modelCase{Name: name}).draft().Name; strings.Contains(got, "PQA-") {
+			t.Fatalf("key kept in %q: %q", name, got)
+		}
+	}
+	if got := (modelCase{Name: "Tarjetas shows Agregar"}).draft().Name; got != "Tarjetas shows Agregar" {
+		t.Fatalf("plain name changed: %q", got)
+	}
+}
+
+// An expected error is refused unless the requirement describes an error.
+func TestInventedErrorIsRefused(t *testing.T) {
+	ex := "An error toast or alert is shown to the user."
+	if got := unrequested(ex, "the user clicks procesar and the account is processed."); len(got) != 1 {
+		t.Fatalf("invented error accepted: %v", got)
+	}
+	if got := unrequested(ex, "if the account is wrong, an error message is shown."); len(got) != 0 {
+		t.Fatalf("described error refused: %v", got)
+	}
+	if got := unrequested(`"Procesar" is enabled.`, "the user clicks procesar."); len(got) != 0 {
+		t.Fatalf("plain expectation refused: %v", got)
+	}
+}

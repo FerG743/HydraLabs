@@ -30,3 +30,20 @@ def test_the_sign_in_path_is_relative_to_the_base_url():
     assert path_under("http://127.0.0.1:3077", "http://127.0.0.1:3077/login?next=/home") == "/login"
     assert path_under("https://qa.example/app", "https://qa.example/app2/login") is None  # a sibling app, not a sub-path
     assert path_under("https://qa.example/app", "https://sso.example/app/login") is None  # single sign-on on another host
+
+
+
+def test_a_selection_shows_what_it_adds_removes_and_changes():
+    import crawl
+    before = crawl.state_of([{"role": "textbox", "name": "Monto (BCD, 8 hex)"}, {"role": "combobox", "name": "Mensaje", "expanded": "false"}])
+    after = crawl.state_of([{"role": "combobox", "name": "Mensaje", "expanded": "true"}, {"role": "textbox", "name": "Referencia_ACC (BCD, 24 hex)"}])
+    d = crawl.diff_scans(before, after)
+    assert d["adds"] == ["textbox:Referencia_ACC (BCD, 24 hex)"]
+    assert d["removes"] == ["textbox:Monto (BCD, 8 hex)"]
+    assert d["changes"] == ["combobox:Mensaje"]
+
+
+def test_a_send_like_option_is_never_selected():
+    import crawl
+    assert crawl.SEND_WORDS.search("Enviar mensaje")
+    assert not crawl.SEND_WORDS.search("Solicitud de Plan 08 (Compra Normal)")

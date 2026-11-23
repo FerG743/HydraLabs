@@ -319,11 +319,13 @@ func main() {
 		yes := fs.Bool("yes", false, "with --create: no confirmation prompt")
 		save := fs.String("save", "", "write the drafts that passed in a saved run into cases/: its folder, or \"last\"")
 		plain := fs.Bool("plain", false, "comparison: draft with no drafting rules and no planning call (the checks still run)")
+		noStates := fs.Bool("no-states", false, "comparison: draft without the observed states from the exploration")
 		fs.Parse(os.Args[2:])
 		if err = cfg.requireHome(); err != nil {
 			break
 		}
 		cfg.PlainDrafts = *plain
+		cfg.NoStates = *noStates
 		var d Design
 		if *save != "" {
 			if d, err = cfg.LoadDesign(*save); err != nil {
@@ -476,6 +478,18 @@ func main() {
 		var text string
 		if text, err = sc.caseText(key); err == nil {
 			fmt.Print(text)
+		}
+	case "suggest": // writes .env.suggested: the values a requirement needs, suggested where the crawl has them; never touches .env
+		from := fs.String("from", "", "requirement as a text file")
+		fs.Parse(os.Args[2:])
+		req, _, e := requirementText(*from, "")
+		if e != nil {
+			err = e
+			break
+		}
+		var out string
+		if out, err = cfg.Suggest(req); err == nil {
+			fmt.Printf("suggestions written to %s: check each value, then copy the ones you need into .env\n", out)
 		}
 	case "index": // the crawl's pages and names plus the local cases, as one small JSON file (what design reads to avoid repeats)
 		fs.Parse(os.Args[2:])

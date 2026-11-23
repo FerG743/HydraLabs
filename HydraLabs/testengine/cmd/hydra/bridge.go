@@ -31,6 +31,7 @@ type CrawlElement struct {
 	Placeholder                            string
 	Stable                                 bool
 	Options                                []string
+	Under                                  string `json:"under_tab,omitempty"` // the tab that revealed it (e.g. Adquirente)
 }
 type Crawl struct {
 	Pages []struct {

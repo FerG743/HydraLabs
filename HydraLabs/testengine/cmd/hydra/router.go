@@ -36,6 +36,7 @@ type Config struct {
 	Agent       string `json:"agent"` // path to agent.py; empty disables T3
 	Model       string `json:"model"` // LM Studio model for T3
 	LMURL       string `json:"lmUrl"`
+	NoStates    bool   `json:"-"`           // design --no-states: draft without the exploration's observed states (for comparing runs)
 	PlainDrafts bool   `json:"-"`           // design --plain: no drafting rules, no planning call (for comparing runs)
 	MaxTurns    int    `json:"maxTurns"`    // hard budget for T3; past it the case goes to review
 	MaxTokens   int    `json:"maxTokens"`   // hard token cap for T3 per case (a stuck run once cost 314k)
@@ -50,11 +51,12 @@ type Config struct {
 	StabilityRuns int                 `json:"stabilityRuns"` // consecutive real-framework passes a case needs before it is delivered (default 3)
 	DeliverRepo   string              `json:"deliverRepo"`   // the framework repo that receives verified tests on review branches
 	BaseBranch    string              `json:"baseBranch"`
-	StoreCrawl    bool                `json:"storeCrawl"`  // crawl: also put the result in the app's own repo, on a review branch
-	RecordVideo   bool                `json:"recordVideo"` // crawl: save a .webm of the crawler's browser under out/crawl/videos
-	SlowMS        int                 `json:"slowMs"`      // crawl: reveal elements one at a time, this many ms apart (0 = as fast as possible)
-	SafeClicks    bool                `json:"safeClicks"`  // open comboboxes/tabs to record their options (never selects or submits)
-	LoginFile     string              `json:"loginFile"`   // steps whose values are ENV: tokens, same convention as the framework CSVs
+	StoreCrawl    bool                `json:"storeCrawl"`       // crawl: also put the result in the app's own repo, on a review branch
+	RecordVideo   bool                `json:"recordVideo"`      // crawl: save a .webm of the crawler's browser under out/crawl/videos
+	SlowMS        int                 `json:"slowMs"`           // crawl: reveal elements one at a time, this many ms apart (0 = as fast as possible)
+	Sweeps        []string            `json:"sweeps,omitempty"` // "PATH=Control": select each option of that dropdown and record what changes
+	SafeClicks    bool                `json:"safeClicks"`       // open comboboxes/tabs to record their options (never selects or submits)
+	LoginFile     string              `json:"loginFile"`        // steps whose values are ENV: tokens, same convention as the framework CSVs
 	LoginPath     string              `json:"loginPath"`
 	EnvFile       string              `json:"envFile"`        // the framework's .env; the pipeline reads it only to resolve ENV: tokens
 	Synonyms      map[string][]string `json:"synonyms"`       // extra word pairs for this app, e.g. {"order": ["remesa"]}

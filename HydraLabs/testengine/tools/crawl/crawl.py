@@ -242,7 +242,10 @@ def record_options(page, el, ev):
     """--safe-clicks: open a combobox/tab just to read its options, then close it. Never selects anything."""
     loc = el["locator"]
     try:
-        page.locator(loc).first.click(timeout=2000)
+        try:
+            page.locator(loc).first.click(timeout=2000)
+        except Exception:  # a generated id (":R5u…:") is not a CSS selector: open it by its accessible name instead
+            page.get_by_role("combobox", name=el["name"], exact=True).first.click(timeout=2000)
         page.wait_for_timeout(250)
         opts = [t.strip() for t in page.get_by_role("option").all_inner_texts() if t.strip()][:40]
         page.keyboard.press("Escape")
@@ -250,6 +253,101 @@ def record_options(page, el, ev):
     except Exception as e:  # a failed peek is information, not an error
         ev.emit("note", url=page.url, text=f"could not open {loc}: {type(e).__name__}")
         return []
+
+
+def annotate(els):
+    """Locator, stability and uniqueness for each element of a scan (a locator that matches several is not stable)."""
+    for el in els:
+        el["locator"], el["strategy"], el["stable"] = best_locator(el)
+    count = {}
+    for el in els:
+        count[el["locator"]] = count.get(el["locator"], 0) + 1
+    for el in els:  # a locator that matches several elements is not a locator (7 carousel dots share one testid)
+        el["unique"] = count[el["locator"]] == 1
+        el["stable"] = el["stable"] and el["unique"]
+    return els
+
+
+def state_of(els):
+    """The named fields, dropdowns and buttons of a scan, as (role, name) pairs with their enabled state."""
+    out = {}
+    for e in els:
+        if e.get("name") and e["role"] in ("textbox", "combobox", "button"):
+            out[(e["role"], e["name"])] = e.get("expanded")
+    return out
+
+
+def diff_scans(before, after):
+    """What an action changed on the form: fields that appeared, disappeared, or changed their state."""
+    adds = sorted(f"{r}:{n}" for (r, n) in after if (r, n) not in before)
+    removes = sorted(f"{r}:{n}" for (r, n) in before if (r, n) not in after)
+    changes = sorted(f"{r}:{n}" for (r, n) in after if (r, n) in before and before[(r, n)] != after[(r, n)])
+    return {"adds": adds, "removes": removes, "changes": changes}
+
+
+SEND_WORDS = re.compile(r"enviar|send|submit|procesar|process|pagar|pay|guardar|save|confirm", re.I)
+
+
+def open_control(page, el):
+    """Open a dropdown by its stored locator, else by its accessible name, else by its label. A dropdown's accessible
+    name is often the value it shows ("LV — Liverpool"), so the label is the last try."""
+    try:
+        page.locator(el["locator"]).first.click(timeout=2000)
+        return
+    except Exception:
+        pass
+    try:
+        page.get_by_role("combobox", name=el["name"], exact=True).first.click(timeout=2000)
+        return
+    except Exception:
+        pass
+    page.get_by_label(el["name"], exact=True).first.click(timeout=2000)
+
+
+def sweep_dropdown(page, control, scan, ev):
+    """Select each option of one dropdown, rescan the form, and record what that option changed. Only the dropdown and its
+    options are clicked: a button that sends or saves is never pressed (SEND_WORDS guards the options too)."""
+    loc = next((e for e in scan() if e["role"] == "combobox" and e["name"] == control), None)
+    if loc is None:
+        return None
+    baseline = state_of(scan())
+    opts = []
+    try:
+        open_control(page, loc)
+        page.wait_for_timeout(250)
+        opts = [t.strip() for t in page.get_by_role("option").all_inner_texts() if t.strip()][:60]
+        page.keyboard.press("Escape")
+    except Exception as e:
+        ev.emit("note", url=page.url, text=f"sweep: could not open {control}: {type(e).__name__}")
+        return None
+    result = {"control": control, "baseline": sorted(f"{r}:{n}" for (r, n) in baseline), "options": {}}
+    for opt in opts:
+        if SEND_WORDS.search(opt):
+            result["options"][opt] = {"skipped": "looks like a send or save, not a selection"}
+            continue
+        try:
+            open_control(page, loc)
+            page.get_by_role("option", name=opt, exact=True).first.click(timeout=2000)
+            page.wait_for_timeout(300)
+        except Exception as e:
+            result["options"][opt] = {"error": type(e).__name__}
+            continue
+        result["options"][opt] = diff_scans(baseline, state_of(scan()))
+    return result
+
+
+def try_sweep(page, specs, scan, ev):
+    """The sweep for this page's dropdown, if one was asked for and it is on screen now; otherwise None."""
+    for spec in specs:
+        path_spec, _, control = spec.partition("=")
+        if control and urlparse(page.url).path == path_spec and any(e["role"] == "combobox" and e["name"] == control for e in scan()):
+            return sweep_dropdown(page, control, scan, ev)
+    return None
+
+
+def should_peek(el):
+    """A dropdown is opened for its options unless it is known to be open already (aria-expanded true)."""
+    return el["role"] in ("combobox", "tab") and el.get("expanded") != "true" and el["stable"]
 
 
 STEP_NAV = re.compile(r'^Navigate to (/\S*?)\.?$')  # the renderer's own wording (tools/jira/render_pytest.py ACTIONS)
@@ -449,19 +547,38 @@ def crawl(a):
             settle()
         def map_here(settled, after=None, writes=None, observed=None):
             """Every element on screen now -> a page entry of the app map (after: the case step that revealed it)."""
-            els = page.evaluate(EXTRACT)
-            for el in els:
-                el["locator"], el["strategy"], el["stable"] = best_locator(el)
-            count = {}
-            for el in els:
-                count[el["locator"]] = count.get(el["locator"], 0) + 1
-            for el in els:  # a locator that matches several elements is not a locator (7 carousel dots share one testid)
-                el["unique"] = count[el["locator"]] == 1
-                el["stable"] = el["stable"] and el["unique"]
+            els = annotate(page.evaluate(EXTRACT))
+            sweep = None
             if a.safe_clicks:
+                # tabs (e.g. Adquiriente / Emisor) reveal their own dropdowns: select each one (a view switch, not a write),
+                # keep what appears under it, then select the tab that was selected at the start again
+                first = next((e for e in els if e["role"] == "tab" and e.get("selected") == "true"), None)
+                seen_keys = {(e["role"], e["name"]) for e in els}
+                for tab in [e for e in els if e["role"] == "tab" and e["stable"] and e.get("selected") != "true"]:
+                    try:
+                        page.get_by_role("tab", name=tab["name"], exact=True).first.click(timeout=2000)
+                        page.wait_for_timeout(300)
+                    except Exception as e:
+                        ev.emit("note", url=page.url, text=f"could not select tab {tab['name']}: {type(e).__name__}")
+                        continue
+                    under = annotate(page.evaluate(EXTRACT))
+                    if sweep is None:  # the sweep runs while the tab that holds its dropdown is selected
+                        sweep = try_sweep(page, a.sweep, lambda: annotate(page.evaluate(EXTRACT)), ev)
+                    for el in under:
+                        if (el["role"], el["name"]) not in seen_keys:
+                            seen_keys.add((el["role"], el["name"]))
+                            el["under_tab"] = tab["name"]
+                            els.append(el)
+                if first is not None:
+                    try:
+                        page.get_by_role("tab", name=first["name"], exact=True).first.click(timeout=2000)
+                    except Exception:
+                        pass
                 for el in els:
-                    if el["role"] in ("combobox", "tab") and el["expanded"] == "false" and el["stable"]:
+                    if should_peek(el):
                         el["options"] = record_options(page, el, ev)
+            if sweep is None:  # a dropdown that is on the first view (no tab to select)
+                sweep = try_sweep(page, a.sweep, lambda: annotate(page.evaluate(EXTRACT)), ev)
             sig = hashlib.sha1("|".join(sorted(f'{e["role"]}:{e["name"]}:{e["id"]}' for e in els)).encode()).hexdigest()[:10]
             shot = f"{len(pages):02d}.png"
             if a.slow:
@@ -484,7 +601,8 @@ def crawl(a):
                 el.pop("rect", None)  # positions are for the picture only; the map stays compact
             pages.append({"url": page.url, "title": page.title(), "hash": sig, "shot": shot, "settled": settled, "elements": els,
                           "headings": [h.strip() for h in page.locator("h1,h2,h3").all_inner_texts() if h.strip()][:10],
-                          **({"after": after} if after else {}), **({"writes": writes} if writes else {}), **({"observed": observed} if observed else {})})
+                          **({"after": after} if after else {}), **({"writes": writes} if writes else {}), **({"observed": observed} if observed else {}),
+                          **({"sweep": sweep} if sweep else {})})
             by = {}
             for el in els:
                 by[el["strategy"]] = by.get(el["strategy"], 0) + 1
@@ -549,6 +667,7 @@ if __name__ == "__main__":
     ap.add_argument("--paths", default="")
     ap.add_argument("--max-pages", type=int, default=25)
     ap.add_argument("--safe-clicks", action="store_true")
+    ap.add_argument("--sweep", action="append", default=[], help="PATH=Control: select each option of that dropdown and record what changes")
     ap.add_argument("--headed", action="store_true")
     ap.add_argument("--video", default="", metavar="DIR", help="record the crawl as a .webm video into DIR")
     ap.add_argument("--slow", type=int, default=0, metavar="MS", help="reveal elements one at a time, MS apart (for showing people)")

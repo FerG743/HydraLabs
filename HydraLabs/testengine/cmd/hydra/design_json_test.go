@@ -161,3 +161,132 @@ func TestInventedErrorIsRefused(t *testing.T) {
 		t.Fatalf("plain expectation refused: %v", got)
 	}
 }
+
+// The exploration's observed changes reach the prompt, and an expected state nobody observed is refused.
+func TestObservedStatesReachTheCheck(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "explore"), 0o755)
+	os.WriteFile(filepath.Join(dir, "explore", "Tarjetas.json"), []byte(`{"path":"/Tarjetas","candidates":[{"after_action":"select \"Selecciona la acción\" = DESBLOQUEO","control":"Procesar","field":"enabled","from":false,"to":true}]}`), 0o644)
+	o := observedStates(dir, "/Tarjetas")
+	if len(o) != 1 || !strings.Contains(o.prompt(), "Procesar") {
+		t.Fatalf("observed: %v", o)
+	}
+	if got := o.unobserved(`"Procesar" is disabled before the account is added and enabled after.`); len(got) != 0 {
+		t.Fatalf("observed change refused: %v", got)
+	}
+	if got := o.unobserved(`"Agregar" is disabled before the account is added and enabled after.`); len(got) != 1 {
+		t.Fatalf("unobserved change accepted: %v", got)
+	}
+	if got := observedStates(dir, "/Otra").unobserved(`"Agregar" is disabled before x and enabled after.`); len(got) != 0 {
+		t.Fatalf("with nothing observed the check must not refuse: %v", got)
+	}
+}
+
+// An observed enable change becomes an expectation only in a draft whose steps cause it, in the renderer's form.
+func TestObservedChangeBecomesAnExpectationForTheDraftThatCausesIt(t *testing.T) {
+	o := observedPage{{AfterAction: `select "Selecciona la acción" = DESBLOQUEO`, Control: "Procesar", Field: "enabled", From: false, To: true}}
+	got := o.expectationsFor([]string{"Navigate to `/Tarjetas`.", "Select Selecciona la acción `DESBLOQUEO`.", `Click "Agregar".`}, map[string]string{"procesar": "button"})
+	if len(got) != 1 || !strings.HasPrefix(got[0], `"Procesar" is disabled before`) || !strings.HasSuffix(got[0], "enabled after.") {
+		t.Fatalf("expectation: %v", got)
+	}
+	if n := len(o.expectationsFor([]string{"Navigate to `/Tarjetas`."}, map[string]string{"procesar": "button"})); n != 0 {
+		t.Fatalf("a draft that does not take the action got an expectation: %d", n)
+	}
+	if !strings.Contains(got[0], "before") {
+		t.Fatal("renderer needs the before/after form")
+	}
+}
+
+// The page path from the requirement is lowercase; the exploration file keeps the app's own casing.
+func TestObservedStatesMatchThePageIgnoringCase(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "explore"), 0o755)
+	os.WriteFile(filepath.Join(dir, "explore", "Tarjetas.json"), []byte(`{"path":"/Tarjetas","candidates":[{"after_action":"click \"Agregar\"","control":"Procesar","field":"enabled","from":false,"to":true}]}`), 0o644)
+	if got := observedStates(dir, "/tarjetas"); len(got) != 1 {
+		t.Fatalf("lowercase page path found nothing: %v", got)
+	}
+}
+
+// Only buttons get generated state expectations: the renderer checks a button's state, not a text field's.
+func TestOnlyButtonsGetGeneratedStateExpectations(t *testing.T) {
+	o := observedPage{{AfterAction: `click "Agregar"`, Control: "Ingresa la cuenta", Field: "enabled", From: true, To: false}}
+	if n := len(o.expectationsFor([]string{`Click "Agregar".`}, map[string]string{"ingresa la cuenta": "textbox"})); n != 0 {
+		t.Fatalf("a text field got a state expectation: %d", n)
+	}
+}
+
+// A navigate step without its slash is the app's page; a state expectation with no between text is refused.
+func TestNavigateAndEmptyBetweenAreFixedOrRefused(t *testing.T) {
+	if m := navigateName.FindStringSubmatch("Navigate to Tarjetas."); m == nil || m[1] != "Tarjetas" {
+		t.Fatalf("navigate not read: %v", m)
+	}
+	if !emptyBefore.MatchString(`"Procesar" is disabled before  and enabled after.`) {
+		t.Fatal("empty between not caught")
+	}
+	if !emptyBefore.MatchString(`"Procesar" is disabled before after click Agregar and enabled after.`) {
+		t.Fatal("empty between with 'after' not caught")
+	}
+	if emptyBefore.MatchString(`"Procesar" is disabled before select "X" = Y and enabled after.`) {
+		t.Fatal("a real between was refused")
+	}
+}
+
+// The needs list names the .env values, the dropdown options and the table title a requirement depends on.
+func TestNeedsListNamesWhatTheTesterMustSupply(t *testing.T) {
+	cr := &Crawl{Pages: []struct {
+		URL      string
+		Elements []CrawlElement
+	}{{URL: "http://x/cobro_ordenes", Elements: []CrawlElement{
+		{Role: "combobox", Name: "Ingresa la tienda", Options: []string{"LIVR", "SBB"}},
+	}}}}
+	req := "Page: /cobro_ordenes\nEscoger la orden [ORDER_NUMBER] en la tienda Ingresa la tienda y cobrarla.\nRevisar que la orden aparezca en la tabla \"Un vistazo a tus ordenes\"."
+	needs := computeNeeds(req, map[string]bool{"ORDER_NUMBER": true}, cr)
+	var values, options, tables int
+	for _, n := range needs {
+		switch n.Kind {
+		case "value":
+			values++
+			if n.Name == "ORDER_NUMBER" && n.Status != "defined in .env" {
+				t.Fatalf("defined value reported as %q", n.Status)
+			}
+		case "options":
+			options++
+			if len(n.Values) != 2 {
+				t.Fatalf("options: %v", n.Values)
+			}
+		case "table":
+			tables++
+		}
+	}
+	if values != 1 || options != 1 || tables != 1 {
+		t.Fatalf("needs: %+v", needs)
+	}
+	if got := computeNeeds("Escoger la orden [STORE_X].", map[string]bool{}, nil); len(got) != 1 || got[0].Status != "missing from .env" {
+		t.Fatalf("missing value not reported: %+v", got)
+	}
+}
+
+// The suggestion file: names from the fields, the page's first option for a dropdown, the crawl's placeholder as a
+// suggestion for a text box, and nothing for a value that is already set in .env.
+func TestSuggestionSuggestsWithoutOverwriting(t *testing.T) {
+	cr := &Crawl{Pages: []struct {
+		URL      string
+		Elements []CrawlElement
+	}{{URL: "http://x/cobro_ordenes", Elements: []CrawlElement{
+		{Role: "textbox", Name: "Ingresa el número de orden", Placeholder: "123456"},
+		{Role: "combobox", Name: "Ingresa la tienda", Options: []string{"LIVR", "SBB"}},
+	}}}}
+	needs := computeNeeds("Page: /cobro_ordenes\nEscoger una orden y cobrarla en la tienda Ingresa la tienda.", map[string]bool{}, cr)
+	out := buildSuggestion(needs, cr, "PortalQAdev", map[string]bool{"TIENDA": true})
+	for _, want := range []string{"NUMERO_DE_ORDEN=123456", "/cobro_ordenes"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "TIENDA=") {
+		t.Fatal("a value already set in .env was suggested again")
+	}
+	if got := envName("Ingresa la cuenta"); got != "CUENTA" {
+		t.Fatalf("envName: %q", got)
+	}
+}

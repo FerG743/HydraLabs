@@ -44,7 +44,77 @@ type Design struct {
 	Model  string        `json:"model"`
 	Tokens int           `json:"tokens"`
 	Dir    string        `json:"dir"`
+	Needs  []Need        `json:"needs,omitempty"` // what the tester must supply, so nobody has to guess it
 	Drafts []DraftResult `json:"drafts"`
+}
+
+// Need is one input the requirement depends on: a value from .env, a dropdown's options, or a table's exact title.
+type Need struct {
+	Kind   string   `json:"kind"`   // "value" | "options" | "table"
+	Name   string   `json:"name"`   // the .env name, the dropdown's name, or what the requirement calls the table
+	Status string   `json:"status"` // "defined in .env" | "missing from .env" | "" (options and table)
+	Hint   string   `json:"hint,omitempty"`
+	Values []string `json:"values,omitempty"` // a dropdown's options on the page
+}
+
+var tableWord = regexp.MustCompile(`(?i)\b(tabla|table)\b\s*(?:de\s+\w+\s*)?(?:"([^"]+)")?`)
+
+// computeNeeds: the inputs a requirement names, checked against .env and the crawl. Nothing is guessed.
+func computeNeeds(requirement string, envKeys map[string]bool, cr *Crawl) []Need {
+	var out []Need
+	seen := map[string]bool{}
+	for _, m := range bracketName.FindAllStringSubmatch(requirement, -1) {
+		if seen[m[1]] {
+			continue
+		}
+		seen[m[1]] = true
+		st := "missing from .env"
+		if envKeys[m[1]] {
+			st = "defined in .env"
+		}
+		out = append(out, Need{Kind: "value", Name: m[1], Status: st, Hint: "set " + m[1] + " in the project's .env"})
+	}
+	low := strings.ToLower(requirement)
+	for _, p := range pagesNamed(cr, low) { // the page's own controls the test must fill: dropdown options, text boxes
+		for _, e := range p.Elements {
+			switch {
+			case e.Role == "combobox" && e.Name != "" && len(e.Options) > 0:
+				out = append(out, Need{Kind: "options", Name: e.Name, Values: e.Options, Hint: "pick one of the page's options"})
+			case e.Role == "textbox" && e.Name != "" && !strings.Contains(low, strings.ToLower(e.Name)):
+				out = append(out, Need{Kind: "value", Name: e.Name, Status: "not given", Hint: "the requirement gives no value for \"" + e.Name + "\": name it as [NAME] and set NAME in .env"})
+			}
+		}
+	}
+	for _, e := range crawlOptions(cr) {
+		if strings.Contains(low, strings.ToLower(e.Name)) && !seenOptions(out, e.Name) {
+			out = append(out, Need{Kind: "options", Name: e.Name, Values: e.Options, Hint: "pick one of the page's options"})
+		}
+	}
+	if m := tableWord.FindStringSubmatch(requirement); m != nil {
+		out = append(out, Need{Kind: "table", Name: strings.TrimSpace(m[2]), Hint: "give the table's exact title as the page shows it"})
+	}
+	return out
+}
+
+type crawlSelect struct {
+	Name    string
+	Options []string
+}
+
+// crawlOptions: the dropdowns on the crawled pages that have options.
+func crawlOptions(cr *Crawl) []crawlSelect {
+	var out []crawlSelect
+	if cr == nil {
+		return nil
+	}
+	for _, p := range cr.Pages {
+		for _, e := range p.Elements {
+			if e.Role == "combobox" && e.Name != "" && len(e.Options) > 0 {
+				out = append(out, crawlSelect{Name: e.Name, Options: e.Options})
+			}
+		}
+	}
+	return out
 }
 
 const designRules = `You write manual test cases for a web app from a requirement.
@@ -273,6 +343,12 @@ func (c Config) Design(requirement, source string, max int) (Design, error) {
 			existing = b.String()
 		}
 	}
+	observed := observedStates(c.Out, start)
+	d.Needs = computeNeeds(requirement, readEnvKeys(filepath.Join(c.Home, ".env")), cr)
+	if c.NoStates {
+		observed = nil
+	}
+	existing += observed.prompt()
 	plan, ptokens := "", 0
 	if !c.PlainDrafts {
 		if plan, ptokens, err = c.askPlan(requirement, c.accessNote(), vocab, existing, max); err != nil {
@@ -285,6 +361,9 @@ func (c Config) Design(requirement, source string, max int) (Design, error) {
 	d.Tokens += tokens
 	if err != nil {
 		return d, err
+	}
+	for i := range drafts { // the states the exploration observed, for the actions this draft takes
+		drafts[i].Expected = append(drafts[i].Expected, observed.expectationsFor(drafts[i].Steps, roles)...)
 	}
 	for i := range drafts { // the app's default starting state, unless the case asked for another
 		if drafts[i].Precondition == "" {
@@ -300,6 +379,11 @@ func (c Config) Design(requirement, source string, max int) (Design, error) {
 	low := strings.ToLower(requirement)
 	seen := map[string]string{} // steps + expected -> the first draft that had them
 	for i, dr := range drafts {
+		for j, st := range dr.Steps { // "Navigate to Tarjetas" is the page /Tarjetas when the app has that page
+			if m := navigateName.FindStringSubmatch(st); m != nil && !strings.HasPrefix(m[1], "/") && known["/"+strings.ToLower(m[1])] {
+				dr.Steps[j] = "Navigate to `/" + m[1] + "`."
+			}
+		}
 		if start != "" && (len(dr.Steps) == 0 || !strings.HasPrefix(dr.Steps[0], "Navigate to ")) {
 			dr.Steps = append([]string{"Navigate to `" + start + "`."}, dr.Steps...) // where the requirement says it happens
 		}
@@ -328,6 +412,10 @@ func (c Config) Design(requirement, source string, max int) (Design, error) {
 		}
 		for _, ex := range dr.Expected {
 			res.Problems = append(res.Problems, unrequested(ex, low)...)
+			res.Problems = append(res.Problems, observed.unobserved(ex)...)
+			if emptyBefore.MatchString(ex) {
+				res.Problems = append(res.Problems, fmt.Sprintf("%q: nothing says what happens in between: write the step that changes the state", ex))
+			}
 		}
 		for _, s := range cs.Steps {
 			for _, m := range backticked.FindAllStringSubmatch(s.Action, -1) {
@@ -433,6 +521,16 @@ func requirementText(from, story string) (string, string, error) {
 }
 
 func printDesign(d Design) {
+	for _, n := range d.Needs {
+		switch n.Kind {
+		case "value":
+			fmt.Printf("NEEDS  [%s] %s: %s\n", n.Name, n.Status, n.Hint)
+		case "options":
+			fmt.Printf("NEEDS  %s options: %s\n", n.Name, strings.Join(n.Values, ", "))
+		default:
+			fmt.Printf("NEEDS  table title: %q (%s)\n", n.Name, n.Hint)
+		}
+	}
 	for _, r := range d.Drafts {
 		mark := "ok      "
 		if !r.OK {
@@ -699,4 +797,144 @@ func unrequested(expected, lowRequirement string) []string {
 		return []string{fmt.Sprintf("%q: the requirement does not describe an error, so this expected result is invented", expected)}
 	}
 	return nil
+}
+
+// observedChange is one state change the exploration saw on a page (out/explore/*.json, from explore.py).
+type observedChange struct {
+	AfterAction string `json:"after_action"`
+	Control     string `json:"control"`
+	Field       string `json:"field"`
+	From        bool   `json:"from"`
+	To          bool   `json:"to"`
+}
+
+type observedPage []observedChange
+
+// observedStates: every exploration result for this page path, from the project's out/explore folder.
+func observedStates(out, path string) observedPage {
+	if path == "" {
+		return nil
+	}
+	var all observedPage
+	files, _ := filepath.Glob(filepath.Join(out, "explore", "*.json"))
+	for _, f := range files {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		var r struct {
+			Path       string           `json:"path"`
+			Candidates []observedChange `json:"candidates"`
+		}
+		if json.Unmarshal(b, &r) == nil && strings.EqualFold(r.Path, path) { // pageNamed gives the lowercase path
+			all = append(all, r.Candidates...)
+		}
+	}
+	return all
+}
+
+// prompt: the observed changes as the only states the drafting may use for expected results.
+func (o observedPage) prompt() string {
+	if len(o) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("States the app was observed to show on this page (use only these for enabled, disabled or visible expected results):\n")
+	for _, c := range o {
+		fmt.Fprintf(&b, "- after %s: %q %s %v -> %v\n", c.AfterAction, c.Control, c.Field, c.From, c.To)
+	}
+	return b.String()
+}
+
+var stateBeforeAfter = regexp.MustCompile(`^"(.+?)" is (enabled|disabled) before .+? and (enabled|disabled) after\.?$`)
+
+// unobserved: an expected "X is enabled|disabled before ... and ... after" must match a change the exploration saw.
+// When nothing was observed for the page, there is nothing to check against, so nothing is refused.
+func (o observedPage) unobserved(expected string) []string {
+	m := stateBeforeAfter.FindStringSubmatch(expected)
+	if m == nil || len(o) == 0 {
+		return nil
+	}
+	want := m[3] == "enabled"
+	for _, c := range o {
+		if c.Control == m[1] && c.Field == "enabled" && c.To == want {
+			return nil
+		}
+	}
+	return []string{fmt.Sprintf("%q: the exploration never saw %q become %s", expected, m[1], m[3])}
+}
+
+// expectationsFor: an observed enable change that this draft's own steps cause becomes a state expectation, written in the
+// form the renderer asserts. Code writes these; the model never does.
+func (o observedPage) expectationsFor(steps []string, roles map[string]string) []string {
+	var out []string
+	joined := strings.ToLower(strings.Join(steps, "\n"))
+	for _, c := range o {
+		if c.Field != "enabled" || c.From == c.To || roles[plainKey(c.Control)] != "button" {
+			continue // the renderer checks the state of buttons only
+		}
+		key := actionKey(c.AfterAction)
+		if key == "" || !strings.Contains(joined, strings.ToLower(key)) {
+			continue
+		}
+		out = append(out, fmt.Sprintf(`"%s" is %s before %s and %s after.`, c.Control, stateWord(c.From), c.AfterAction, stateWord(c.To)))
+	}
+	return out
+}
+
+func stateWord(enabled bool) string {
+	if enabled {
+		return "enabled"
+	}
+	return "disabled"
+}
+
+// actionKey: the value a step picks ("DESBLOQUEO" from select "..." = DESBLOQUEO), or the button a step clicks ("Agregar").
+var clickedName = regexp.MustCompile(`^click "(.+?)"$`)
+
+func actionKey(action string) string {
+	if i := strings.LastIndex(action, "="); i >= 0 {
+		return strings.TrimSpace(action[i+1:])
+	}
+	if m := clickedName.FindStringSubmatch(action); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+var navigateName = regexp.MustCompile("^Navigate to `?([^`.]+?)`?\\.$")
+
+// emptyBefore: a state expectation with nothing between "before" and "and" (the between text is required).
+var emptyBefore = regexp.MustCompile(`is (enabled|disabled) before\s+(and|after)\b`)
+
+// pagesNamed: the crawled pages whose path the requirement mentions.
+func pagesNamed(cr *Crawl, lowRequirement string) []struct {
+	URL      string
+	Elements []CrawlElement
+} {
+	var out []struct {
+		URL      string
+		Elements []CrawlElement
+	}
+	if cr == nil {
+		return nil
+	}
+	seen := map[string]bool{} // the crawl can list one page twice
+	for _, p := range cr.Pages {
+		u, _ := url.Parse(p.URL)
+		if u != nil && u.Path != "/" && !seen[u.Path] && strings.Contains(lowRequirement, strings.ToLower(u.Path)) {
+			seen[u.Path] = true
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func seenOptions(needs []Need, name string) bool {
+	for _, n := range needs {
+		if n.Kind == "options" && n.Name == name {
+			return true
+		}
+	}
+	return false
 }

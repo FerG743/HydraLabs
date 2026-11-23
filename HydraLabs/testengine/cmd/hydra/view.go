@@ -66,6 +66,9 @@ func (c Config) crawlArgs(events, out string, headed bool) []string {
 	if c.SafeClicks {
 		args = append(args, "--safe-clicks")
 	}
+	for _, sw := range c.Sweeps {
+		args = append(args, "--sweep", sw)
+	}
 	if headed {
 		args = append(args, "--headed")
 	}
